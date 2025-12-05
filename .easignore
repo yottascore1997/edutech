@@ -1,0 +1,48 @@
+# Node modules
+node_modules
+npm-debug.*
+yarn-error.log
+*.log
+
+# Git
+.git
+.gitignore
+
+# Expo
+.expo
+.expo-shared
+
+# Build outputs
+dist
+build
+android/.gradle
+android/build
+android/app/build
+ios/build
+web-build
+
+# Coverage and tests
+coverage
+__tests__
+.jest
+
+# Environment
+.env
+.env.*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Misc
+*.log
+*.tmp
+*.cache
+
