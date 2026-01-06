@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    Image,
     SafeAreaView,
     ScrollView,
     StatusBar,
@@ -45,6 +46,7 @@ interface PracticeExam {
   attempted: boolean;
   score?: number;
   attemptedAt?: string;
+  logoUrl?: string;
 }
 
 interface WeeklyProgress {
@@ -156,6 +158,12 @@ export default function PracticeCategoriesScreen() {
         }
         
         // Store all exams data
+        console.log('Practice exams loaded:', response.data.length, 'exams');
+        const examsWithLogo = response.data.filter((exam: any) => exam.logoUrl);
+        console.log('Exams with logoUrl:', examsWithLogo.length);
+        if (examsWithLogo.length > 0) {
+          console.log('Sample exam logoUrl:', examsWithLogo[0].logoUrl);
+        }
         setExams(response.data);
       }
     } catch (error) {
@@ -259,6 +267,18 @@ export default function PracticeCategoriesScreen() {
     setSelectedCategory(categoryId);
   };
 
+  // Helper function to get full image URL
+  const getImageUrl = (logoUrl: string | undefined) => {
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith('http')) return logoUrl;
+    try {
+      return getImageUrlFromApi(logoUrl);
+    } catch (error) {
+      console.error('Error getting image URL:', error);
+      return null;
+    }
+  };
+
   const handleExamPress = (exam: PracticeExam) => {
     // Navigate to practice exam page with exam info
     router.push(`/(tabs)/practice-exam/${exam.id}`);
@@ -356,7 +376,7 @@ export default function PracticeCategoriesScreen() {
         <View style={styles.sectionHeaderPremium}>
           <View style={styles.sectionTitleContainer}>
             <View style={styles.sectionIconBadge}>
-              <Ionicons name="analytics" size={18} color="#6366F1" />
+              <Ionicons name="analytics" size={14} color="#6366F1" />
             </View>
             <Text style={styles.sectionTitlePremium}>Analysis</Text>
           </View>
@@ -370,14 +390,6 @@ export default function PracticeCategoriesScreen() {
               colors={['#FFFFFF', '#F0F9FF']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#06B6D4', '#0891B2']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="library" size={24} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
               <Text style={styles.metricLabel}>Total Exams</Text>
               <Text style={styles.metricValueLarge}>{totalExams}</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#06B6D4' }]} />
@@ -390,14 +402,6 @@ export default function PracticeCategoriesScreen() {
               colors={['#FFFFFF', '#F0FDF4']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
               <Text style={styles.metricLabel}>Completed</Text>
               <Text style={styles.metricValueLarge}>{completedExams}</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#10B981' }]} />
@@ -413,14 +417,6 @@ export default function PracticeCategoriesScreen() {
               colors={['#FFFFFF', '#FEFBFF']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#7C3AED', '#8B5CF6']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="stats-chart" size={24} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
               <Text style={styles.metricLabel}>Completion</Text>
               <Text style={styles.metricValueLarge}>{completionPercentage}%</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#7C3AED' }]} />
@@ -433,52 +429,10 @@ export default function PracticeCategoriesScreen() {
               colors={['#FFFFFF', '#FFFAF5']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#F59E0B', '#FB923C']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="trophy" size={24} color="#FFFFFF" />
-                </LinearGradient>
-              </View>
               <Text style={styles.metricLabel}>Average Score</Text>
               <Text style={styles.metricValueLarge}>{avgScore}%</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#F59E0B' }]} />
             </LinearGradient>
-          </View>
-        </View>
-
-        {/* Weekly Activity Graph */}
-        <View style={styles.weeklyGraphCard}>
-          <Text style={styles.weeklyGraphTitle}>This Week's Activity</Text>
-          <View style={styles.graphContainer}>
-            {weeklyData.map((day, index) => {
-              const barHeight = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
-              const isToday = index === 6;
-              
-              return (
-                <View key={day.day} style={styles.barContainer}>
-                  <View style={styles.barWrapper}>
-                    <View style={[styles.barBackground, { height: 100 }]}>
-                      <LinearGradient
-                        colors={isToday ? ['#4F46E5', '#7C3AED'] : ['#E0E7FF', '#C7D2FE']}
-                        style={[styles.barFill, { height: `${barHeight}%` }]}
-                      >
-                        {day.count > 0 && (
-                          <Text style={[styles.barCount, isToday && styles.barCountActive]}>
-                            {day.count}
-                          </Text>
-                        )}
-                      </LinearGradient>
-                    </View>
-                  </View>
-                  <Text style={[styles.dayLabel, isToday && styles.dayLabelActive]}>
-                    {day.day}
-                  </Text>
-                  {isToday && <View style={styles.todayIndicator} />}
-                </View>
-              );
-            })}
           </View>
         </View>
       </View>
@@ -498,38 +452,6 @@ export default function PracticeCategoriesScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
       
-      {/* Premium Header */}
-      <LinearGradient
-        colors={['#7C3AED', '#8B5CF6']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          
-          <Text style={styles.headerTitle}>Practice Exams</Text>
-          
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
-              <Ionicons name="search" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
-              <Ionicons name="cart" size={24} color="#FFFFFF" />
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>1</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
-
       {/* Main Content */}
       <View style={styles.mainContent}>
         {/* Left Sidebar */}
@@ -626,7 +548,18 @@ export default function PracticeCategoriesScreen() {
                           >
                             <View style={styles.examCardContentHorizontal}>
                               <View style={[styles.examIconContainerHorizontal, { backgroundColor: category?.color || '#7C3AED' }]}>
-                                <Ionicons name={category?.icon as any || 'library'} size={24} color="#FFFFFF" />
+                                {exam.logoUrl && getImageUrl(exam.logoUrl) ? (
+                                  <Image 
+                                    source={{ uri: getImageUrl(exam.logoUrl) || '' }} 
+                                    style={styles.examLogoHorizontal}
+                                    resizeMode="cover"
+                                    onError={(error) => {
+                                      console.error('Image load error for exam:', exam.title, 'URL:', getImageUrl(exam.logoUrl));
+                                    }}
+                                  />
+                                ) : (
+                                  <Ionicons name={category?.icon as any || 'library'} size={24} color="#FFFFFF" />
+                                )}
                               </View>
                               <View style={styles.examTitleContainerHorizontal}>
                                 <Text style={styles.examTitleHorizontal} numberOfLines={2}>
@@ -933,6 +866,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  examLogoHorizontal: {
+    width: '100%',
+    height: '100%',
   },
   examTitleContainerHorizontal: {
     width: '100%',
@@ -1180,81 +1118,84 @@ const styles = StyleSheet.create({
   
   // Analysis Section Styles
   analysisSection: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionHeaderPremium: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   sectionIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionTitlePremium: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
     letterSpacing: -0.5,
   },
   scoreStreakRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 10,
   },
   premiumMetricCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   metricCardGradient: {
-    padding: 20,
-    borderRadius: 20,
-    minHeight: 140,
+    padding: 12,
+    borderRadius: 14,
+    minHeight: 85,
+    justifyContent: 'center',
   },
   metricIconWrapper: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   metricIconGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   metricLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '700',
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
   metricValueLarge: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -1,
+    textAlign: 'center',
   },
   metricCardBorder: {
     position: 'absolute',

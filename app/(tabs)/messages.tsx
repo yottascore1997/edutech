@@ -133,7 +133,7 @@ export default function MessagesScreen() {
     
     if (user?.token) {
 
-      const newSocket = io('http://192.168.1.3:3001', {
+      const newSocket = io('http://192.168.1.5:3001', {
         auth: {
           token: user.token
         },

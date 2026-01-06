@@ -39,6 +39,12 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
     };
 
+    const navigateToExamNotifications = () => {
+        setActiveMenu('exam-notifications');
+        navigation.navigate('exam-notifications');
+        navigation.closeDrawer();
+    };
+
     const navigateToPracticeExam = () => {
         setActiveMenu('practice-exam');
         navigation.navigate('(tabs)', { screen: 'practice-categories' });
@@ -104,6 +110,12 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
     };
 
+    const navigateToFollowRequests = () => {
+        setActiveMenu('follow-requests');
+        navigation.navigate('(tabs)', { screen: 'follow-requests' });
+        navigation.closeDrawer();
+    };
+
 
     return (
         <View style={[styles.container, isDarkMode && styles.darkContainer]}>
@@ -142,6 +154,15 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'my-exams'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#2ED573"
+                            />
+                            
+                            <MenuItem 
+                                icon="notifications-outline" 
+                                label="Exam Notifications" 
+                                onPress={navigateToExamNotifications}
+                                isActive={activeMenu === 'exam-notifications'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#FF6B6B"
                             />
                             
                             <MenuItem 
@@ -189,14 +210,17 @@ const CustomDrawerContent = (props: any) => {
                                 iconColor="#FF4757"
                             />
                             
-                            <MenuItem 
-                                icon="chatbubbles-outline" 
-                                label="Messages" 
-                                onPress={navigateToMessages}
-                                isActive={activeMenu === 'messages'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#667eea"
-                            />
+                            {/* Messages - Temporarily hidden */}
+                            {false && (
+                                <MenuItem 
+                                    icon="chatbubbles-outline" 
+                                    label="Messages" 
+                                    onPress={navigateToMessages}
+                                    isActive={activeMenu === 'messages'}
+                                    isDarkMode={isDarkMode}
+                                    iconColor="#667eea"
+                                />
+                            )}
                             
                             <MenuItem 
                                 icon="stats-chart-outline" 

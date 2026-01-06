@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -47,6 +47,95 @@ interface WeeklyLeaderboardData {
   leaderboard: ExamLeaderboard[];
 }
 
+// Enhanced Avatar Component with proper image loading
+const WinnerAvatar = ({ userPhoto, userName }: { userPhoto: string | null; userName: string }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  // Check if userPhoto is valid
+  const isValidPhoto = userPhoto && userPhoto.trim() !== '' && userPhoto !== 'null';
+
+  // Get image URL
+  const getImageUri = () => {
+    if (!isValidPhoto) return null;
+    // If already a full URL, return as is
+    if (userPhoto.startsWith('http://') || userPhoto.startsWith('https://')) {
+      return userPhoto;
+    }
+    // Otherwise use getImageUrl
+    return getImageUrl(userPhoto);
+  };
+
+  const imageUri = getImageUri();
+
+  if (!imageUri || imageError) {
+    return (
+      <View style={styles.avatarPlaceholder}>
+        <LinearGradient
+          colors={['#6366F1', '#8B5CF6', '#A855F7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarGradient}
+        >
+          <Text style={styles.avatarInitials}>{getInitials(userName)}</Text>
+        </LinearGradient>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.avatarContainer}>
+      {imageLoading && (
+        <View style={styles.avatarLoadingContainer}>
+          <ActivityIndicator size="small" color="#6366F1" />
+        </View>
+      )}
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.winnerImage}
+        onLoadStart={() => setImageLoading(true)}
+        onLoadEnd={() => {
+          setImageLoading(false);
+          setImageError(false);
+        }}
+        onError={(error) => {
+          console.log('Image load error:', error.nativeEvent.error);
+          setImageError(true);
+          setImageLoading(false);
+        }}
+        resizeMode="cover"
+        defaultSource={require('../../assets/images/avatar1.jpg')}
+      />
+    </View>
+  );
+};
+
+// Helper function to get current week in format YYYY-WW (ISO week)
+const getCurrentWeek = (): string => {
+  const now = new Date();
+  
+  // ISO week calculation
+  const dayOfWeek = now.getDay() || 7; // Make Sunday 7 instead of 0
+  now.setDate(now.getDate() + 4 - dayOfWeek); // Get Thursday of current week
+  
+  const year = now.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const days = Math.floor((now.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
+  const weekNumber = Math.ceil((days + 1) / 7);
+  
+  // Format as YYYY-WW (e.g., 2025-49)
+  return `${year}-${weekNumber.toString().padStart(2, '0')}`;
+};
+
 export default function WeeklyLeaderboardScreen() {
   const { user } = useAuth();
   const [leaderboardData, setLeaderboardData] = useState<WeeklyLeaderboardData | null>(null);
@@ -54,11 +143,17 @@ export default function WeeklyLeaderboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [podiumAnimation] = useState(new Animated.Value(0));
 
-  const fetchLeaderboardData = async () => {
+  const fetchLeaderboardData = async (week?: string) => {
     try {
       if (!user?.token) return;
       
-      const response = await apiFetchAuth('/student/weekly-leaderboard', user.token);
+      // Always use current week if not specified
+      const weekToUse = week || getCurrentWeek();
+      
+      // Build URL with week parameter (always include current week)
+      const url = `/student/weekly-leaderboard?week=${weekToUse}`;
+      
+      const response = await apiFetchAuth(url, user.token);
       
       if (response.ok) {
         setLeaderboardData(response.data);
@@ -103,6 +198,12 @@ export default function WeeklyLeaderboardScreen() {
       style: 'currency',
       currency: 'INR',
       maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -306,14 +407,11 @@ export default function WeeklyLeaderboardScreen() {
                       winner.rank === 5 && styles.fifthPlaceRankText,
                     ]}>Rank #{winner.rank}</Text>
                     <View style={styles.winnerAvatar}>
-                      {winner.userPhoto ? (
-                        <Image source={{ uri: winner.userPhoto }} style={styles.winnerImage} />
-                      ) : (
-                        <Ionicons name="person-circle" size={60} color="#E5E7EB" />
-                      )}
+                      <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} />
                     </View>
                     <Text style={styles.winnerName}>{winner.userName}</Text>
-                    <Text style={styles.winnerPrize}>Won ₹{formatPrizeAmount(winner.winnings)}</Text>
+                    <Text style={styles.winnerScore}>Score: {winner.score}</Text>
+                    <Text style={styles.winnerPrize}>Won {formatPrizeAmount(winner.winnings)}</Text>
                   </View>
                 ))}
               </ScrollView>
@@ -386,14 +484,11 @@ export default function WeeklyLeaderboardScreen() {
                           winner.rank === 5 && styles.fifthPlaceRankText,
                         ]}>Rank #{winner.rank}</Text>
                         <View style={styles.winnerAvatar}>
-                          {winner.userPhoto ? (
-                            <Image source={{ uri: winner.userPhoto }} style={styles.winnerImage} />
-                          ) : (
-                            <Ionicons name="person-circle" size={60} color="#E5E7EB" />
-                          )}
+                          <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} />
                         </View>
                         <Text style={styles.winnerName}>{winner.userName}</Text>
-                        <Text style={styles.winnerPrize}>Won ₹{formatPrizeAmount(winner.winnings)}</Text>
+                        <Text style={styles.winnerScore}>Score: {winner.score}</Text>
+                        <Text style={styles.winnerPrize}>Won {formatPrizeAmount(winner.winnings)}</Text>
                       </View>
                     ))}
                   </ScrollView>
@@ -441,16 +536,18 @@ const styles = StyleSheet.create({
   },
   // Mega Exam Section Styles
   megaExamSection: {
-    padding: 20,
+    padding: 24,
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    marginTop: 12,
+    borderRadius: 24,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -486,16 +583,16 @@ const styles = StyleSheet.create({
   // Exam Card Styles
   examCard: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   examCardTop: {
     flexDirection: 'row',
@@ -678,17 +775,17 @@ const styles = StyleSheet.create({
   },
   winnerCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginRight: 16,
-    width: 150,
+    width: 170,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1.5,
     borderColor: '#F1F5F9',
   },
   rankText: {
@@ -702,37 +799,98 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   winnerAvatar: {
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 16,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   winnerImage: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 3,
     borderColor: '#FFFFFF',
+    backgroundColor: '#F3F4F6',
+  },
+  avatarContainer: {
+    position: 'relative',
+    width: 72,
+    height: 72,
+  },
+  avatarLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 36,
+    zIndex: 1,
+  },
+  avatarPlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  avatarGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitials: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   winnerName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1E293B',
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
     letterSpacing: 0.2,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
+  },
+  winnerScore: {
+    fontSize: 12,
+    color: '#6366F1',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 6,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   winnerPrize: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#059669',
     fontWeight: '700',
     textAlign: 'center',
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
   },
   // Rank-specific Card Backgrounds
   firstPlaceCard: {
@@ -831,16 +989,16 @@ const styles = StyleSheet.create({
   weekInfoCard: {
     marginHorizontal: 16,
     marginTop: 16,
-    marginBottom: 20,
-    borderRadius: 20,
+    marginBottom: 24,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 15,
-    borderWidth: 2,
-    borderColor: 'rgba(99, 102, 241, 0.3)',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 20,
+    borderWidth: 2.5,
+    borderColor: 'rgba(99, 102, 241, 0.4)',
   },
   weekInfoGradient: {
     padding: 20,
@@ -1145,15 +1303,15 @@ const styles = StyleSheet.create({
   leaderboardCard: {
     marginHorizontal: 16,
     marginBottom: 24,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.1)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(139, 92, 246, 0.15)',
   },
   leaderboardGradient: {
     padding: 0,

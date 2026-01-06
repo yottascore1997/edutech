@@ -45,7 +45,7 @@ adb reverse tcp:8081 tcp:8081
    npx expo start --lan --clear
    ```
 
-3. Ab network IP dikhna chahiye (jaise `192.168.1.7:8081`)
+3. Ab network IP dikhna chahiye (jaise `192.168.1.3:8081`)
 
 ---
 
@@ -58,7 +58,7 @@ adb reverse tcp:8081 tcp:8081
 Ya manually:
 
 ```powershell
-$env:REACT_NATIVE_PACKAGER_HOSTNAME = "192.168.1.7"
+$env:REACT_NATIVE_PACKAGER_HOSTNAME = "192.168.1.3"
 npx expo start --lan --clear
 ```
 
@@ -94,7 +94,7 @@ Agar router me "AP Isolation" ya "Client Isolation" enabled hai:
 2. Bottom me **"Connection"** tab me jao
 3. Ya **"Settings"** → **"Connection"**
 4. **"Enter URL"** ya **"Manual Connection"** option dhundho
-5. Ye URL enter karein: `exp://192.168.1.7:8081`
+5. Ye URL enter karein: `exp://192.168.1.3:8081`
 
 **Agar option nahi dikhe**, to:
 - Expo Go app ko **update** karein (Play Store se)
@@ -110,7 +110,7 @@ Check karein ki network IP sahi hai:
 ipconfig | findstr /i "IPv4"
 ```
 
-Aapka IP `192.168.1.7` hona chahiye.
+Aapka IP `192.168.1.3` hona chahiye.
 
 ---
 
@@ -126,7 +126,7 @@ Aapka IP `192.168.1.7` hona chahiye.
 
 **Expo Go me manually URL enter karein:**
 ```
-exp://192.168.1.7:8081
+exp://192.168.1.3:8081
 ```
 
 Yeh hamesha kaam karta hai! ✅

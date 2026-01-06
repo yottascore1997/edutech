@@ -182,10 +182,18 @@ const PracticeExamQuestionsScreen = () => {
         console.log('Submit response:', response.data);
         setShowSubmitModal(false);
         setSubmitting(false);
+        
+        // Extract result from nested response structure
+        const resultData = response.data?.result || response.data;
+        console.log('Result data to pass:', resultData);
+        
         // Store result data and redirect to result page
         router.push({
-          pathname: `/(tabs)/practice-exam/result/${id}`,
-          params: { resultData: JSON.stringify(response.data) }
+          pathname: '/(tabs)/practice-exam/result/[id]' as any,
+          params: { 
+            id: id,
+            resultData: JSON.stringify(resultData) 
+          }
         });
       } else {
         console.error('Failed to submit test:', response);

@@ -151,12 +151,11 @@ const MyExamsScreen = () => {
         const bestScore = totalExams > 0
             ? Math.max(...completedExams.map(e => getAccuracy(e.correctAnswers, e.totalQuestions)))
             : 0;
-        const totalTimeTaken = completedExams.reduce((sum, e) => sum + e.timeTaken, 0);
 
-        return { totalExams, avgScore, bestScore, totalTimeTaken };
+        return { totalExams, avgScore, bestScore };
     }, [exams]);
 
-    const { totalExams, avgScore, bestScore, totalTimeTaken } = analytics;
+    const { totalExams, avgScore, bestScore } = analytics;
 
     const getScorePercentage = (score: number, total: number) => {
         return total > 0 ? Math.round((score / total) * 100) : 0;
@@ -217,6 +216,7 @@ const MyExamsScreen = () => {
                         colors={
                             percentage >= 80 ? ['#10B981', '#059669'] :
                             percentage >= 60 ? ['#F59E0B', '#D97706'] :
+                            percentage === 0 ? ['#6366F1', '#8B5CF6'] : // Same as Total card background
                             ['#EF4444', '#DC2626']
                         }
                         start={{ x: 0, y: 0 }}
@@ -327,17 +327,6 @@ const MyExamsScreen = () => {
                     />
                 }
             >
-                {/* Header */}
-                <LinearGradient
-                    colors={['#6366F1', '#8B5CF6', '#A855F7']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.header}
-                >
-                    <Text style={styles.headerTitle}>My Exams</Text>
-                    <Text style={styles.headerSubtitle}>Track your exam performance</Text>
-                </LinearGradient>
-
                 {/* Analytics Cards */}
                 {totalExams > 0 && (
                     <View style={styles.analyticsContainer}>
@@ -378,19 +367,6 @@ const MyExamsScreen = () => {
                             </View>
                             <Text style={styles.analyticsValueWhite}>{bestScore}%</Text>
                             <Text style={styles.analyticsLabelWhite}>Best</Text>
-                        </LinearGradient>
-
-                        <LinearGradient
-                            colors={['#EC4899', '#DB2777']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.analyticsCard}
-                        >
-                            <View style={styles.analyticsIconBox}>
-                                <Ionicons name="time" size={20} color="#FFF" />
-                            </View>
-                            <Text style={styles.analyticsValueWhite}>{Math.floor(totalTimeTaken / 60)}m</Text>
-                            <Text style={styles.analyticsLabelWhite}>Total Time</Text>
                         </LinearGradient>
                     </View>
                 )}

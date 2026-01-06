@@ -127,13 +127,13 @@ export default function HomeScreen() {
         }
     }, [user, featuredExams.length]);
 
-    // Auto-refresh every 30 seconds when screen is active
+    // Auto-refresh every 1 hour when screen is active
     useEffect(() => {
         const interval = setInterval(() => {
             if (user?.token) {
                 fetchExams();
             }
-        }, 30000); // 30 seconds
+        }, 3600000); // 1 hour (3600000 milliseconds)
 
         return () => clearInterval(interval);
     }, [user?.token]);
@@ -165,34 +165,37 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Categories Section */}
+        {/* Premium Categories Section */}
         <View style={styles.categoriesSection}>
-          <FlatList
-            data={[
-              { id: '1', name: 'Live Exam', icon: 'flash', color: '#4F46E5', route: '/(tabs)/exam' },
-                { id: '2', name: 'Practice', icon: 'school', color: '#7C3AED', route: '/(tabs)/practice-categories' },
-                { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', route: '/(tabs)/quiz' },
-                { id: '4', name: 'Social', icon: 'people', color: '#EC4899', route: '/(tabs)/social' },
-                { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', route: '/(tabs)/timetable' },
-                { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', route: '/(tabs)/book-store' },
-              ]}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.categoryItem}
-                  onPress={() => router.push(item.route as any)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.categoryIconContainer, { backgroundColor: item.color }]}>
-                    <Ionicons name={item.icon as any} size={24} color="#FFFFFF" />
-                  </View>
-                  <Text style={styles.categoryText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesContainer}
-            />
+          <View style={styles.categoriesGrid}>
+            {[
+              { id: '1', name: 'Live Exam', icon: 'flash', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'], route: '/(tabs)/exam' },
+              { id: '2', name: 'Practice', icon: 'school', color: '#8B5CF6', gradient: ['#8B5CF6', '#A78BFA'], route: '/(tabs)/practice-categories' },
+              { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', gradient: ['#10B981', '#34D399'], route: '/(tabs)/quiz' },
+              { id: '4', name: 'Social', icon: 'people', color: '#EC4899', gradient: ['#EC4899', '#F472B6'], route: '/(tabs)/social' },
+              { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable' },
+              { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store' },
+            ].map((item) => (
+              <TouchableOpacity 
+                key={item.id}
+                style={styles.categoryCard}
+                onPress={() => router.push(item.route as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.categoryCardInner}>
+                  <LinearGradient
+                    colors={item.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.categoryIconWrapper}
+                  >
+                    <Ionicons name={item.icon as any} size={20} color="#FFFFFF" />
+                  </LinearGradient>
+                  <Text style={styles.categoryName}>{item.name}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Custom Banner Slider */}
@@ -213,86 +216,103 @@ export default function HomeScreen() {
                         }
                     }} />
 
-                    {/* Enhanced Live Exams Header */}
-                    <View style={styles.enhancedLiveExamsHeader}>
+                    {/* Professional Live Exams Section */}
+                    <View style={styles.professionalLiveExamsSection}>
                         <LinearGradient
-                            colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
+                            colors={['#EFF6FF', '#DBEAFE', '#E0E7FF']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={styles.enhancedHeaderGradient}
+                            style={styles.professionalSectionContainer}
                         >
-                            <View style={styles.enhancedHeaderContent}>
-                                <View style={styles.enhancedHeaderLeft}>
-                                    <View style={styles.enhancedIconContainer}>
-                                        <Ionicons name="flash" size={20} color="#FFFFFF" />
+                            {/* Header Section */}
+                            <View style={styles.professionalHeaderSection}>
+                                <View style={styles.professionalHeaderLeft}>
+                                    <View style={styles.professionalIconContainer}>
+                                        <LinearGradient
+                                            colors={['#6366F1', '#8B5CF6']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 1 }}
+                                            style={styles.professionalIconGradient}
+                                        >
+                                            <Ionicons name="flash" size={22} color="#FFFFFF" />
+                                        </LinearGradient>
                                     </View>
-                                    <View style={styles.enhancedTextContainer}>
-                                        <Text style={styles.enhancedHeaderTitle}>Live Exams</Text>
-                                        <Text style={styles.enhancedHeaderSubtitle}>Join now & win rewards</Text>
+                                    <View style={styles.professionalHeaderText}>
+                                        <Text style={styles.professionalTitle}>Live Exams</Text>
+                                        <View style={styles.professionalTitleUnderline} />
                                     </View>
                                 </View>
                                 <TouchableOpacity 
-                                    style={styles.enhancedViewAllButton}
+                                    style={styles.professionalViewAllBtn}
                                     onPress={() => router.push('/(tabs)/exam')}
                                     activeOpacity={0.8}
                                 >
-                                    <Text style={styles.enhancedViewAllText}>View All</Text>
-                                    <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                                    <Text style={styles.professionalViewAllText}>View All</Text>
+                                    <Ionicons name="chevron-forward" size={16} color="#6366F1" />
                                 </TouchableOpacity>
                             </View>
+
+                            {/* Exams Content Section */}
+                            {loading ? (
+                                <View style={styles.professionalLoadingContainer}>
+                                    <ActivityIndicator size="large" color="#6366F1" />
+                                </View>
+                            ) : featuredExams.length === 0 ? (
+                                <View style={styles.professionalEmptyContainer}>
+                                    <Ionicons name="library-outline" size={48} color="#9CA3AF" />
+                                    <Text style={styles.professionalEmptyTitle}>No Exams Available</Text>
+                                    <Text style={styles.professionalEmptySubtext}>Check back later for new featured exams.</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    <FlatList
+                                        ref={examSliderRef}
+                                        data={featuredExams}
+                                        renderItem={renderExamCard}
+                                        keyExtractor={(item) => item.id}
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.professionalListContainer}
+                                        onScrollBeginDrag={stopAutoScroll}
+                                        onScrollEndDrag={startAutoScroll}
+                                        onMomentumScrollEnd={(event) => {
+                                            const offsetX = event.nativeEvent.contentOffset.x;
+                                            const index = Math.round(offsetX / (screenWidth - 32));
+                                            setCurrentExamIndex(Math.min(index, featuredExams.length - 1));
+                                        }}
+                                        getItemLayout={(data, index) => ({
+                                            length: screenWidth - 32,
+                                            offset: (screenWidth - 32) * index,
+                                            index,
+                                        })}
+                                        snapToInterval={screenWidth - 32}
+                                        snapToAlignment="center"
+                                        decelerationRate="fast"
+                                        pagingEnabled
+                                    />
+                                    <View style={styles.professionalPaginationContainer}>
+                                        {featuredExams.map((_, index) => (
+                                            <TouchableOpacity
+                                                key={index}
+                                                onPress={() => {
+                                                    setCurrentExamIndex(index);
+                                                    examSliderRef.current?.scrollToIndex({ index, animated: true });
+                                                }}
+                                                style={styles.professionalPaginationWrapper}
+                                            >
+                                                <View
+                                                    style={[
+                                                        styles.professionalPaginationDot,
+                                                        index === currentExamIndex && styles.professionalPaginationDotActive
+                                                    ]}
+                                                />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </>
+                            )}
                         </LinearGradient>
                     </View>
-
-            {loading ? (
-                <ActivityIndicator size="large" color={AppColors.primary} style={{ marginTop: 20 }} />
-            ) : featuredExams.length === 0 ? (
-                <View style={styles.emptyCard}>
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="library-outline" size={48} color={AppColors.grey} />
-                        <Text style={styles.emptyTitle}>No Exams Available</Text>
-                        <Text style={styles.emptySubtext}>Check back later for new featured exams.</Text>
-                    </View>
-                </View>
-            ) : (
-                <>
-                    <FlatList
-                        ref={examSliderRef}
-                        data={featuredExams}
-                        renderItem={renderExamCard}
-                        keyExtractor={(item) => item.id}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.listContainer}
-                        onScrollBeginDrag={stopAutoScroll}
-                        onScrollEndDrag={startAutoScroll}
-                        onMomentumScrollEnd={(event) => {
-                            const offsetX = event.nativeEvent.contentOffset.x;
-                            const index = Math.round(offsetX / (screenWidth - 20));
-                            setCurrentExamIndex(Math.min(index, featuredExams.length - 1));
-                        }}
-                        getItemLayout={(data, index) => ({
-                            length: screenWidth - 20,
-                            offset: (screenWidth - 20) * index,
-                            index,
-                        })}
-                        snapToInterval={screenWidth - 20}
-                        snapToAlignment="center"
-                        decelerationRate="fast"
-                        pagingEnabled
-                    />
-                    <View style={styles.paginationContainer}>
-                        {featuredExams.map((_, index) => (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.paginationDot,
-                                    currentExamIndex === index && styles.paginationDotActive
-                                ]}
-                            />
-                        ))}
-                    </View>
-                </>
-            )}
             
             {/* Question of the Day Section */}
             <QuestionOfTheDayPreview />
@@ -326,118 +346,175 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F9FA',
     },
     
-    // Categories Section
+    // Premium Categories Section
     categoriesSection: {
         backgroundColor: '#FFFFFF',
-        paddingVertical: 16,
-        paddingHorizontal: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
         marginTop: 8,
         marginBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
     },
-    categoriesContainer: {
-        paddingHorizontal: 12,
-        alignItems: 'center',
+    categoriesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
     },
-    categoryItem: {
+    categoryCard: {
+        width: (screenWidth - 48) / 3,
+        marginBottom: 10,
+    },
+    categoryCardInner: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 4,
         alignItems: 'center',
         justifyContent: 'center',
-        minWidth: 70,
-        marginVertical: 8,
-        marginHorizontal: 4,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    categoryIconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+    categoryIconWrapper: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 6,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 4,
     },
-    categoryText: {
-        fontSize: 12,
+    categoryName: {
+        fontSize: 10,
         fontWeight: '600',
-        color: '#374151',
+        color: '#1F2937',
         textAlign: 'center',
+        marginTop: 0,
     },
     
-    // Enhanced Live Exams Header Styles
-    enhancedLiveExamsHeader: {
-        marginHorizontal: 16,
-        marginTop: 0,
-        marginBottom: 16,
-        borderRadius: 16,
-        overflow: 'hidden',
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 10,
+    // Professional Live Exams Section
+    professionalLiveExamsSection: {
+        marginHorizontal: 0,
+        marginTop: 12,
+        marginBottom: 24,
+        backgroundColor: '#FFFFFF',
     },
-    enhancedHeaderGradient: {
-        paddingVertical: 16,
-        paddingHorizontal: 18,
+    professionalSectionContainer: {
+        paddingVertical: 20,
+        paddingHorizontal: 16,
     },
-    enhancedHeaderContent: {
+    professionalHeaderSection: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        marginBottom: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
     },
-    enhancedHeaderLeft: {
+    professionalHeaderLeft: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
     },
-    enhancedIconContainer: {
-        width: 40,
-        height: 40,
+    professionalIconContainer: {
+        marginRight: 12,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    professionalIconGradient: {
+        width: 44,
+        height: 44,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
     },
-    enhancedTextContainer: {
+    professionalHeaderText: {
         flex: 1,
     },
-    enhancedHeaderTitle: {
-        fontSize: 18,
+    professionalTitle: {
+        fontSize: 24,
         fontWeight: '800',
-        color: '#FFFFFF',
-        marginBottom: 2,
-        letterSpacing: 0.4,
-        textShadowColor: 'rgba(0, 0, 0, 0.2)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+        color: '#1F2937',
+        letterSpacing: -0.5,
+        marginBottom: 6,
     },
-    enhancedHeaderSubtitle: {
-        fontSize: 13,
-        color: 'rgba(255, 255, 255, 0.9)',
-        fontWeight: '600',
-        letterSpacing: 0.2,
+    professionalTitleUnderline: {
+        width: 40,
+        height: 3,
+        backgroundColor: '#6366F1',
+        borderRadius: 2,
     },
-    enhancedViewAllButton: {
+    professionalViewAllBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
+        backgroundColor: '#F3F4F6',
     },
-    enhancedViewAllText: {
+    professionalViewAllText: {
         fontSize: 13,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: '#6366F1',
         marginRight: 4,
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
+    },
+    professionalListContainer: {
+        paddingHorizontal: 0,
+        paddingBottom: 12,
+    },
+    professionalLoadingContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    professionalEmptyContainer: {
+        paddingVertical: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    professionalEmptyTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#374151',
+        marginTop: 12,
+        marginBottom: 4,
+    },
+    professionalEmptySubtext: {
+        fontSize: 13,
+        color: '#9CA3AF',
+        textAlign: 'center',
+    },
+    professionalPaginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 16,
+        gap: 6,
+    },
+    professionalPaginationWrapper: {
+        padding: 4,
+    },
+    professionalPaginationDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#E5E7EB',
+    },
+    professionalPaginationDotActive: {
+        width: 24,
+        backgroundColor: '#6366F1',
     },
     
     listContainer: {

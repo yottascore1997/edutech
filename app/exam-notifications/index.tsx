@@ -381,30 +381,9 @@ export default function ExamNotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
       
-      {/* Professional Header */}
-      <LinearGradient
-        colors={['#1E40AF', '#3B82F6', '#6366F1']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.headerIconContainer}>
-              <Ionicons name="newspaper" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle}>Exam Notifications</Text>
-              <Text style={styles.headerSubtitle}>
-                Official Recruitment Updates
-              </Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
 
       {/* Statistics Bar */}
-      <View style={styles.statsBar}>
+      <View style={[styles.statsBar, { marginTop: 20, paddingTop: 20 }]}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{stats.total}</Text>
           <Text style={styles.statLabel}>Total</Text>

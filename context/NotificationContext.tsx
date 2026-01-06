@@ -131,7 +131,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     if (!user?.token) return;
 
     try {
-      const response = await fetch('http://192.168.1.7:3000/api/student/notifications', {
+      const response = await fetch('http://192.168.1.5:3000/api/student/notifications', {
         headers: {
           'Authorization': `Bearer ${user.token}`,
           'Content-Type': 'application/json',

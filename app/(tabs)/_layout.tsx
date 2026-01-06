@@ -39,12 +39,14 @@ function TabLayout() {
         name="social"
         options={{
           title: 'Social',
+          href: null, // Temporarily hidden - will be added back in next launch
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
+          href: null, // Temporarily hidden - will be added back in next launch
         }}
       />
       <Tabs.Screen
@@ -139,8 +141,7 @@ function TabLayout() {
       <Tabs.Screen
         name="book-store"
         options={{
-          title: 'Book Store',
-          href: null,
+          title: 'Books',
         }}
       />
       <Tabs.Screen

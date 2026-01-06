@@ -1,17 +1,21 @@
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
+import { SoundManager } from '@/utils/sounds';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Easing,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Dimensions,
+  Easing,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 
@@ -105,6 +109,43 @@ export default function MatchmakingScreen() {
     }
   }, []);
 
+  // Start timer when status is searching
+  useEffect(() => {
+    if (matchmakingState.status === 'searching') {
+      // Clear any existing timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      
+      // Ensure start time is set
+      if (!searchStartTime.current || searchStartTime.current === 0) {
+        searchStartTime.current = Date.now();
+      }
+      
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setMatchmakingState(prev => ({
+          ...prev,
+          timeElapsed: Math.floor((Date.now() - searchStartTime.current) / 1000)
+        }));
+      }, 1000);
+      
+      return () => {
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    } else {
+      // Clear timer when not searching
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [matchmakingState.status]);
+
   // Initialize socket connection - Enhanced like web version
   useEffect(() => {
 
@@ -113,14 +154,11 @@ export default function MatchmakingScreen() {
     
     if (user?.token) {
 
-      const newSocket = io('http://192.168.1.7:3001', {
+      const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: user.token
         },
-        transports: ['polling', 'websocket'],
-        path: '/api/socket',
-        timeout: 20000,
-        forceNew: true
+        ...WEBSOCKET_CONFIG.CONNECTION_OPTIONS
       });
 
       newSocket.on('connect', () => {
@@ -175,7 +213,10 @@ export default function MatchmakingScreen() {
     hasStartedSearch.current = true;
     searchStartTime.current = Date.now();
 
-    // Start timer
+    // Start timer immediately
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     timerRef.current = setInterval(() => {
       setMatchmakingState(prev => ({
         ...prev,
@@ -222,6 +263,10 @@ export default function MatchmakingScreen() {
 
     socket.on('opponent_found', (data: { opponent: User; category?: string }) => {
 
+      // Play match found sound
+      SoundManager.playMatchFoundSound();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
       setMatchmakingState(prev => ({
         ...prev,
         status: 'found',
@@ -670,7 +715,7 @@ export default function MatchmakingScreen() {
 
   return (
     <LinearGradient
-      colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
+      colors={['#1e1b4b', '#312e81', '#4c1d95', '#5b21b6']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.container}
@@ -971,13 +1016,7 @@ export default function MatchmakingScreen() {
                        {
                          translateY: searchAnim.interpolate({
                            inputRange: [0, 1],
-                           outputRange: [-40, 40]
-                         })
-                       },
-                       {
-                         scale: searchAnim.interpolate({
-                           inputRange: [0, 0.5, 1],
-                           outputRange: [1, 1.3, 1]
+                           outputRange: [-20, 20]
                          })
                        }
                      ]
@@ -1019,7 +1058,7 @@ export default function MatchmakingScreen() {
                     </LinearGradient>
                   </Animated.View>
                 </View>
-                <Text style={styles.playerName}>Finding...</Text>
+                <Text style={styles.playerName}>Opponent</Text>
                 <View style={styles.searchingBadge}>
                   <Animated.View
                     style={{
@@ -1028,28 +1067,31 @@ export default function MatchmakingScreen() {
                   >
                     <Ionicons name="radio" size={16} color="#FF6B6B" />
                   </Animated.View>
-                  <Text style={styles.searchingText}>Searching</Text>
+                  <Text style={styles.searchingText}>Finding</Text>
                 </View>
               </Animated.View>
             </View>
             
-            {/* Exciting Status Info */}
+            {/* Premium Status Info */}
             <View style={styles.statusInfo}>
-                                           <Animated.Text 
-                  style={[
-                    styles.statusTitle,
-                    {
-                      opacity: fadeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1]
-                      })
-                    }
-                  ]}
-                >
-                  🔍 Searching for Opponent
-                </Animated.Text>
+              <Animated.Text 
+                style={[
+                  styles.statusTitle,
+                  {
+                    opacity: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1]
+                    })
+                  }
+                ]}
+              >
+                Searching for Opponent
+              </Animated.Text>
+              <Text style={styles.statusSubtitleText}>
+                Finding the perfect match for you...
+              </Text>
 
-                {/* Large Time Display */}
+                {/* Premium Time Display */}
                 <Animated.View
                   style={[
                     styles.largeTimeContainer,
@@ -1062,62 +1104,41 @@ export default function MatchmakingScreen() {
                   ]}
                 >
                   <LinearGradient
-                    colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.05)']}
                     style={styles.largeTimeGradient}
                   >
-                    <Ionicons name="time" size={32} color="rgba(255,255,255,0.9)" />
+                    <View style={styles.timeIconContainer}>
+                      <Ionicons name="time-outline" size={28} color="rgba(255,255,255,0.95)" />
+                    </View>
                     <Text style={styles.largeTimeText}>
                       {formatTime(matchmakingState.timeElapsed)}
                     </Text>
-                    <Text style={styles.largeTimeLabel}>elapsed</Text>
+                    <Text style={styles.largeTimeLabel}>Time Elapsed</Text>
                   </LinearGradient>
-                                 </Animated.View>
-                 
-                 {/* Live Battle Text */}
-                 <Animated.View
-                   style={[
-                     styles.liveBattleContainer,
-                     {
-                       opacity: fadeAnim.interpolate({
-                         inputRange: [0, 1],
-                         outputRange: [0.8, 1]
-                       })
-                     }
-                   ]}
-                 >
-                   <LinearGradient
-                     colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
-                     style={styles.liveBattleGradient}
-                   >
-                     <Ionicons name="radio" size={20} color="rgba(255,255,255,0.9)" />
-                     <Text style={styles.liveBattleText}>Live Battle</Text>
-                   </LinearGradient>
-                 </Animated.View>
-                 
-                
-                
+                </Animated.View>
             </View>
             
-            {/* Exciting Cancel Button */}
+            {/* Premium Cancel Button */}
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={handleCancelSearch}
+              activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['rgba(239, 68, 68, 0.5)', 'rgba(239, 68, 68, 0.3)', 'rgba(239, 68, 68, 0.2)']}
+                colors={['rgba(239, 68, 68, 0.9)', 'rgba(220, 38, 38, 0.9)', 'rgba(185, 28, 28, 0.9)']}
                 style={styles.cancelButtonGradient}
               >
-                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Ionicons name="close-circle-outline" size={20} color="#fff" />
                 <Text style={styles.cancelButtonText}>Cancel Search</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
 
-                          {/* Exciting Opponent Found State */}
+                          {/* Premium Opponent Found State */}
          {matchmakingState.status === 'found' && matchmakingState.opponent && (
            <View style={styles.foundContainer}>
-             {/* Exciting Success Animation */}
+             {/* Premium Success Animation */}
              <Animated.View 
                style={[
                  styles.successIcon,
@@ -1125,14 +1146,15 @@ export default function MatchmakingScreen() {
                ]}
              >
                <LinearGradient
-                 colors={['#10B981', '#059669', '#047857']}
+                 colors={['#10b981', '#059669', '#047857', '#065f46']}
                  style={styles.successIconGradient}
                >
-                 <Ionicons name="checkmark-circle" size={80} color="#fff" />
+                 <Ionicons name="checkmark-circle" size={72} color="#fff" />
                </LinearGradient>
              </Animated.View>
              
-             <Text style={styles.statusTitle}>🎯 Opponent Found!</Text>
+             <Text style={styles.foundTitle}>Opponent Found!</Text>
+             <Text style={styles.foundSubtitle}>Get ready for battle</Text>
              
              {/* Exciting Matchup */}
              <View style={styles.matchupContainer}>
@@ -1205,7 +1227,7 @@ export default function MatchmakingScreen() {
            </View>
          )}
 
-        {/* Exciting Match Starting State */}
+        {/* Premium Match Starting State */}
         {matchmakingState.status === 'starting' && (
           <View style={styles.startingContainer}>
             <Animated.View 
@@ -1215,29 +1237,29 @@ export default function MatchmakingScreen() {
               ]}
             >
               <LinearGradient
-                colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
+                colors={['#ef4444', '#dc2626', '#b91c1c', '#991b1b']}
                 style={styles.gameIconGradient}
               >
-                <Ionicons name="game-controller" size={80} color="#fff" />
+                <Ionicons name="flash" size={64} color="#fff" />
               </LinearGradient>
             </Animated.View>
             
             <LinearGradient
-              colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
+              colors={['rgba(239, 68, 68, 0.9)', 'rgba(220, 38, 38, 0.9)', 'rgba(185, 28, 28, 0.9)']}
               style={styles.battleTitleGradient}
             >
-              <Text style={styles.battleTitleText}>🎮 Battle Starting!</Text>
+              <Text style={styles.battleTitleText}>Battle Starting!</Text>
             </LinearGradient>
-            <Text style={styles.statusSubtitle}>Get ready to compete...</Text>
+            <Text style={styles.statusSubtitle}>Prepare yourself...</Text>
             
             <View style={styles.countdownCard}>
               <LinearGradient
-                colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.15)', 'rgba(255,255,255,0.1)']}
                 style={styles.countdownGradient}
               >
                 <Text style={styles.countdownNumber}>{countdown}</Text>
                 <Text style={styles.countdownText}>
-                  {countdown > 0 ? 'Battle begins in...' : 'GO!'}
+                  {countdown > 0 ? 'Starting in' : 'GO!'}
                 </Text>
               </LinearGradient>
             </View>
@@ -1374,13 +1396,13 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   vsText: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: 0.8,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+    letterSpacing: 1,
   },
   opponentScrollContainer: {
     position: 'absolute',
@@ -1548,25 +1570,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-              statusTitle: {
-     fontSize: 18,
-     fontWeight: '900',
-     color: '#fff',
-     marginTop: 40,
-     marginBottom: 16,
-     textAlign: 'left',
-     textShadowColor: 'rgba(0,0,0,0.5)',
-     textShadowOffset: { width: 0, height: 3 },
-     textShadowRadius: 6,
-     letterSpacing: 0.8,
-   },
-  statusSubtitle: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 40,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
   infoCard: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 16,
@@ -1603,34 +1606,38 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   successIcon: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   successIconGradient: {
-    borderRadius: 40,
-    padding: 15,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: 50,
+    padding: 20,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#10b981',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.5,
+      shadowRadius: 20,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 14 : 12,
   },
   matchupContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 24,
+    padding: 28,
     width: '100%',
-    maxWidth: 350,
-    borderWidth: 2,
+    maxWidth: 360,
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 14 : 12,
   },
   userCard: {
     flex: 1,
@@ -1662,80 +1669,86 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   gameIcon: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   gameIconGradient: {
-    borderRadius: 40,
-    padding: 15,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
-    shadowColor: '#FF6B6B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    borderRadius: 50,
+    padding: 20,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#ef4444',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.5,
+      shadowRadius: 20,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 14 : 12,
   },
   countdownCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    padding: 32,
+    borderRadius: 24,
+    padding: 36,
     width: '100%',
-    maxWidth: 220,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    maxWidth: 240,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 14 : 12,
+    overflow: 'hidden',
   },
   countdownNumber: {
-    fontSize: 56,
-    fontWeight: '800',
+    fontSize: 72,
+    fontWeight: '900',
     color: '#fff',
-    marginBottom: 12,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    marginBottom: 8,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 8,
+    letterSpacing: 2,
   },
   countdownText: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
     fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
-                       cancelButton: {
-       backgroundColor: 'rgba(239,68,68,0.2)',
-       paddingHorizontal: 32,
-       paddingVertical: 14,
-       borderRadius: 25,
-       borderWidth: 2,
-       borderColor: 'rgba(239,68,68,0.4)',
-       marginTop: 0,
+   cancelButton: {
+     borderRadius: 16,
+     overflow: 'hidden',
+     marginTop: 8,
+     ...(Platform.OS === 'ios' ? {
        shadowColor: '#ef4444',
-       shadowOffset: { width: 0, height: 4 },
-       shadowOpacity: 0.3,
-       shadowRadius: 8,
-       elevation: 6,
-     },
+       shadowOffset: { width: 0, height: 6 },
+       shadowOpacity: 0.4,
+       shadowRadius: 12,
+     } : {}),
+     elevation: Platform.OS === 'android' ? 10 : 8,
+   },
    cancelButtonGradient: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: 10,
-     paddingHorizontal: 20,
+     paddingVertical: 14,
+     paddingHorizontal: 32,
+     minWidth: 200,
    },
    cancelButtonText: {
-     fontSize: 16,
+     fontSize: 15,
      fontWeight: '700',
      color: '#fff',
      textAlign: 'center',
      marginLeft: 8,
-     textShadowColor: 'rgba(0,0,0,0.3)',
-     textShadowOffset: { width: 0, height: 1 },
-     textShadowRadius: 2,
-     letterSpacing: 0.3,
+     textShadowColor: 'rgba(0,0,0,0.4)',
+     textShadowOffset: { width: 0, height: 2 },
+     textShadowRadius: 3,
+     letterSpacing: 0.5,
    },
   tipsContainer: {
     marginBottom: 40,
@@ -1797,70 +1810,119 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   playerAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 8 : 6,
   },
   playerInitial: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 26,
+    fontWeight: '900',
     color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   playerName: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 8,
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
+    marginTop: 10,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   playerStatus: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
   },
      statusInfo: {
-     marginBottom: 20,
+     marginBottom: 24,
+     marginTop: 32,
      alignItems: 'center',
      width: '100%',
      paddingHorizontal: 20,
    },
+   statusTitle: {
+     fontSize: 24,
+     fontWeight: '800',
+     color: '#fff',
+     marginBottom: 8,
+     textAlign: 'center',
+     letterSpacing: 0.5,
+     textShadowColor: 'rgba(0,0,0,0.5)',
+     textShadowOffset: { width: 0, height: 2 },
+     textShadowRadius: 4,
+   },
+   statusSubtitleText: {
+     fontSize: 14,
+     fontWeight: '500',
+     color: 'rgba(255,255,255,0.7)',
+     textAlign: 'center',
+     marginTop: 4,
+   },
   statusBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 20,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    minWidth: 80,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 28,
+    marginTop: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    minWidth: 130,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 4 : 3,
   },
   statusText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: '#fff',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   searchingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    backgroundColor: 'rgba(255,107,107,0.15)',
-    borderRadius: 16,
-    paddingVertical: 6,
+    marginTop: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderRadius: 18,
+    paddingVertical: 8,
     paddingHorizontal: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,107,0.3)',
-    minWidth: 100,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.35)',
+    minWidth: 110,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#ef4444',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 4 : 3,
   },
   searchingText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FF6B6B',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#fff',
     marginLeft: 6,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   playerGlow: {
     position: 'absolute',
@@ -1877,16 +1939,18 @@ const styles = StyleSheet.create({
     borderRadius: 35,
   },
   vsGradient: {
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    borderColor: 'rgba(255,255,255,0.5)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 10 : 8,
   },
   readyBadge: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -1925,13 +1989,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   playerCardGradient: {
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 20,
+    padding: 20,
     width: '100%',
-    maxWidth: 130,
+    maxWidth: 140,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 8 : 6,
   },
   countdownGradient: {
     borderRadius: 16,
@@ -2046,7 +2117,11 @@ const styles = StyleSheet.create({
   statusBadgeGradient: {
     borderRadius: 12,
     paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   readyBadgeGradient: {
     borderRadius: 12,
@@ -2125,93 +2200,125 @@ const styles = StyleSheet.create({
      textShadowRadius: 2,
    },
    largeTimeContainer: {
-     marginTop: 20,
-     marginBottom: 10,
+     marginTop: 24,
+     marginBottom: 16,
      alignItems: 'center',
    },
    largeTimeGradient: {
-     borderRadius: 20,
-     paddingVertical: 16,
-     paddingHorizontal: 24,
+     borderRadius: 24,
+     paddingVertical: 20,
+     paddingHorizontal: 32,
      alignItems: 'center',
-     borderWidth: 2,
-     borderColor: 'rgba(255,255,255,0.3)',
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 4 },
-     shadowOpacity: 0.3,
-     shadowRadius: 8,
-     elevation: 6,
+     borderWidth: 1.5,
+     borderColor: 'rgba(255,255,255,0.25)',
+     ...(Platform.OS === 'ios' ? {
+       shadowColor: '#000',
+       shadowOffset: { width: 0, height: 8 },
+       shadowOpacity: 0.4,
+       shadowRadius: 16,
+     } : {}),
+     elevation: Platform.OS === 'android' ? 10 : 8,
+     minWidth: 200,
+   },
+   timeIconContainer: {
+     width: 48,
+     height: 48,
+     borderRadius: 24,
+     backgroundColor: 'rgba(255,255,255,0.15)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginBottom: 12,
    },
    largeTimeText: {
-     fontSize: 28,
+     fontSize: 36,
      fontWeight: '900',
      color: '#fff',
-     marginTop: 8,
-     textShadowColor: 'rgba(0,0,0,0.5)',
-     textShadowOffset: { width: 0, height: 2 },
-     textShadowRadius: 4,
-     letterSpacing: 1,
+     marginTop: 4,
+     textShadowColor: 'rgba(0,0,0,0.6)',
+     textShadowOffset: { width: 0, height: 3 },
+     textShadowRadius: 6,
+     letterSpacing: 2,
    },
-       largeTimeLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: 'rgba(255,255,255,0.8)',
-      marginTop: 4,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
+   largeTimeLabel: {
+     fontSize: 12,
+     fontWeight: '600',
+     color: 'rgba(255,255,255,0.75)',
+     marginTop: 6,
+     textTransform: 'uppercase',
+     letterSpacing: 1.5,
+   },
     battleTitleGradient: {
-      borderRadius: 20,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderWidth: 2,
-      borderColor: 'rgba(255,255,255,0.4)',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 6,
-      marginBottom: 16,
+      borderRadius: 18,
+      paddingVertical: 14,
+      paddingHorizontal: 28,
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.3)',
+      ...(Platform.OS === 'ios' ? {
+        shadowColor: '#ef4444',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+      } : {}),
+      elevation: Platform.OS === 'android' ? 10 : 8,
+      marginBottom: 12,
     },
-         battleTitleText: {
-       fontSize: 28,
-       fontWeight: '900',
-       color: '#fff',
-       textAlign: 'center',
-       textShadowColor: 'rgba(0,0,0,0.6)',
-       textShadowOffset: { width: 0, height: 2 },
-       textShadowRadius: 4,
-       letterSpacing: 0.8,
-     },
+    battleTitleText: {
+      fontSize: 24,
+      fontWeight: '900',
+      color: '#fff',
+      textAlign: 'center',
+      textShadowColor: 'rgba(0,0,0,0.6)',
+      textShadowOffset: { width: 0, height: 2 },
+      textShadowRadius: 4,
+      letterSpacing: 0.8,
+    },
+    statusSubtitle: {
+      fontSize: 15,
+      color: 'rgba(255,255,255,0.75)',
+      textAlign: 'center',
+      fontWeight: '500',
+      marginBottom: 24,
+      letterSpacing: 0.3,
+    },
      liveBattleContainer: {
        marginTop: 20,
-       marginBottom: 10,
+       marginBottom: 12,
        alignItems: 'center',
      },
      liveBattleGradient: {
        borderRadius: 20,
-       paddingVertical: 12,
-       paddingHorizontal: 24,
+       paddingVertical: 10,
+       paddingHorizontal: 20,
        alignItems: 'center',
        flexDirection: 'row',
-       borderWidth: 2,
-       borderColor: 'rgba(255,255,255,0.4)',
-       shadowColor: '#000',
+       borderWidth: 1.5,
+       borderColor: 'rgba(255,255,255,0.3)',
+       shadowColor: '#ef4444',
        shadowOffset: { width: 0, height: 4 },
-       shadowOpacity: 0.3,
-       shadowRadius: 8,
-       elevation: 6,
+       shadowOpacity: 0.5,
+       shadowRadius: 12,
+       elevation: 8,
      },
-           liveBattleText: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#fff',
-        marginLeft: 8,
-        textShadowColor: 'rgba(0,0,0,0.6)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4,
-        letterSpacing: 0.8,
-      },
+     liveIndicatorDot: {
+       width: 8,
+       height: 8,
+       borderRadius: 4,
+       backgroundColor: '#fff',
+       marginRight: 8,
+       shadowColor: '#fff',
+       shadowOffset: { width: 0, height: 0 },
+       shadowOpacity: 0.8,
+       shadowRadius: 4,
+     },
+     liveBattleText: {
+       fontSize: 14,
+       fontWeight: '800',
+       color: '#fff',
+       textShadowColor: 'rgba(0,0,0,0.5)',
+       textShadowOffset: { width: 0, height: 1 },
+       textShadowRadius: 3,
+       letterSpacing: 1.5,
+     },
       backgroundContainer: {
         position: 'absolute',
         top: 0,
@@ -2314,27 +2421,28 @@ const styles = StyleSheet.create({
          borderWidth: 1,
          borderColor: 'rgba(255,255,255,0.08)',
        },
-       // Enhanced Opponent Found Styles
+       // Premium Opponent Found Styles
        foundTitle: {
-         fontSize: 32,
+         fontSize: 28,
          fontWeight: '900',
          color: '#fff',
-         marginBottom: 8,
+         marginBottom: 6,
          textAlign: 'center',
          textShadowColor: 'rgba(0,0,0,0.6)',
          textShadowOffset: { width: 0, height: 3 },
          textShadowRadius: 6,
-         letterSpacing: 1,
+         letterSpacing: 0.8,
        },
        foundSubtitle: {
-         fontSize: 18,
-         color: 'rgba(255,255,255,0.9)',
-         marginBottom: 40,
+         fontSize: 15,
+         color: 'rgba(255,255,255,0.75)',
+         marginBottom: 32,
          textAlign: 'center',
-         fontWeight: '600',
-         textShadowColor: 'rgba(0,0,0,0.4)',
-         textShadowOffset: { width: 0, height: 2 },
-         textShadowRadius: 4,
+         fontWeight: '500',
+         textShadowColor: 'rgba(0,0,0,0.3)',
+         textShadowOffset: { width: 0, height: 1 },
+         textShadowRadius: 3,
+         letterSpacing: 0.3,
        },
        enhancedMatchupContainer: {
          flexDirection: 'row',

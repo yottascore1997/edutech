@@ -162,10 +162,8 @@ const ExamNotificationsSection = () => {
             </View>
         );
     }
-    if (error || notifications.length === 0) {
-        return null;
-    }
-
+    
+    // Don't return null - always show the section with dummy data if needed
     // Add dummy notifications if we have less than 5
     const getDummyNotifications = () => {
         const dummyData = [
@@ -232,8 +230,13 @@ const ExamNotificationsSection = () => {
     };
 
     const displayNotifications = getDummyNotifications();
+    // Filter out expired notifications
+    const activeNotifications = displayNotifications.filter(item => {
+        const daysRemaining = getDaysRemaining(item.applyLastDate);
+        return daysRemaining >= 0; // Only show non-expired notifications
+    });
     const monthYear = getMonthYear(notifications.length > 0 ? notifications : displayNotifications);
-    const examCount = displayNotifications.length;
+    const examCount = activeNotifications.length;
 
 
 
@@ -263,15 +266,28 @@ const ExamNotificationsSection = () => {
                         onPress={() => router.push('/exam-notifications')}
                         activeOpacity={0.7}
                     >
-                        <Text style={styles.headerViewAllText}>View All</Text>
-                        <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+                        <LinearGradient
+                            colors={['#F59E0B', '#D97706']}
+                            style={styles.headerViewAllGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Text style={styles.headerViewAllText}>View All</Text>
+                            <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
             
             {/* Dynamic Notifications (Max 5) */}
             <View style={styles.notificationsList}>
-                {displayNotifications.slice(0, Math.min(5, notifications.length)).map((item, index) => {
+                {activeNotifications.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                        <Ionicons name="notifications-off-outline" size={48} color="#9CA3AF" />
+                        <Text style={styles.emptyText}>No active notifications</Text>
+                    </View>
+                ) : (
+                    activeNotifications.slice(0, Math.min(5, activeNotifications.length)).map((item, index) => {
                     const daysRemaining = getDaysRemaining(item.applyLastDate);
                     const isUrgent = daysRemaining <= 7 && daysRemaining >= 0;
                     const isExpired = daysRemaining < 0;
@@ -323,7 +339,8 @@ const ExamNotificationsSection = () => {
                             <Ionicons name="chevron-forward" size={16} color={AppColors.grey} />
                         </TouchableOpacity>
                     );
-                })}
+                    })
+                )}
             </View>
 
             {/* Enhanced Modal with Animations */}
@@ -489,7 +506,7 @@ const styles = StyleSheet.create({
     },
     headerContent: {
         flexDirection: 'row',
-        justifyContent: 'flex-start',
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
     headerLeft: {
@@ -531,21 +548,34 @@ const styles = StyleSheet.create({
         fontFamily: 'System',
     },
     headerViewAllButton: {
+        borderRadius: 10,
+        overflow: 'hidden',
+        zIndex: 3,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+        borderWidth: 1,
+        borderColor: 'rgba(245, 158, 11, 0.3)',
+    },
+    headerViewAllGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 12,
-        gap: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
+        paddingHorizontal: 8,
+        paddingVertical: 5,
     },
     headerViewAllText: {
-        fontSize: 13,
-        fontWeight: '700',
+        fontSize: 12,
         color: '#FFFFFF',
+        fontWeight: '600',
+        marginRight: 3,
         letterSpacing: 0.3,
+        textShadowColor: 'rgba(0, 0, 0, 0.15)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 1,
+        includeFontPadding: false,
+        lineHeight: 15,
     },
     monthBadge: {
         borderRadius: 20,
@@ -648,6 +678,17 @@ const styles = StyleSheet.create({
     loadingContainer: {
         padding: 20,
         alignItems: 'center',
+    },
+    emptyContainer: {
+        padding: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        marginTop: 12,
+        fontWeight: '600',
     },
     modalOverlay: {
         flex: 1,

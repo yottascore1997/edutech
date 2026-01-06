@@ -231,7 +231,7 @@ const BookDetailsScreen = () => {
         {/* Header Image */}
         <View style={styles.imageContainer}>
           <Image 
-            source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.7:3000${book.coverImage}` }} 
+            source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.5:3000${book.coverImage}` }} 
             style={styles.coverImage}
             resizeMode="cover"
           />
@@ -306,7 +306,7 @@ const BookDetailsScreen = () => {
                 {book.additionalImages.map((image, index) => (
                   <Image
                     key={index}
-                    source={{ uri: image.startsWith('http') ? image : `http://192.168.1.7:3000${image}` }}
+                    source={{ uri: image.startsWith('http') ? image : `http://192.168.1.5:3000${image}` }}
                     style={styles.additionalImage}
                     resizeMode="cover"
                   />

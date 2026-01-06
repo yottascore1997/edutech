@@ -170,7 +170,7 @@ export default function CartScreen() {
   const renderBookItem = (book: Book, cartItem: CartItem) => (
     <View key={cartItem.id} style={styles.bookItem}>
       <Image 
-        source={{ uri: `http://192.168.1.7:3000${book.coverImage}` }} 
+        source={{ uri: `http://192.168.1.5:3000${book.coverImage}` }} 
         style={styles.bookImage}
         defaultSource={require('@/assets/images/book.jpg')}
       />

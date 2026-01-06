@@ -97,7 +97,7 @@ export default function QuizScreen() {
   // Initialize socket connection
   useEffect(() => {
     if (user?.token) {
-      const newSocket = io('http://192.168.1.7:3001', {
+      const newSocket = io('http://192.168.1.5:3001', {
         auth: {
           token: user.token
         },
@@ -834,82 +834,8 @@ export default function QuizScreen() {
                        }
                      ]}
                    >
-                     <Text style={styles.battleArenaTitle}>BATTLE ARENA</Text>
-                     <Text style={styles.battleArenaSubtitle}>Challenge other players in real-time battle</Text>
-                   </Animated.View>
-                   
-                   {/* Animated Stats Row */}
-                   <Animated.View 
-                     style={[
-                       styles.battleStatsRow,
-                       {
-                         opacity: fadeAnim,
-                         transform: [
-                           { translateY: slideAnim.interpolate({
-                             inputRange: [0, 1],
-                             outputRange: [30, 0],
-                           })}
-                         ]
-                       }
-                     ]}
-                   >
-                     <View style={styles.battleStatItem}>
-                       <Animated.View 
-                         style={[
-                           styles.battleStatIcon,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim },
-                               { rotate: iconRotateAnim.interpolate({
-                                 inputRange: [0, 1],
-                                 outputRange: ['0deg', '360deg'],
-                               })}
-                             ]
-                           }
-                         ]}
-                       >
-                         <Trophy size={16} color="#FFD700" />
-                       </Animated.View>
-                       <Text style={styles.battleStatText}>1.2k Players</Text>
-                     </View>
-                     <View style={styles.battleStatItem}>
-                       <Animated.View 
-                         style={[
-                           styles.battleStatIcon,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim },
-                               { rotate: iconRotateAnim.interpolate({
-                                 inputRange: [0, 1],
-                                 outputRange: ['0deg', '-360deg'],
-                               })}
-                             ]
-                           }
-                         ]}
-                       >
-                         <Zap size={16} color="#FFD700" />
-                       </Animated.View>
-                       <Text style={styles.battleStatText}>Live Battles</Text>
-                     </View>
-                     <View style={styles.battleStatItem}>
-                       <Animated.View 
-                         style={[
-                           styles.battleStatIcon,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim },
-                               { rotate: iconRotateAnim.interpolate({
-                                 inputRange: [0, 1],
-                                 outputRange: ['0deg', '360deg'],
-                               })}
-                             ]
-                           }
-                         ]}
-                       >
-                         <Clock size={16} color="#FFD700" />
-                       </Animated.View>
-                       <Text style={styles.battleStatText}>~30s Wait</Text>
-                     </View>
+                     <Text style={styles.battleArenaTitle} numberOfLines={1}>BATTLE ARENA</Text>
+                     <Text style={styles.battleArenaSubtitle} numberOfLines={2}>Challenge other players in real-time battle</Text>
                    </Animated.View>
                  </View>
                  
@@ -954,79 +880,33 @@ export default function QuizScreen() {
                </View>
              </LinearGradient>
                        </View>
- 
-                       {/* Enhanced Stats Section */}
-            <View style={styles.section}>
-              <View style={styles.enhancedStatsRow}>
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(255, 107, 107, 0.1)', 'rgba(255, 107, 107, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                                         <View style={styles.enhancedStatIconContainer}>
-                       <LinearGradient
-                         colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 107, 107, 0.1)']}
-                         style={styles.enhancedStatIconGradient}
-                       >
-                         <Clock size={24} color="#FF6B6B" />
-                       </LinearGradient>
-                     </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>~30s</Text>
-                      <Text style={styles.enhancedStatLabel}>Wait Time</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(78, 205, 196, 0.1)', 'rgba(78, 205, 196, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                                         <View style={styles.enhancedStatIconContainer}>
-                       <LinearGradient
-                         colors={['rgba(78, 205, 196, 0.2)', 'rgba(78, 205, 196, 0.1)']}
-                         style={styles.enhancedStatIconGradient}
-                       >
-                         <Users size={28} color="#4ECDC4" />
-                       </LinearGradient>
-                     </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>1.2k</Text>
-                      <Text style={styles.enhancedStatLabel}>Online</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(255, 217, 61, 0.1)', 'rgba(255, 217, 61, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                                         <View style={styles.enhancedStatIconContainer}>
-                       <LinearGradient
-                         colors={['rgba(255, 217, 61, 0.2)', 'rgba(255, 217, 61, 0.1)']}
-                         style={styles.enhancedStatIconGradient}
-                       >
-                         <Trophy size={28} color="#FFD93D" />
-                       </LinearGradient>
-                     </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>50</Text>
-                      <Text style={styles.enhancedStatLabel}>High Rewards</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-              </View>
-            </View>
- 
+
            {/* Enhanced Category Selection */}
           <View style={styles.section}>
-            <View style={styles.categorySectionBackground}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Select Your Battle Category</Text>
+            <LinearGradient
+              colors={['#FFFFFF', '#F8FAFF', '#F0F4FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.categorySectionBackground}
+            >
+              {/* Premium Header */}
+              <View style={styles.premiumSectionHeader}>
+                <LinearGradient
+                  colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.premiumHeaderGradient}
+                >
+                  <View style={styles.premiumIconWrapper}>
+                    <Trophy size={20} color="#FFD700" />
+                  </View>
+                  <View style={styles.premiumHeaderText}>
+                    <Text style={styles.premiumSectionTitle}>Select Your Battle Category</Text>
+                  </View>
+                </LinearGradient>
               </View>
               
+              <View style={styles.premiumCategoryContent}>
               <View style={styles.categoryGrid}>
                 {/* Large Category Card - Left Side */}
                 <View style={styles.largeCategoryContainer}>
@@ -1172,6 +1052,7 @@ export default function QuizScreen() {
                   </View>
                 </View>
               </View>
+              </View>
 
                              {/* Main Action Button */}
                <Animated.View 
@@ -1286,6 +1167,115 @@ export default function QuizScreen() {
                    </LinearGradient>
                  </TouchableOpacity>
                </Animated.View>
+            </LinearGradient>
+
+            {/* Premium Info Cards Section */}
+            <View style={styles.section}>
+              <View style={styles.infoCardsContainer}>
+                <View style={styles.infoCard}>
+                  <LinearGradient
+                    colors={['#EEF2FF', '#E0E7FF']}
+                    style={styles.infoCardGradient}
+                  >
+                    <View style={styles.infoCardIconWrapper}>
+                      <Trophy size={24} color="#4F46E5" />
+                    </View>
+                    <Text style={styles.infoCardTitle}>Win Big</Text>
+                    <Text style={styles.infoCardDescription}>Compete and earn rewards up to ₹10,000</Text>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.infoCard}>
+                  <LinearGradient
+                    colors={['#F0FDF4', '#DCFCE7']}
+                    style={styles.infoCardGradient}
+                  >
+                    <View style={styles.infoCardIconWrapper}>
+                      <Zap size={24} color="#10B981" />
+                    </View>
+                    <Text style={styles.infoCardTitle}>Quick Match</Text>
+                    <Text style={styles.infoCardDescription}>Find opponents in just 30 seconds</Text>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.infoCard}>
+                  <LinearGradient
+                    colors={['#FEF3C7', '#FDE68A']}
+                    style={styles.infoCardGradient}
+                  >
+                    <View style={styles.infoCardIconWrapper}>
+                      <Users size={24} color="#F59E0B" />
+                    </View>
+                    <Text style={styles.infoCardTitle}>Live Players</Text>
+                    <Text style={styles.infoCardDescription}>Join 1.2k+ active players now</Text>
+                  </LinearGradient>
+                </View>
+              </View>
+            </View>
+
+                       {/* Enhanced Stats Section */}
+            <View style={styles.section}>
+              <View style={styles.enhancedStatsRow}>
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['rgba(255, 107, 107, 0.1)', 'rgba(255, 107, 107, 0.05)']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIconContainer}>
+                      <LinearGradient
+                        colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 107, 107, 0.1)']}
+                        style={styles.enhancedStatIconGradient}
+                      >
+                        <Clock size={20} color="#FF6B6B" />
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatValue}>~30s</Text>
+                      <Text style={styles.enhancedStatLabel}>Wait Time</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['rgba(78, 205, 196, 0.1)', 'rgba(78, 205, 196, 0.05)']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIconContainer}>
+                      <LinearGradient
+                        colors={['rgba(78, 205, 196, 0.2)', 'rgba(78, 205, 196, 0.1)']}
+                        style={styles.enhancedStatIconGradient}
+                      >
+                        <Users size={20} color="#4ECDC4" />
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatValue}>1.2k</Text>
+                      <Text style={styles.enhancedStatLabel}>Online</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.enhancedStatCard}>
+                  <LinearGradient
+                    colors={['rgba(255, 217, 61, 0.1)', 'rgba(255, 217, 61, 0.05)']}
+                    style={styles.enhancedStatGradient}
+                  >
+                    <View style={styles.enhancedStatIconContainer}>
+                      <LinearGradient
+                        colors={['rgba(255, 217, 61, 0.2)', 'rgba(255, 217, 61, 0.1)']}
+                        style={styles.enhancedStatIconGradient}
+                      >
+                        <Trophy size={20} color="#FFD93D" />
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.enhancedStatContent}>
+                      <Text style={styles.enhancedStatValue}>50</Text>
+                      <Text style={styles.enhancedStatLabel}>High Rewards</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+              </View>
             </View>
 
             {/* TEMPORARILY COMMENTED OUT - Private Room and Join Section 
@@ -1394,14 +1384,14 @@ export default function QuizScreen() {
                  <View style={styles.enhancedModalHeader}>
                    <View style={styles.modalTitleContainer}>
                      <Text style={styles.enhancedModalTitle}>Choose Battle Amount</Text>
-                     <Text style={styles.modalSubtitle}>Select your entry fee for {selectedCategoryName}</Text>
+                     <Text style={styles.modalSubtitle}>{selectedCategoryName}</Text>
                    </View>
                    <TouchableOpacity onPress={closeAmountModal} style={styles.enhancedCloseButton}>
                      <LinearGradient
                        colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
                        style={styles.closeButtonGradient}
                      >
-                       <X size={18} color="#fff" />
+                       <X size={16} color="#fff" />
                      </LinearGradient>
                    </TouchableOpacity>
                  </View>
@@ -1422,7 +1412,7 @@ export default function QuizScreen() {
                          }
                        ]}
                      >
-                       <Zap size={24} color="#fff" />
+                       <Zap size={20} color="#fff" />
                      </Animated.View>
                      <Text style={styles.enhancedLoadingText}>✨ Loading amounts...</Text>
                    </View>
@@ -1460,7 +1450,7 @@ export default function QuizScreen() {
                           {/* Selection Indicator */}
                           {selectedAmount?.id === amount.id && (
                             <View style={styles.amountSelectedIndicator}>
-                              <CheckCircle size={20} color="#fff" />
+                              <CheckCircle size={16} color="#fff" />
                             </View>
                           )}
                           
@@ -1509,7 +1499,7 @@ export default function QuizScreen() {
                             }
                           ]}
                         >
-                          <Zap size={20} color="#fff" />
+                          <Zap size={18} color="#fff" />
                         </Animated.View>
                         <View style={styles.playButtonTextContainer}>
                           <Text style={styles.enhancedPlayNowButtonText}>
@@ -1521,7 +1511,7 @@ export default function QuizScreen() {
                             </Text>
                           )}
                         </View>
-                        <ArrowRight size={20} color="#fff" />
+                        <ArrowRight size={18} color="#fff" />
                       </View>
                     </LinearGradient>
                   </TouchableOpacity>
@@ -1541,39 +1531,62 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FAFC',
     paddingBottom: 0,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 16,
     paddingBottom: 100,
-    paddingTop: 0, // Remove top padding since we have animated header
+    paddingTop: 0,
+    width: '100%',
   },
   content: {
-    marginTop: 20,
+    marginTop: 0,
+    width: '100%',
   },
   section: {
-    marginBottom: 12,
+    marginBottom: 20,
+    width: '100%',
   },
   sectionHeader: {
-    marginBottom: 16,
-    alignItems: 'center', // Center the title
+    marginBottom: 24,
+    alignItems: 'flex-start',
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionTitleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
   },
      sectionTitle: {
-     fontSize: 14,
-     fontWeight: '700',
+     fontSize: 20,
+     fontWeight: '900',
      color: '#1E293B',
-     marginBottom: 16,
-     textAlign: 'center',
-     textShadowColor: 'rgba(0,0,0,0.1)',
-     textShadowOffset: { width: 0, height: 1 },
-     textShadowRadius: 2,
+     marginBottom: 0,
+     textAlign: 'left',
      letterSpacing: 0.3,
-     textTransform: 'uppercase',
+     flex: 1,
    },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 0,
+    letterSpacing: 0.2,
+  },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1620,6 +1633,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
+    marginTop: 0,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   allCategoriesContainer: {
     width: '100%',
@@ -1645,13 +1661,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   selectedCategoryCard: {
-    borderColor: '#667eea',
-    borderWidth: 2,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: '#FFD700',
+    borderWidth: 4,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 16,
+    transform: [{ scale: 1.05 }],
   },
   categoryContent: {
     padding: 16,
@@ -1660,7 +1677,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   selectedCategoryContent: {
-    backgroundColor: '#667eea',
+    opacity: 1,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   categoryIcon: {
     width: 44,
@@ -1691,48 +1710,57 @@ const styles = StyleSheet.create({
   },
   selectedIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 10,
-    width: 24,
-    height: 24,
+    top: 10,
+    right: 10,
+    backgroundColor: '#10B981',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  mainActionButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#FF6B6B',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 6,
-    marginTop: 16,
+    zIndex: 10,
+  },
+  mainActionButton: {
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    elevation: 16,
+    marginTop: 24,
     position: 'relative',
   },
      mainActionButtonGradient: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: 10,
-     paddingHorizontal: 20,
-     minHeight: 48,
+     paddingVertical: 20,
+     paddingHorizontal: 32,
+     minHeight: 70,
      position: 'relative',
+     borderWidth: 2,
+     borderColor: 'rgba(255, 255, 255, 0.3)',
+     borderRadius: 24,
    },
   mainActionButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginHorizontal: 12,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: 0.5,
+    fontSize: 20,
+    fontWeight: '900',
+    marginHorizontal: 14,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+    letterSpacing: 1,
   },
   privateRoomContainer: {
     borderRadius: 16,
@@ -1951,25 +1979,35 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   largeCategoryContainer: {
-    width: '48%', // Adjust as needed for the large card
-    borderRadius: 16,
+    width: '48%',
+    borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    marginBottom: 0,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
     position: 'relative',
+    flexShrink: 0,
   },
   largeCategoryCard: {
     width: '100%',
-    height: 160, // Match the height of 4 small cards (2 rows × 80px each)
+    height: 220,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3E8FF', // Default background for large card
+    backgroundColor: 'transparent',
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   largeCategoryContent: {
     width: '100%',
@@ -1977,71 +2015,98 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 28,
   },
      largeCategoryIcon: {
-     width: 80,
-     height: 80,
-     borderRadius: 40,
+     width: 100,
+     height: 100,
+     borderRadius: 50,
      justifyContent: 'center',
      alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-     marginBottom: 12,
-     borderWidth: 2,
-     borderColor: 'rgba(255, 255, 255, 0.5)',
+     backgroundColor: 'rgba(255, 255, 255, 0.35)',
+     marginBottom: 18,
+     borderWidth: 4,
+     borderColor: 'rgba(255, 255, 255, 0.8)',
      overflow: 'hidden',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 8 },
+     shadowOpacity: 0.4,
+     shadowRadius: 16,
+     elevation: 12,
    },
   largeCategoryName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff', // Changed to white for dark backgrounds
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#fff',
     textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+    letterSpacing: 0.8,
   },
   smallCategoriesContainer: {
-    width: '48%', // Adjust as needed for the small cards
-    gap: 8,
+    width: '48%',
+    gap: 10,
+    flexShrink: 0,
   },
   smallCategoriesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
   },
   smallCategoryCard: {
-    width: '48%', // Adjust as needed for the small cards
-    borderRadius: 12,
+    width: '48%',
+    borderRadius: 24,
     overflow: 'hidden',
-    marginBottom: 0, // No bottom margin for small cards
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 0,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
     position: 'relative',
   },
   smallCategoryContent: {
     width: '100%',
-    height: 80, // Fixed height for small cards
+    height: 110,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 24,
   },
      smallCategoryIcon: {
-     width: 40,
-     height: 40,
-     borderRadius: 0,
+     width: 56,
+     height: 56,
+     borderRadius: 28,
      justifyContent: 'center',
      alignItems: 'center',
-     backgroundColor: 'transparent',
-     marginBottom: 2,
-     borderWidth: 0,
-     borderColor: 'transparent',
+     backgroundColor: 'rgba(255, 255, 255, 0.3)',
+     marginBottom: 10,
+     borderWidth: 3,
+     borderColor: 'rgba(255, 255, 255, 0.7)',
+     overflow: 'hidden',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.3,
+     shadowRadius: 8,
+     elevation: 6,
    },
   smallCategoryName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff', // Changed to white for dark backgrounds
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#fff',
     textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.5,
   },
   buttonGlow: {
     position: 'absolute',
@@ -2057,24 +2122,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-     buttonIconContainer: {
-     width: 40,
-     height: 40,
-     borderRadius: 20,
-     justifyContent: 'center',
-     alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-     marginRight: 8,
-   },
-     buttonArrowContainer: {
-     width: 40,
-     height: 40,
-     borderRadius: 20,
-     justifyContent: 'center',
-     alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-     marginLeft: 8,
-   },
+       buttonIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+      buttonArrowContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      marginLeft: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
   buttonSparkle1: {
     position: 'absolute',
     top: -10,
@@ -2533,9 +2602,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   battleArenaSection: {
-    marginTop: 20,
+    marginTop: 24,
     marginBottom: 20,
-    height: 180, // Reduced height from 240 to 180 for more compact design
+    height: 200,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
+    width: '100%',
   },
   battleArenaGradient: {
     position: 'relative',
@@ -2550,35 +2627,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: '100%',
     paddingHorizontal: 20,
-    paddingVertical: 16, // Added vertical padding
+    paddingVertical: 20,
+    width: '100%',
   },
   battleArenaLeft: {
     flex: 1,
-    marginRight: 10,
-    justifyContent: 'center', // Center content vertically
+    marginRight: 12,
+    justifyContent: 'center',
+    minWidth: 0,
   },
   battleArenaRight: {
     width: 100,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   titleContainer: {
-    marginBottom: 12, // Reduced margin to fit better
+    marginBottom: 0,
+    flexShrink: 1,
+    flex: 1,
   },
   battleArenaTitle: {
-    fontSize: 24, // Reduced font size to prevent cutting
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '900',
     color: '#fff',
     textAlign: 'left',
-    marginBottom: 4, // Reduced margin
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.3,
+    flexWrap: 'wrap',
   },
   battleArenaSubtitle: {
-    fontSize: 16, // Reduced font size to prevent cutting
-    color: '#fff',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.95)',
     textAlign: 'left',
-    marginBottom: 2, // Reduced margin
-    opacity: 0.9, // Slightly transparent for better hierarchy
+    marginBottom: 0,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    flexWrap: 'wrap',
   },
   quizGameSection: {
     marginTop: 8, // Reduced margin
@@ -2777,18 +2866,71 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
      categorySectionBackground: {
-     backgroundColor: '#F3E8FF', // Added background color for category section
-     borderRadius: 16,
-     padding: 16,
-     marginTop: 12,
-     borderWidth: 1,
-     borderColor: '#E2E8F0',
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.05,
-     shadowRadius: 4,
-     elevation: 2,
-   },
+      borderRadius: 32,
+      padding: 0,
+      marginTop: 0,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'rgba(79, 70, 229, 0.2)',
+      shadowColor: '#4F46E5',
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.25,
+      shadowRadius: 32,
+      elevation: 12,
+      width: '100%',
+    },
+    premiumSectionHeader: {
+      marginBottom: 24,
+      borderRadius: 0,
+      overflow: 'hidden',
+    },
+    premiumHeaderGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    premiumIconWrapper: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255, 215, 0, 0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+      borderWidth: 2,
+      borderColor: 'rgba(255, 215, 0, 0.4)',
+      shadowColor: '#FFD700',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 6,
+    },
+    premiumHeaderText: {
+      flex: 1,
+    },
+    premiumSectionTitle: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: '#FFFFFF',
+      marginBottom: 0,
+      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      textShadowOffset: { width: 0, height: 2 },
+      textShadowRadius: 4,
+      letterSpacing: 0.4,
+    },
+    premiumSectionSubtitle: {
+      fontSize: 14,
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '600',
+      letterSpacing: 0.3,
+    },
+    premiumCategoryContent: {
+      padding: 24,
+      paddingTop: 20,
+    },
    
    // Enhanced Battle Arena Styles
        battleStatsRow: {
@@ -2866,36 +3008,38 @@ const styles = StyleSheet.create({
             enhancedStatsRow: {
      flexDirection: 'row',
      justifyContent: 'space-between',
-     marginBottom: 8, // Increased for better spacing
-     gap: 8, // Reduced gap for more compact design
+     marginBottom: 0,
+     gap: 10,
+     marginTop: 0,
    },
     enhancedStatCard: {
       flex: 1,
       borderRadius: 16,
       overflow: 'hidden',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
       shadowRadius: 8,
-      elevation: 4,
+      elevation: 2,
       borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.2)',
+      borderColor: '#E5E7EB',
+      backgroundColor: '#FFFFFF',
     },
          enhancedStatGradient: {
        padding: 12,
        alignItems: 'center',
-       minHeight: 60,
+       minHeight: 70,
      },
          enhancedStatIconContainer: {
-       width: 32,
-       height: 32,
-       borderRadius: 16,
-       backgroundColor: 'rgba(255, 255, 255, 0.15)',
+       width: 40,
+       height: 40,
+       borderRadius: 20,
+       backgroundColor: '#F9FAFB',
        justifyContent: 'center',
        alignItems: 'center',
-       marginBottom: 6,
+       marginBottom: 8,
        borderWidth: 1,
-       borderColor: 'rgba(255, 255, 255, 0.2)',
+       borderColor: '#E5E7EB',
      },
     enhancedStatContent: {
       alignItems: 'center',
@@ -2904,19 +3048,15 @@ const styles = StyleSheet.create({
        fontSize: 18,
        fontWeight: '800',
        color: '#1E293B',
-       marginBottom: 2,
-       textShadowColor: 'rgba(0,0,0,0.1)',
-       textShadowOffset: { width: 0, height: 1 },
-       textShadowRadius: 2,
-       letterSpacing: 0.3,
+       marginBottom: 3,
+       letterSpacing: 0.2,
      },
      enhancedStatLabel: {
-       fontSize: 13,
+       fontSize: 11,
        color: '#64748B',
        fontWeight: '600',
        textAlign: 'center',
-       letterSpacing: 0.3,
-       textTransform: 'uppercase',
+       letterSpacing: 0.2,
      },
         enhancedStatIconGradient: {
      width: 48,
@@ -2954,21 +3094,21 @@ const styles = StyleSheet.create({
      borderColor: 'rgba(255, 255, 255, 0.15)',
    },
        modalGradientBackground: {
-     padding: 24,
-     paddingTop: 8,
-     paddingBottom: 30,
+     padding: 18,
+     paddingTop: 6,
+     paddingBottom: 20,
      borderTopLeftRadius: 25,
      borderTopRightRadius: 25,
      minHeight: 'auto',
    },
    enhancedHandleBar: {
      alignItems: 'center',
-     marginBottom: 12,
-     paddingTop: 6,
+     marginBottom: 8,
+     paddingTop: 4,
    },
    handleBarLine: {
-     width: 40,
-     height: 4,
+     width: 36,
+     height: 3,
      backgroundColor: 'rgba(255, 255, 255, 0.6)',
      borderRadius: 2,
      shadowColor: '#000',
@@ -2981,7 +3121,7 @@ const styles = StyleSheet.create({
      flexDirection: 'row',
      justifyContent: 'space-between',
      alignItems: 'center',
-     marginBottom: 25,
+     marginBottom: 16,
      paddingHorizontal: 4,
    },
    modalTitleContainer: {
@@ -2989,47 +3129,47 @@ const styles = StyleSheet.create({
      alignItems: 'center',
    },
    enhancedModalTitle: {
-     fontSize: 20,
+     fontSize: 18,
      fontWeight: '800',
      color: '#FFFFFF',
      textAlign: 'center',
      textShadowColor: 'rgba(0,0,0,0.3)',
      textShadowOffset: { width: 0, height: 2 },
      textShadowRadius: 4,
-     letterSpacing: 0.6,
-     marginBottom: 4,
+     letterSpacing: 0.5,
+     marginBottom: 2,
    },
    modalSubtitle: {
-     fontSize: 14,
+     fontSize: 12,
      color: 'rgba(255,255,255,0.85)',
      textAlign: 'center',
-     fontWeight: '600',
-     letterSpacing: 0.3,
+     fontWeight: '500',
+     letterSpacing: 0.2,
      textShadowColor: 'rgba(0,0,0,0.2)',
      textShadowOffset: { width: 0, height: 1 },
      textShadowRadius: 2,
    },
     enhancedCloseButton: {
-      padding: 6,
+      padding: 5,
       backgroundColor: 'rgba(255,255,255,0.25)',
-      borderRadius: 15,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.4)',
     },
        enhancedLoadingContainer: {
      alignItems: 'center',
-     paddingVertical: 20,
+     paddingVertical: 16,
    },
        loadingIconContainer: {
-     marginBottom: 8,
-     padding: 8,
+     marginBottom: 6,
+     padding: 6,
      backgroundColor: 'rgba(255,255,255,0.15)',
-     borderRadius: 16,
+     borderRadius: 12,
      borderWidth: 1,
      borderColor: 'rgba(255,255,255,0.3)',
    },
     enhancedLoadingText: {
-      fontSize: 14,
+      fontSize: 12,
       color: '#fff',
       fontWeight: '600',
       letterSpacing: 0.2,
@@ -3038,29 +3178,29 @@ const styles = StyleSheet.create({
      flexDirection: 'row',
      justifyContent: 'space-around',
      alignItems: 'center',
-     marginBottom: 30,
+     marginBottom: 18,
      flexWrap: 'wrap',
-     gap: 12,
-     paddingHorizontal: 8,
-     paddingVertical: 10,
+     gap: 10,
+     paddingHorizontal: 4,
+     paddingVertical: 6,
    },
        amountOptionWrapper: {
      marginBottom: 4,
    },
     enhancedAmountOption: {
-      width: 80,
-      height: 80,
-      borderRadius: 20,
+      width: 70,
+      height: 70,
+      borderRadius: 16,
       borderWidth: 2,
       borderColor: 'rgba(255,255,255,0.3)',
       shadowColor: '#667eea',
-      shadowOffset: { width: 0, height: 4 },
+      shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 6,
+      shadowRadius: 6,
+      elevation: 5,
       position: 'relative',
       overflow: 'hidden',
-      marginHorizontal: 6,
+      marginHorizontal: 4,
     },
     amountOptionGradient: {
       width: '100%',
@@ -3071,27 +3211,27 @@ const styles = StyleSheet.create({
     enhancedSelectedAmountOption: {
       borderColor: '#10B981',
       borderWidth: 3,
-      transform: [{ scale: 1.08 }],
+      transform: [{ scale: 1.05 }],
       shadowColor: '#10B981',
-      shadowOffset: { width: 0, height: 8 },
+      shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.4,
-      shadowRadius: 15,
-      elevation: 10,
+      shadowRadius: 12,
+      elevation: 8,
     },
        enhancedAmountOptionText: {
-     fontSize: 18,
+     fontSize: 16,
      fontWeight: '800',
      color: '#fff',
      textShadowColor: 'rgba(0,0,0,0.3)',
      textShadowOffset: { width: 0, height: 1 },
      textShadowRadius: 3,
-     letterSpacing: 0.5,
+     letterSpacing: 0.4,
    },
    currencySymbol: {
-     fontSize: 14,
+     fontSize: 12,
      fontWeight: '600',
      color: 'rgba(255,255,255,0.8)',
-     marginBottom: 2,
+     marginBottom: 1,
    },
    amountOptionContent: {
      alignItems: 'center',
@@ -3099,12 +3239,12 @@ const styles = StyleSheet.create({
    },
    amountSelectedIndicator: {
      position: 'absolute',
-     top: -8,
-     right: -8,
+     top: -6,
+     right: -6,
      backgroundColor: '#10B981',
-     borderRadius: 15,
-     width: 30,
-     height: 30,
+     borderRadius: 12,
+     width: 24,
+     height: 24,
      justifyContent: 'center',
      alignItems: 'center',
      borderWidth: 2,
@@ -3126,34 +3266,35 @@ const styles = StyleSheet.create({
      zIndex: -1,
    },
    closeButtonGradient: {
-     width: 32,
-     height: 32,
-     borderRadius: 16,
+     width: 28,
+     height: 28,
+     borderRadius: 14,
      justifyContent: 'center',
      alignItems: 'center',
    },
    playButtonContainer: {
-     marginTop: 10,
-     marginBottom: 5,
+     marginTop: 8,
+     marginBottom: 4,
    },
    playButtonContent: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingHorizontal: 20,
-     paddingVertical: 16,
+     paddingHorizontal: 16,
+     paddingVertical: 12,
+     gap: 8,
    },
    playButtonTextContainer: {
      flex: 1,
      alignItems: 'center',
-     marginHorizontal: 15,
+     marginHorizontal: 10,
    },
    playButtonSubtext: {
-     fontSize: 12,
+     fontSize: 10,
      color: 'rgba(255,255,255,0.9)',
      fontWeight: '600',
-     marginTop: 2,
-     letterSpacing: 0.3,
+     marginTop: 1,
+     letterSpacing: 0.2,
    },
    disabledPlayButton: {
      opacity: 0.7,
@@ -3167,13 +3308,19 @@ const styles = StyleSheet.create({
    },
    selectedIndicator: {
      position: 'absolute',
-     top: -8,
-     right: -8,
-     backgroundColor: '#4CAF50',
-     borderRadius: 12,
+     top: 8,
+     right: 8,
+     backgroundColor: '#10B981',
+     borderRadius: 14,
      padding: 2,
-     borderWidth: 2,
+     borderWidth: 3,
      borderColor: '#FFFFFF',
+     shadowColor: '#10B981',
+     shadowOffset: { width: 0, height: 3 },
+     shadowOpacity: 0.5,
+     shadowRadius: 6,
+     elevation: 5,
+     zIndex: 10,
    },
    loadingContainer: {
      padding: 20,
@@ -3201,25 +3348,25 @@ const styles = StyleSheet.create({
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: 10,
-     paddingHorizontal: 20,
-     minHeight: 42,
+     paddingVertical: 8,
+     paddingHorizontal: 16,
+     minHeight: 38,
      position: 'relative',
    },
     playButtonIconContainer: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.25)',
-      marginRight: 8,
+      marginRight: 6,
     },
     enhancedPlayNowButtonText: {
       color: '#fff',
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '700',
-      marginHorizontal: 8,
+      marginHorizontal: 6,
       textShadowColor: 'rgba(0,0,0,0.2)',
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 2,
@@ -3328,4 +3475,54 @@ const styles = StyleSheet.create({
        backgroundColor: '#FFD700',
        zIndex: 1,
      },
+  // Premium Info Cards Styles
+  infoCardsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  infoCard: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  infoCardGradient: {
+    padding: 14,
+    alignItems: 'center',
+    minHeight: 110,
+    justifyContent: 'center',
+  },
+  infoCardIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 1)',
+  },
+  infoCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 5,
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  infoCardDescription: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
 }); 

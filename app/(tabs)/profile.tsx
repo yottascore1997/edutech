@@ -52,6 +52,7 @@ export default function ProfileScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+  const [followRequestsCount, setFollowRequestsCount] = useState(0);
   
 
   const fetchProfile = async () => {
@@ -133,10 +134,11 @@ export default function ProfileScreen() {
   const fetchUserPosts = async () => {
     setPostsLoading(true);
     try {
-      const res = await apiFetchAuth(`/student/posts?authorId=${user?.id}&limit=20`, user?.token || '');
+      const res = await apiFetchAuth(`/student/posts/user/${user?.id}`, user?.token || '');
       if (res.ok) {
-        // Posts are already filtered by authorId on the backend
-        setUserPosts(res.data);
+        // Handle different API response formats (array or object with posts property)
+        const posts = Array.isArray(res.data) ? res.data : (res.data.posts || res.data.data || []);
+        setUserPosts(posts);
       }
     } catch (e) {
       console.error('Error fetching user posts:', e);
@@ -165,12 +167,31 @@ export default function ProfileScreen() {
     setRefreshing(false);
   };
 
+  const fetchFollowRequestsCount = async () => {
+    try {
+      const res = await apiFetchAuth('/student/follow-requests', user?.token || '');
+      if (res.ok) {
+        const requests = res.data || [];
+        // Count pending requests where current user is the receiver
+        const pendingCount = requests.filter((req: any) => {
+          const isPending = req.status === 'pending' || req.status === 'PENDING' || req.status === 'waiting' || req.status === 'WAITING';
+          const isReceiver = req.receiverId === user?.id;
+          return isPending && isReceiver;
+        }).length;
+        setFollowRequestsCount(pendingCount);
+      }
+    } catch (error) {
+      console.error('Error fetching follow requests count:', error);
+    }
+  };
+
   // Refresh profile data every time the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       fetchProfile();
       fetchUserPosts();
       fetchPendingPosts();
+      fetchFollowRequestsCount();
     }, [user?.token])
   );
 
@@ -449,36 +470,41 @@ export default function ProfileScreen() {
          >
            {/* Professional Header Content */}
            <View style={styles.professionalHeaderContent}>
-             {/* Professional Avatar Section */}
+             {/* Enhanced Avatar Section */}
              <View style={styles.professionalAvatarSection}>
                <View style={styles.professionalAvatarContainer}>
-                 {uploadingPhoto ? (
-                   <View style={styles.professionalAvatarLoading}>
-                     <ActivityIndicator size="large" color="#fff" />
-                   </View>
-                 ) : profile?.profilePhoto ? (
-                   <Image source={{ uri: profile.profilePhoto }} style={styles.professionalAvatar} />
-                 ) : (
-                   <LinearGradient
-                     colors={['#6366F1', '#8B5CF6']}
-                     style={styles.professionalAvatarPlaceholder}
-                   >
-                     <Text style={styles.professionalAvatarInitials}>{getInitials(profile?.name)}</Text>
-                   </LinearGradient>
-                 )}
+                 <View style={styles.avatarRing}>
+                   {uploadingPhoto ? (
+                     <View style={styles.professionalAvatarLoading}>
+                       <ActivityIndicator size="large" color="#fff" />
+                     </View>
+                   ) : profile?.profilePhoto ? (
+                     <Image source={{ uri: profile.profilePhoto }} style={styles.professionalAvatar} />
+                   ) : (
+                     <LinearGradient
+                       colors={['#6366F1', '#8B5CF6', '#A855F7']}
+                       style={styles.professionalAvatarPlaceholder}
+                     >
+                       <Text style={styles.professionalAvatarInitials}>{getInitials(profile?.name)}</Text>
+                     </LinearGradient>
+                   )}
+                 </View>
                  <TouchableOpacity 
                    style={[styles.professionalEditAvatarButton, uploadingPhoto && styles.editAvatarButtonDisabled]} 
                    activeOpacity={0.8}
                    onPress={handleProfilePhotoUpload}
                    disabled={uploadingPhoto}
                  >
-                   <View style={styles.professionalEditAvatarIcon}>
+                   <LinearGradient
+                     colors={['#10B981', '#059669']}
+                     style={styles.professionalEditAvatarIcon}
+                   >
                      {uploadingPhoto ? (
                        <ActivityIndicator size="small" color="#fff" />
                      ) : (
                        <Ionicons name="camera" size={16} color="#fff" />
                      )}
-                   </View>
+                   </LinearGradient>
                  </TouchableOpacity>
                </View>
                
@@ -495,88 +521,125 @@ export default function ProfileScreen() {
                   </Text>
                   {(profile?.course || profile?.year) && (
                     <View style={styles.professionalCourseInfo}>
-                      <Ionicons name="school-outline" size={14} color="#94A3B8" />
+                      <Ionicons name="school" size={14} color="#FFFFFF" />
                       <Text style={styles.professionalCourseText}>{[profile?.course, profile?.year].filter(Boolean).join(' • ')}</Text>
                     </View>
                   )}
+                  
+                  {/* Stats next to name */}
+                  <View style={styles.professionalStatsContainer}>
+                    <TouchableOpacity 
+                      style={styles.professionalStatItem} 
+                      activeOpacity={0.8}
+                      onPress={() => handleStatPress('posts')}
+                    >
+                      <Text style={styles.professionalStatNumber}>{profile?._count?.posts || 0}</Text>
+                      <Text style={styles.professionalStatLabel}>Posts</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.professionalStatItem} 
+                      activeOpacity={0.8}
+                      onPress={() => handleStatPress('followers')}
+                    >
+                      <Text style={styles.professionalStatNumber}>{profile?._count?.followers || 0}</Text>
+                      <Text style={styles.professionalStatLabel}>Followers</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.professionalStatItem} 
+                      activeOpacity={0.8}
+                      onPress={() => handleStatPress('following')}
+                    >
+                      <Text style={styles.professionalStatNumber}>{profile?._count?.following || 0}</Text>
+                      <Text style={styles.professionalStatLabel}>Following</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
              </View>
-
-             {/* Professional Stats Cards */}
-             <View style={styles.professionalStatsContainer}>
-               <View style={styles.professionalStatCard}>
-                 <View style={styles.professionalStatGradient}>
-                   <View style={styles.professionalStatIconContainer}>
-                     <Ionicons name="document-text" size={20} color="#FFFFFF" />
-                   </View>
-                   <Text style={styles.professionalStatNumber}>{profile?._count?.posts || 0}</Text>
-                   <Text style={styles.professionalStatLabel}>Posts</Text>
-                 </View>
-               </View>
-               <View style={styles.professionalStatCard}>
-                 <View style={styles.professionalStatGradient}>
-                   <View style={styles.professionalStatIconContainer}>
-                     <Ionicons name="people" size={20} color="#FFFFFF" />
-                   </View>
-                   <Text style={styles.professionalStatNumber}>{profile?._count?.followers || 0}</Text>
-                   <Text style={styles.professionalStatLabel}>Followers</Text>
-                 </View>
-               </View>
-               <View style={styles.professionalStatCard}>
-                 <View style={styles.professionalStatGradient}>
-                   <View style={styles.professionalStatIconContainer}>
-                     <Ionicons name="person-add" size={20} color="#FFFFFF" />
-                   </View>
-                   <Text style={styles.professionalStatNumber}>{profile?._count?.following || 0}</Text>
-                   <Text style={styles.professionalStatLabel}>Following</Text>
-                 </View>
-               </View>
-             </View>
              
              
              
-             {/* Professional Action Buttons */}
+             {/* Enhanced Action Buttons */}
              <View style={styles.professionalActionButtons}>
                {user?.id !== profile?.id ? (
                  <TouchableOpacity style={styles.professionalFollowButton} activeOpacity={0.8} onPress={handleFollow}>
-                   <View style={styles.professionalFollowButtonContent}>
+                   <LinearGradient
+                     colors={['#10B981', '#059669']}
+                     start={{ x: 0, y: 0 }}
+                     end={{ x: 1, y: 0 }}
+                     style={styles.professionalFollowButtonContent}
+                   >
                      <Ionicons name="person-add" size={18} color="#fff" />
                      <Text style={styles.professionalFollowButtonText}>Follow</Text>
-                   </View>
+                   </LinearGradient>
                  </TouchableOpacity>
                ) : (
                  <TouchableOpacity style={styles.professionalEditButton} activeOpacity={0.8} onPress={handleEditProfile}>
-                   <View style={styles.professionalEditButtonContent}>
-                     <Ionicons name="create" size={18} color="#fff" />
+                   <LinearGradient
+                     colors={['#3B82F6', '#2563EB']}
+                     start={{ x: 0, y: 0 }}
+                     end={{ x: 1, y: 0 }}
+                     style={styles.professionalEditButtonContent}
+                   >
+                     <Ionicons name="create-outline" size={18} color="#fff" />
                      <Text style={styles.professionalEditButtonText}>Edit Profile</Text>
-                   </View>
+                   </LinearGradient>
                  </TouchableOpacity>
                )}
-               <TouchableOpacity style={styles.professionalShareButton} onPress={handleShareProfile}>
-                 <View style={styles.professionalShareButtonContent}>
+               <TouchableOpacity 
+                 style={styles.professionalFollowRequestsButton} 
+                 activeOpacity={0.8}
+                 onPress={() => navigation.navigate('(tabs)', { screen: 'follow-requests' })}
+               >
+                 <LinearGradient
+                   colors={['#FF6B6B', '#EF4444']}
+                   start={{ x: 0, y: 0 }}
+                   end={{ x: 1, y: 0 }}
+                   style={styles.professionalFollowRequestsButtonContent}
+                 >
+                   <Ionicons name="person-add-outline" size={18} color="#fff" />
+                   <Text style={styles.professionalFollowRequestsButtonText}>Requests</Text>
+                 </LinearGradient>
+               </TouchableOpacity>
+               <TouchableOpacity 
+                 style={styles.professionalShareButton} 
+                 activeOpacity={0.8}
+                 onPress={handleShareProfile}
+               >
+                 <LinearGradient
+                   colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.15)']}
+                   style={styles.professionalShareButtonContent}
+                 >
                    <Ionicons name="share-social" size={20} color="#fff" />
-                 </View>
+                 </LinearGradient>
                </TouchableOpacity>
              </View>
            </View>
          </LinearGradient>
 
-        {/* Professional Bio Section */}
+        {/* Enhanced Bio Section */}
         {profile?.bio && (
           <View style={styles.professionalBioSection}>
-            <View style={styles.professionalBioHeader}>
-              <View style={styles.professionalBioIconContainer}>
-                <Ionicons name="information-circle" size={20} color="#6366F1" />
+            <LinearGradient
+              colors={['rgba(99, 102, 241, 0.05)', 'rgba(139, 92, 246, 0.05)']}
+              style={styles.bioGradientContainer}
+            >
+              <View style={styles.professionalBioHeader}>
+                <LinearGradient
+                  colors={['#6366F1', '#8B5CF6']}
+                  style={styles.professionalBioIconContainer}
+                >
+                  <Ionicons name="information-circle" size={20} color="#FFFFFF" />
+                </LinearGradient>
+                <Text style={styles.professionalBioTitle}>About Me</Text>
               </View>
-              <Text style={styles.professionalBioTitle}>About Me</Text>
-            </View>
-            <Text style={styles.professionalBio}>{profile?.bio}</Text>
+              <Text style={styles.professionalBio}>{profile?.bio}</Text>
+            </LinearGradient>
           </View>
         )}
 
 
 
-        {/* Pending Posts Section */}
+        {/* Enhanced Pending Posts Section */}
         {pendingPosts.length > 0 && (
           <View style={styles.pendingPostsSection}>
             <TouchableOpacity 
@@ -587,18 +650,23 @@ export default function ProfileScreen() {
               <View style={styles.pendingPostsHeaderLeft}>
                 <LinearGradient
                   colors={['#F59E0B', '#D97706']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
                   style={styles.pendingPostsIconContainer}
                 >
-                  <Ionicons name="time-outline" size={20} color="#FFFFFF" />
+                  <Ionicons name="time" size={20} color="#FFFFFF" />
                 </LinearGradient>
                 <View style={styles.pendingPostsHeaderText}>
                   <Text style={styles.pendingPostsTitle}>Pending for Review</Text>
                   <Text style={styles.pendingPostsSubtitle}>{pendingPosts.length} post{pendingPosts.length !== 1 ? 's' : ''} awaiting approval</Text>
                 </View>
               </View>
-              <View style={styles.pendingPostsBadge}>
+              <LinearGradient
+                colors={['#F59E0B', '#D97706']}
+                style={styles.pendingPostsBadge}
+              >
                 <Text style={styles.pendingPostsBadgeText}>{pendingPosts.length}</Text>
-              </View>
+              </LinearGradient>
               <Ionicons name="chevron-forward" size={20} color="#F59E0B" />
             </TouchableOpacity>
           </View>
@@ -663,14 +731,14 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Professional Floating Action Button */}
+      {/* Enhanced Floating Action Button */}
       <TouchableOpacity
         style={styles.professionalFab}
         onPress={() => setCreatePostVisible(true)}
-        activeOpacity={0.8}
+        activeOpacity={0.9}
       >
         <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
+          colors={['#6366F1', '#8B5CF6', '#A855F7']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.professionalFabGradient}
@@ -1051,20 +1119,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
-  postCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 16,
-    marginHorizontal: 16,
-    padding: 20,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
+   postCard: {
+     backgroundColor: '#FFFFFF',
+     borderRadius: 20,
+     marginBottom: 16,
+     marginHorizontal: 16,
+     padding: 20,
+     shadowColor: '#4F46E5',
+     shadowOffset: { width: 0, height: 6 },
+     shadowOpacity: 0.15,
+     shadowRadius: 16,
+     elevation: 6,
+     borderWidth: 1,
+     borderColor: 'rgba(99, 102, 241, 0.1)',
+   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1483,23 +1551,26 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  // Pending Posts Section Styles
+  // Enhanced Pending Posts Section Styles
   pendingPostsSection: {
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 12,
+    marginTop: 4,
   },
   pendingPostsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    padding: 20,
+    padding: 12,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
   },
   pendingPostsHeaderLeft: {
     flexDirection: 'row',
@@ -1507,34 +1578,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pendingPostsIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 10,
   },
   pendingPostsHeaderText: {
     flex: 1,
   },
   pendingPostsTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 2,
+    letterSpacing: 0.2,
   },
   pendingPostsSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6B7280',
     fontWeight: '500',
   },
   pendingPostsBadge: {
-    backgroundColor: '#F59E0B',
     borderRadius: 12,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     marginRight: 12,
-    minWidth: 24,
+    minWidth: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2148,8 +2219,8 @@ const styles = StyleSheet.create({
    // Professional Profile Styles
    professionalProfileHeader: {
      paddingTop: 40,
-     paddingBottom: 20,
-     paddingHorizontal: 20,
+     paddingBottom: 24,
+     paddingHorizontal: 16,
      borderBottomLeftRadius: 20,
      borderBottomRightRadius: 20,
      shadowColor: '#1E293B',
@@ -2163,9 +2234,9 @@ const styles = StyleSheet.create({
    },
    professionalAvatarSection: {
      flexDirection: 'row',
-     alignItems: 'center',
+     alignItems: 'flex-start',
      justifyContent: 'flex-start',
-     marginBottom: 20,
+     marginBottom: 12,
      paddingHorizontal: 4,
    },
    professionalAvatarContainer: {
@@ -2173,35 +2244,47 @@ const styles = StyleSheet.create({
      marginRight: 16,
    },
    professionalAvatar: {
-     width: 70,
-     height: 70,
-     borderRadius: 35,
-     borderWidth: 3,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
+     width: 100,
+     height: 100,
+     borderRadius: 50,
+     borderWidth: 4,
+     borderColor: '#FFFFFF',
    },
    professionalAvatarPlaceholder: {
-     width: 70,
-     height: 70,
-     borderRadius: 35,
+     width: 100,
+     height: 100,
+     borderRadius: 50,
      justifyContent: 'center',
      alignItems: 'center',
-     borderWidth: 3,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
+     borderWidth: 4,
+     borderColor: '#FFFFFF',
+   },
+   avatarRing: {
+     width: 100,
+     height: 100,
+     borderRadius: 50,
+     borderWidth: 4,
+     borderColor: 'rgba(255, 255, 255, 0.5)',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.2,
+     shadowRadius: 4,
+     elevation: 4,
    },
    professionalAvatarInitials: {
-     fontSize: 24,
+     fontSize: 36,
      fontWeight: 'bold',
      color: '#FFFFFF',
    },
    professionalAvatarLoading: {
-     width: 70,
-     height: 70,
-     borderRadius: 35,
+     width: 100,
+     height: 100,
+     borderRadius: 50,
      backgroundColor: 'rgba(255,255,255,0.2)',
      justifyContent: 'center',
      alignItems: 'center',
-     borderWidth: 3,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
+     borderWidth: 4,
+     borderColor: '#FFFFFF',
    },
    professionalEditAvatarButton: {
      position: 'absolute',
@@ -2209,13 +2292,12 @@ const styles = StyleSheet.create({
      right: 0,
    },
    professionalEditAvatarIcon: {
-     width: 28,
-     height: 28,
-     borderRadius: 14,
-     backgroundColor: '#6366F1',
+     width: 32,
+     height: 32,
+     borderRadius: 16,
      justifyContent: 'center',
      alignItems: 'center',
-     borderWidth: 2,
+     borderWidth: 3,
      borderColor: '#FFFFFF',
      shadowColor: '#000',
      shadowOffset: { width: 0, height: 2 },
@@ -2225,89 +2307,75 @@ const styles = StyleSheet.create({
    },
    professionalProfileInfo: {
      flex: 1,
+     marginTop: 8,
    },
    professionalName: {
-     fontSize: 22,
+     fontSize: 20,
      fontWeight: '700',
      color: '#FFFFFF',
      marginBottom: 4,
      letterSpacing: 0.3,
    },
    professionalEmail: {
-     fontSize: 14,
-     color: 'rgba(255, 255, 255, 0.8)',
+     fontSize: 13,
+     color: 'rgba(255, 255, 255, 0.9)',
      marginBottom: 6,
      fontWeight: '500',
    },
    professionalCourseInfo: {
      flexDirection: 'row',
      alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+     backgroundColor: 'rgba(255, 255, 255, 0.15)',
      paddingHorizontal: 10,
      paddingVertical: 4,
      borderRadius: 12,
    },
    professionalCourseText: {
-     fontSize: 12,
+     fontSize: 11,
      color: 'rgba(255, 255, 255, 0.9)',
      fontWeight: '500',
      marginLeft: 6,
    },
    professionalStatsContainer: {
      flexDirection: 'row',
-     justifyContent: 'space-between',
-     marginBottom: 20,
-     paddingHorizontal: 4,
-     gap: 8,
-   },
-   professionalStatCard: {
-     flex: 1,
-     borderRadius: 12,
-     overflow: 'hidden',
-     borderWidth: 1,
-     borderColor: 'rgba(255, 255, 255, 0.2)',
-   },
-   professionalStatGradient: {
-     backgroundColor: '#F97316',
-     padding: 12,
+     justifyContent: 'flex-start',
      alignItems: 'center',
+     marginTop: 8,
+     paddingHorizontal: 0,
+     gap: 16,
+     marginLeft: -12,
    },
-   professionalStatIconContainer: {
-     width: 32,
-     height: 32,
-     borderRadius: 16,
-     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+   professionalStatItem: {
+     alignItems: 'center',
      justifyContent: 'center',
-     alignItems: 'center',
-     marginBottom: 6,
+     minWidth: 60,
    },
    professionalStatNumber: {
-     fontSize: 18,
+     fontSize: 20,
      fontWeight: '700',
      color: '#FFFFFF',
      marginBottom: 2,
      textAlign: 'center',
    },
    professionalStatLabel: {
-     fontSize: 10,
+     fontSize: 12,
      color: 'rgba(255, 255, 255, 0.9)',
      fontWeight: '500',
-     textTransform: 'uppercase',
-     letterSpacing: 0.5,
      textAlign: 'center',
    },
-   professionalActionButtons: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     gap: 12,
-     marginTop: 4,
-     paddingHorizontal: 4,
-   },
+  professionalActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 0,
+    paddingHorizontal: 4,
+    justifyContent: 'space-between',
+  },
    professionalFollowButton: {
      flex: 1,
-     backgroundColor: '#6366F1',
      borderRadius: 12,
-     shadowColor: '#6366F1',
+     overflow: 'hidden',
+     shadowColor: '#10B981',
      shadowOffset: { width: 0, height: 2 },
      shadowOpacity: 0.3,
      shadowRadius: 4,
@@ -2317,77 +2385,136 @@ const styles = StyleSheet.create({
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: 12,
-     paddingHorizontal: 16,
+     paddingVertical: 8,
+     paddingHorizontal: 14,
      borderRadius: 12,
    },
    professionalFollowButtonText: {
      color: '#fff',
-     fontSize: 14,
+     fontSize: 13,
      fontWeight: '600',
      marginLeft: 6,
      letterSpacing: 0.3,
    },
-   professionalEditButton: {
-     flex: 1,
-     backgroundColor: '#10B981',
-     borderRadius: 12,
-     shadowColor: '#10B981',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.3,
-     shadowRadius: 4,
-     elevation: 4,
-   },
+  professionalFollowRequestsButton: {
+    flex: 1,
+    maxWidth: '45%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    position: 'relative',
+  },
+  professionalFollowRequestsButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    gap: 6,
+    position: 'relative',
+  },
+  professionalFollowRequestsButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  followRequestsBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FF6B6B',
+    zIndex: 10,
+  },
+  followRequestsBadgeText: {
+    color: '#FF6B6B',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 13,
+    textAlign: 'center',
+  },
+  professionalEditButton: {
+    flex: 1,
+    maxWidth: '45%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
    professionalEditButtonContent: {
      flexDirection: 'row',
      alignItems: 'center',
      justifyContent: 'center',
-     paddingVertical: 12,
-     paddingHorizontal: 16,
+     paddingVertical: 8,
+     paddingHorizontal: 14,
      borderRadius: 12,
    },
    professionalEditButtonText: {
      color: '#fff',
-     fontSize: 14,
+     fontSize: 13,
      fontWeight: '600',
      marginLeft: 6,
      letterSpacing: 0.3,
    },
    professionalShareButton: {
-     backgroundColor: 'rgba(255, 255, 255, 0.2)',
      borderRadius: 12,
-     borderWidth: 1,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
+     overflow: 'hidden',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.2,
+     shadowRadius: 4,
+     elevation: 4,
    },
    professionalShareButtonContent: {
-     width: 44,
-     height: 44,
+     width: 40,
+     height: 40,
      borderRadius: 12,
      justifyContent: 'center',
      alignItems: 'center',
    },
    professionalBioSection: {
      margin: 16,
-     marginTop: 24,
+     marginTop: 12,
      backgroundColor: '#FFFFFF',
      borderRadius: 16,
-     padding: 16,
+     overflow: 'hidden',
      shadowColor: '#000',
      shadowOffset: { width: 0, height: 2 },
      shadowOpacity: 0.1,
      shadowRadius: 8,
      elevation: 4,
+     borderWidth: 1,
+     borderColor: 'rgba(99, 102, 241, 0.1)',
+   },
+   bioGradientContainer: {
+     padding: 12,
+     borderRadius: 16,
    },
    professionalBioHeader: {
      flexDirection: 'row',
      alignItems: 'center',
-     marginBottom: 8,
+     marginBottom: 6,
    },
    professionalBioIconContainer: {
      width: 28,
      height: 28,
      borderRadius: 14,
-     backgroundColor: 'rgba(99, 102, 241, 0.1)',
      justifyContent: 'center',
      alignItems: 'center',
      marginRight: 10,
@@ -2400,13 +2527,13 @@ const styles = StyleSheet.create({
    },
    professionalBio: {
      fontSize: 14,
-     color: '#374151',
+     color: '#4B5563',
      lineHeight: 20,
      fontWeight: '500',
    },
    professionalPostsSection: {
      marginHorizontal: 16,
-     marginTop: 24,
+     marginTop: 12,
      marginBottom: 100,
      backgroundColor: '#FFFFFF',
      borderRadius: 16,
@@ -2415,6 +2542,8 @@ const styles = StyleSheet.create({
      shadowOpacity: 0.1,
      shadowRadius: 8,
      elevation: 4,
+     borderWidth: 1,
+     borderColor: 'rgba(99, 102, 241, 0.08)',
    },
    professionalPostsHeader: {
      borderBottomWidth: 1,

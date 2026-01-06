@@ -22,7 +22,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     login: (email: string, password: string) => Promise<any>;
-    register: (userData: { name: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => Promise<any>;
+    register: (userData: { name: string; username: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => Promise<any>;
     logout: () => void;
     updateUser: (userData: Partial<User>) => void;
     // Firebase OTP methods
@@ -155,7 +155,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw lastError || { message: 'Login failed. Please try again.' };
     };
 
-    const register = async (userData: { name: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => {
+    const register = async (userData: { name: string; username: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => {
 
         try {
             const response = await apiFetch('/auth/register', {

@@ -1,9 +1,6 @@
 // Environment-based API configuration
-// Get current network IP dynamically or use environment variable
-const DEV_IP = process.env.EXPO_PUBLIC_API_URL?.replace('/api', '') || 'http://192.168.1.7:3000';
-const BASE_URL = __DEV__ 
-  ? `${DEV_IP}/api`  // Local development
-  : 'https://examindia-production.up.railway.app/api'; // Production
+// Using yottascore.com for both development and production
+const BASE_URL = 'https://www.yottascore.com/api';
 
 type ApiOptions = {
   method?: string;

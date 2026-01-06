@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    Image,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -28,6 +29,7 @@ interface PracticeExam {
   startTime: string;
   endTime: string;
   attempted: boolean;
+  logoUrl?: string;
 }
 
 const ExamCategoryPage = () => {
@@ -95,6 +97,13 @@ const ExamCategoryPage = () => {
 
   const handleReviewExam = (exam: PracticeExam) => {
     router.push(`/practice-exam/${exam.id}/result`);
+  };
+
+  // Helper function to get full image URL
+  const getImageUrl = (logoUrl: string | undefined) => {
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith('http')) return logoUrl;
+    return `http://192.168.1.5:3000${logoUrl}`;
   };
 
   const getCategoryIcon = (category: string) => {
@@ -266,11 +275,19 @@ const ExamCategoryPage = () => {
                 >
                   <View style={styles.examCardContent}>
                     <View style={styles.examIconContainer}>
-                      <Ionicons 
-                        name={getCategoryIcon(exam.category)} 
-                        size={24} 
-                        color="#FFFFFF" 
-                      />
+                      {exam.logoUrl && getImageUrl(exam.logoUrl) ? (
+                        <Image 
+                          source={{ uri: getImageUrl(exam.logoUrl) || '' }} 
+                          style={styles.examLogo}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Ionicons 
+                          name={getCategoryIcon(exam.category)} 
+                          size={24} 
+                          color="#FFFFFF" 
+                        />
+                      )}
                     </View>
                     <Text style={styles.examTitle}>{exam.title}</Text>
                     <Text style={styles.examSubcategory}>{exam.subcategory}</Text>
@@ -499,6 +516,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  examLogo: {
+    width: '100%',
+    height: '100%',
   },
   examTitle: {
     fontSize: 12,

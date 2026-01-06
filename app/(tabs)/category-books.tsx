@@ -220,7 +220,7 @@ export default function CategoryBooksScreen() {
               <View key={book.id} style={styles.bookCard}>
                 <View style={styles.bookImageContainer}>
                   <Image
-                    source={{ uri: `http://192.168.1.7:3000${book.coverImage}` }}
+                    source={{ uri: `http://192.168.1.5:3000${book.coverImage}` }}
                     style={styles.bookImage}
                     defaultSource={require('@/assets/images/book.jpg')}
                   />

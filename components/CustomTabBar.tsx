@@ -10,7 +10,8 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
     const { routes, index: activeIndex } = state;
 
     // Filter to only the routes we expect, to prevent duplicates
-    const expectedRoutes = ['home', 'exam', 'quiz', 'social', 'profile'];
+    // Temporarily using timetable and book-store instead of social and profile
+    const expectedRoutes = ['home', 'exam', 'quiz', 'timetable', 'book-store'];
     const filteredRoutes = routes.filter((r: any) => expectedRoutes.includes(r.name));
 
     const onTabPress = (route: any, isFocused: boolean) => {
@@ -53,14 +54,23 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                             iconName = 'qr-code';
                             label = 'Quiz';
                             break;
-                        case 'social':
-                            iconName = isFocused ? 'people' : 'people-outline';
-                            label = 'Social';
+                        case 'timetable':
+                            iconName = isFocused ? 'calendar' : 'calendar-outline';
+                            label = 'Timetable';
                             break;
-                        case 'profile':
-                            iconName = isFocused ? 'person' : 'person-outline';
-                            label = 'Profile';
+                        case 'book-store':
+                            iconName = isFocused ? 'library' : 'library-outline';
+                            label = 'Books';
                             break;
+                        // Temporarily commented - will be added back in next launch
+                        // case 'social':
+                        //     iconName = isFocused ? 'people' : 'people-outline';
+                        //     label = 'Social';
+                        //     break;
+                        // case 'profile':
+                        //     iconName = isFocused ? 'person' : 'person-outline';
+                        //     label = 'Profile';
+                        //     break;
                     }
                     
                     const isCenter = route.name === 'quiz';

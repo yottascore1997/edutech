@@ -34,6 +34,7 @@ export default function EditProfileScreen() {
   
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [fetchingProfile, setFetchingProfile] = useState(true);
   const [profileData, setProfileData] = useState({
     name: '',
     username: '',
@@ -45,19 +46,62 @@ export default function EditProfileScreen() {
     isPrivate: false
   });
 
-  useEffect(() => {
-    if (user) {
-      setProfileData({
-        name: user.name || '',
-        username: (user as any).username || '',
-        email: user.email || '',
-        bio: (user as any).bio || '',
-        course: (user as any).course || '',
-        year: (user as any).year || '',
-        profilePhoto: user.profilePhoto || '',
-        isPrivate: (user as any).isPrivate || false
-      });
+  // Fetch latest profile data
+  const fetchProfile = async () => {
+    if (!user?.token) return;
+    
+    setFetchingProfile(true);
+    try {
+      const res = await apiFetchAuth('/student/profile', user.token);
+      if (res.ok && res.data) {
+        const profile = res.data;
+        setProfileData({
+          name: profile.name || '',
+          username: profile.username || profile.handle || '',
+          email: profile.email || '',
+          bio: profile.bio || '',
+          course: profile.course || '',
+          year: profile.year || '',
+          profilePhoto: profile.profilePhoto || '',
+          isPrivate: profile.isPrivate || false
+        });
+      } else {
+        // Fallback to user context data
+        if (user) {
+          setProfileData({
+            name: user.name || '',
+            username: (user as any).username || (user as any).handle || '',
+            email: user.email || '',
+            bio: (user as any).bio || '',
+            course: (user as any).course || '',
+            year: (user as any).year || '',
+            profilePhoto: user.profilePhoto || '',
+            isPrivate: (user as any).isPrivate || false
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      // Fallback to user context data
+      if (user) {
+        setProfileData({
+          name: user.name || '',
+          username: (user as any).username || (user as any).handle || '',
+          email: user.email || '',
+          bio: (user as any).bio || '',
+          course: (user as any).course || '',
+          year: (user as any).year || '',
+          profilePhoto: user.profilePhoto || '',
+          isPrivate: (user as any).isPrivate || false
+        });
+      }
+    } finally {
+      setFetchingProfile(false);
     }
+  };
+
+  useEffect(() => {
+    fetchProfile();
     
     // Start animations
     Animated.parallel([
@@ -153,22 +197,38 @@ export default function EditProfileScreen() {
 
     setLoading(true);
     try {
+      // Prepare the data to send - only include fields that have values or are being updated
+      const updateData: any = {
+        name: profileData.name,
+        email: profileData.email,
+      };
+
+      // Only include optional fields if they have values
+      if (profileData.username) updateData.username = profileData.username;
+      if (profileData.bio !== undefined) updateData.bio = profileData.bio;
+      if (profileData.course) updateData.course = profileData.course;
+      if (profileData.year) updateData.year = profileData.year;
+      if (profileData.profilePhoto) updateData.profilePhoto = profileData.profilePhoto;
+      if (profileData.isPrivate !== undefined) updateData.isPrivate = profileData.isPrivate;
+
       const updateResponse = await apiFetchAuth('/student/profile', user?.token || '', {
-        method: 'PUT',
-        body: profileData,
+        method: 'PATCH',
+        body: updateData,
       });
 
-             if (updateResponse.ok) {
+      if (updateResponse.ok) {
         // Update the user context with new profile data
-        if (user) {
+        if (user && updateResponse.data) {
           const updatedUser = { ...user, ...updateResponse.data };
           updateUser(updatedUser);
         }
         Alert.alert('Success', 'Profile updated successfully!', [
-          { text: 'OK', onPress: () => navigation.navigate('profile' as never) }
+          { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       } else {
-        Alert.alert('Error', 'Failed to update profile. Please try again.');
+        console.error('Update failed:', updateResponse);
+        const errorMessage = updateResponse.data?.message || updateResponse.data?.error || updateResponse.data || 'Failed to update profile. Please try again.';
+        Alert.alert('Error', String(errorMessage));
       }
     } catch (error) {
       console.error('Update error:', error);
@@ -197,6 +257,17 @@ export default function EditProfileScreen() {
       .join('')
       .toUpperCase();
   };
+
+    if (fetchingProfile) {
+      return (
+        <View style={styles.container}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        </View>
+      );
+    }
 
     return (
     <View style={styles.container}>
@@ -631,5 +702,17 @@ export default function EditProfileScreen() {
      fontWeight: 'bold',
      color: '#fff',
      textAlign: 'center',
+   },
+   loadingContainer: {
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     backgroundColor: '#f8f9fa',
+   },
+   loadingText: {
+     marginTop: 16,
+     fontSize: 16,
+     color: '#6B7280',
+     fontWeight: '500',
    },
 });

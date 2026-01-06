@@ -223,8 +223,17 @@ const LiveExamQuestionsScreen = () => {
   };
 
   const handleNext = () => {
+    // Mark current question as visited even if not saving answer
+    setStatuses((prev) => {
+      const updated = [...prev];
+      updated[current] = {
+        ...updated[current],
+        visited: true,
+      };
+      return updated;
+    });
 
-    // Just move to next question without saving
+    // Move to next question
     if (current < questions.length - 1) {
       setCurrent(current + 1);
       setShowSidePanel(false);
@@ -693,22 +702,32 @@ const LiveExamQuestionsScreen = () => {
                   let textColor = '#666';
                   let borderColor = '#E0E0E0';
                   
-                  if (statuses[idx]?.answered && statuses[idx]?.marked) {
-                    statusColor = '#4CAF50';
-                    textColor = '#fff';
-                    borderColor = '#4CAF50';
-                  } else if (statuses[idx]?.answered) {
-                    statusColor = '#4CAF50';
-                    textColor = '#fff';
-                    borderColor = '#4CAF50';
-                  } else if (statuses[idx]?.marked) {
-                    statusColor = '#FFC107';
+                  // Check marked first - marked questions should always show yellow
+                  if (statuses[idx]?.marked && statuses[idx]?.answered) {
+                    // Marked and answered - yellow with checkmark
+                    statusColor = '#FFD700';
                     textColor = '#000';
-                    borderColor = '#FFC107';
+                    borderColor = '#FFD700';
+                  } else if (statuses[idx]?.marked) {
+                    // Marked but not answered - yellow
+                    statusColor = '#FFD700';
+                    textColor = '#000';
+                    borderColor = '#FFD700';
+                  } else if (statuses[idx]?.answered) {
+                    // Answered but not marked - green
+                    statusColor = '#4CAF50';
+                    textColor = '#fff';
+                    borderColor = '#4CAF50';
                   } else if (statuses[idx]?.visited && !statuses[idx]?.answered) {
+                    // Visited but not answered and not marked - red
                     statusColor = '#F44336';
                     textColor = '#fff';
                     borderColor = '#F44336';
+                  } else if (!statuses[idx]?.visited) {
+                    // Not visited - gray
+                    statusColor = '#E0E0E0';
+                    textColor = '#666';
+                    borderColor = '#E0E0E0';
                   }
                   
                   return (
@@ -729,7 +748,7 @@ const LiveExamQuestionsScreen = () => {
                       </Text>
                       {statuses[idx]?.answered && statuses[idx]?.marked && (
                         <View style={styles.checkmarkBadge}>
-                          <Ionicons name="checkmark" size={12} color="#fff" />
+                          <Ionicons name="checkmark" size={12} color="#000" />
                         </View>
                       )}
                     </TouchableOpacity>

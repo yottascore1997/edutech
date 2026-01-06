@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, FlatList, Image, KeyboardAvoidingView, Modal, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { apiFetchAuth, getImageUrl } from '../constants/api';
 import { useAuth } from '../context/AuthContext';
@@ -67,7 +67,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
     { 
       id: 'add-story', 
       username: 'Your Story', 
-      image: require('../assets/images/avatar1.jpg'), 
+      image: user?.profilePhoto ? getImageUrl(user.profilePhoto) : require('../assets/images/avatar1.jpg'), 
       hasStory: false, 
       isAdd: true
     }
@@ -92,32 +92,46 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
   const [blockReason, setBlockReason] = useState<string>('');
   const [blocking, setBlocking] = useState(false);
 
+  // Ref to prevent concurrent fetches
+  const isFetchingRef = useRef(false);
+  const hasMountedRef = useRef(false);
+  const lastRefreshTriggerRef = useRef(0);
+
   useEffect(() => {
-    fetchPosts();
-    fetchStories();
-    fetchFollowRequests(); // Fetch follow requests on mount
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      lastRefreshTriggerRef.current = refreshTrigger || 0;
+      fetchPosts(1, true);
+      fetchStories();
+      fetchFollowRequests(); // Fetch follow requests on mount
+    }
   }, []);
 
-  // Refresh when refreshTrigger changes
+  // Refresh when refreshTrigger changes (but not on initial mount)
   useEffect(() => {
-    if (refreshTrigger) {
+    if (hasMountedRef.current && refreshTrigger && refreshTrigger !== lastRefreshTriggerRef.current) {
+      lastRefreshTriggerRef.current = refreshTrigger;
       resetAndFetchPosts();
       fetchStories();
     }
   }, [refreshTrigger]);
 
-  // Refresh every time the screen comes into focus (with throttling)
-  useFocusEffect(
-    React.useCallback(() => {
-      const now = Date.now();
-      // Only refresh if it's been more than 30 seconds since last refresh
-      if (now - lastRefresh > 30000) {
-        resetAndFetchPosts();
-        fetchStories();
-        setLastRefresh(now);
-      }
-    }, [user?.token, lastRefresh])
-  );
+  // Update "Your Story" image when user profile photo changes
+  useEffect(() => {
+    if (hasMountedRef.current) {
+      setStories(prevStories => {
+        const updatedStories = [...prevStories];
+        const yourStoryIndex = updatedStories.findIndex(story => story.id === 'add-story');
+        if (yourStoryIndex !== -1) {
+          updatedStories[yourStoryIndex] = {
+            ...updatedStories[yourStoryIndex],
+            image: user?.profilePhoto ? getImageUrl(user.profilePhoto) : require('../assets/images/avatar1.jpg')
+          };
+        }
+        return updatedStories;
+      });
+    }
+  }, [user?.profilePhoto]);
   
   // Debug state changes
   useEffect(() => {
@@ -134,13 +148,18 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
   }, [searchResults, showSearchResults, searching]);
 
   const resetAndFetchPosts = () => {
+    if (isFetchingRef.current) return; // Prevent concurrent fetches
     setPage(1);
     setHasMorePosts(true);
     setPosts([]);
-    fetchPosts(true);
+    fetchPosts(1, true);
   };
 
-  const fetchPosts = async (isRefresh = false) => {
+  const fetchPosts = async (pageNumber: number = page, isRefresh = false) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     if (isRefresh) {
       setLoading(true);
     } else {
@@ -150,7 +169,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
     setError('');
     try {
       // Use pagination parameters
-      const res = await apiFetchAuth(`/student/posts?page=${page}&limit=10`, user?.token || '');
+      const res = await apiFetchAuth(`/student/posts?page=${pageNumber}&limit=10`, user?.token || '');
       if (res.ok) {
         const newPosts = res.data.posts || res.data; // Handle different API response formats
         
@@ -160,9 +179,18 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         }
         
         if (isRefresh) {
-          setPosts(newPosts);
+          // Deduplicate posts by ID
+          const uniquePosts = newPosts.filter((post: any, index: number, self: any[]) => 
+            index === self.findIndex((p: any) => p.id === post.id)
+          );
+          setPosts(uniquePosts);
         } else {
-          setPosts(prev => [...prev, ...newPosts]);
+          setPosts(prev => {
+            // Deduplicate: only add posts that don't already exist
+            const existingIds = new Set(prev.map(post => post.id));
+            const uniqueNewPosts = newPosts.filter((post: any) => !existingIds.has(post.id));
+            return [...prev, ...uniqueNewPosts];
+          });
         }
       } else {
         setError('Failed to load posts');
@@ -172,11 +200,12 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   };
 
   const loadMorePosts = () => {
-    if (!loadingMore && hasMorePosts) {
+    if (!loadingMore && hasMorePosts && !isFetchingRef.current) {
       const nextPage = page + 1;
       setPage(nextPage);
       fetchPostsWithPage(nextPage);
@@ -184,6 +213,10 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
   };
 
   const fetchPostsWithPage = async (pageNumber: number) => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     setLoadingMore(true);
     setError('');
     try {
@@ -207,6 +240,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
       setError('Failed to load posts');
     } finally {
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -220,7 +254,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
           { 
             id: 'add-story', 
             username: 'Your Story', 
-            image: require('../assets/images/avatar1.jpg'), 
+            image: user?.profilePhoto ? getImageUrl(user.profilePhoto) : require('../assets/images/avatar1.jpg'), 
             hasStory: false, 
             isAdd: true 
           }
@@ -1203,7 +1237,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
                               colors={['#FFFFFF', '#F8FAFC']}
                               style={styles.addIconGradient}
                             >
-                              <Ionicons name="add" size={20} color="#6366F1" />
+                              <Ionicons name="add" size={16} color="#6366F1" />
                             </LinearGradient>
                           </View>
                         )}
@@ -3684,17 +3718,17 @@ const styles = StyleSheet.create({
 
   // Premium Stories Styles
   premiumStoriesContainer: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 12,
   },
   premiumStoriesGradient: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 16,
+    padding: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
@@ -3702,13 +3736,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   premiumStoriesTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#1E293B',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   storiesIndicator: {
     flexDirection: 'row',
@@ -3724,22 +3758,22 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   premiumStoryItem: {
-    marginRight: 16,
+    marginRight: 12,
   },
   premiumStoryWrapper: {
     alignItems: 'center',
   },
   premiumStoryRing: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    padding: 3,
-    marginBottom: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    padding: 2.5,
+    marginBottom: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   premiumAddStoryRing: {
     shadowColor: '#6366F1',
@@ -3763,18 +3797,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   premiumStoryInner: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   premiumStoryImage: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
   },
   premiumAddStoryIcon: {
     position: 'absolute',
@@ -3782,9 +3816,9 @@ const styles = StyleSheet.create({
     right: 2,
   },
   addIconGradient: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -3807,14 +3841,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   premiumStoryUsername: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: '#374151',
     textAlign: 'center',
-    maxWidth: 80,
+    maxWidth: 60,
   },
   premiumAddStoryText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '500',
     color: '#6366F1',
     marginTop: 2,

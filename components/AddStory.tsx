@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { apiFetchAuth, uploadFile } from '../constants/api';
+import { apiFetchAuth, getImageUrl, uploadFile } from '../constants/api';
 import { useAuth } from '../context/AuthContext';
 
 interface AddStoryProps {
@@ -205,7 +205,22 @@ export default function AddStory({ visible, onClose, onStoryCreated }: AddStoryP
               // Image selection options
               <View style={styles.imageSelectionContainer}>
                 <View style={styles.imageSelectionCard}>
-                  <Ionicons name="camera" size={48} color="#667eea" />
+                  {/* User Profile Photo */}
+                  <View style={styles.userAvatarContainer}>
+                    {user?.profilePhoto ? (
+                      <Image 
+                        source={{ uri: getImageUrl(user.profilePhoto) }} 
+                        style={styles.userAvatar} 
+                      />
+                    ) : (
+                      <View style={styles.userAvatarPlaceholder}>
+                        <Text style={styles.userAvatarInitials}>
+                          {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  
                   <Text style={styles.imageSelectionTitle}>Add to Your Story</Text>
                   <Text style={styles.imageSelectionSubtitle}>
                     Share a photo or video that will appear at the top of your story for 24 hours
@@ -313,6 +328,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     maxWidth: 300,
+  },
+  userAvatarContainer: {
+    marginBottom: 20,
+  },
+  userAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#667eea',
+  },
+  userAvatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#667eea',
+  },
+  userAvatarInitials: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#fff',
   },
   imageSelectionTitle: {
     fontSize: 20,

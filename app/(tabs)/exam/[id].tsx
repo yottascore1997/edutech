@@ -239,7 +239,9 @@ const ExamDetailScreen = () => {
                 data={[{ key: 'content' }]}
                 renderItem={() => (
                     <>
-                        <ExamCard exam={exam} hideAttemptButton={String(from) === 'my-exams'} isDetailsPage={true} />
+                        <View style={styles.examCardWrapper}>
+                            <ExamCard exam={exam} hideAttemptButton={String(from) === 'my-exams'} isDetailsPage={true} />
+                        </View>
 
                         <View style={styles.tabContainer}>
                             {['Info', 'Leaderboard', 'Winnings'].map(tabName => (
@@ -500,6 +502,18 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: AppColors.lightGrey,
     },
+    examCardWrapper: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+        borderRadius: 20,
+        overflow: 'hidden',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
+        elevation: 10,
+    },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -626,38 +640,46 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         backgroundColor: AppColors.white,
-        margin: 15,
-        borderRadius: 12,
-        padding: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 12,
+        borderRadius: 16,
+        padding: 6,
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(99, 102, 241, 0.1)',
     },
     tab: {
         paddingVertical: 12,
         paddingHorizontal: 16,
-        borderRadius: 8,
+        borderRadius: 12,
         flex: 1,
         alignItems: 'center',
+        marginHorizontal: 2,
     },
     activeTab: {
         backgroundColor: AppColors.primary,
         shadowColor: AppColors.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 5,
     },
     tabText: {
         color: AppColors.grey,
         fontWeight: '600',
-        fontSize: 13,
+        fontSize: 14,
+        letterSpacing: 0.2,
     },
     activeTabText: {
         color: AppColors.white,
-        fontWeight: '700',
+        fontWeight: '800',
+        fontSize: 14,
+        letterSpacing: 0.3,
     },
     tabContent: {
         backgroundColor: AppColors.white,

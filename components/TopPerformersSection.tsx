@@ -4,13 +4,14 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
-import { apiFetchAuth } from '../constants/api';
+import { apiFetchAuth, getImageUrl } from '../constants/api';
 import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -49,6 +50,71 @@ interface TopPerformersSectionProps {
     onPress?: () => void;
 }
 
+// Enhanced Avatar Component with proper image loading
+const WinnerAvatar = ({ userPhoto, userName }: { userPhoto?: string | null; userName: string }) => {
+    const [imageError, setImageError] = useState(false);
+    const [imageLoading, setImageLoading] = useState(true);
+
+    const getInitials = (name: string) => {
+        if (!name) return 'U';
+        const parts = name.trim().split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    };
+
+    const isValidPhoto = userPhoto && userPhoto.trim() !== '' && userPhoto !== 'null';
+    const getImageUri = () => {
+        if (!isValidPhoto) return null;
+        if (userPhoto.startsWith('http://') || userPhoto.startsWith('https://')) {
+            return userPhoto;
+        }
+        return getImageUrl(userPhoto);
+    };
+
+    const imageUri = getImageUri();
+
+    if (!imageUri || imageError) {
+        return (
+            <View style={styles.avatarPlaceholder}>
+                <LinearGradient
+                    colors={['#6366F1', '#8B5CF6', '#A855F7']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatarGradient}
+                >
+                    <Text style={styles.avatarInitials}>{getInitials(userName)}</Text>
+                </LinearGradient>
+            </View>
+        );
+    }
+
+    return (
+        <View style={styles.avatarContainer}>
+            {imageLoading && (
+                <View style={styles.avatarLoadingContainer}>
+                    <ActivityIndicator size="small" color="#6366F1" />
+                </View>
+            )}
+            <Image
+                source={{ uri: imageUri }}
+                style={styles.winnerAvatarImage}
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => {
+                    setImageLoading(false);
+                    setImageError(false);
+                }}
+                onError={() => {
+                    setImageError(true);
+                    setImageLoading(false);
+                }}
+                resizeMode="cover"
+            />
+        </View>
+    );
+};
+
 const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) => {
     const { user } = useAuth();
     const [leaderboardData, setLeaderboardData] = useState<WeeklyLeaderboardData | null>(null);
@@ -57,20 +123,21 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
     const scrollViewRef = useRef<ScrollView>(null);
     const autoScrollInterval = useRef<ReturnType<typeof setInterval>>(null);
     
-    // Auto-scroll functionality
+    // Auto-scroll functionality - disabled since we only show one exam (today's or most recent)
     const startAutoScroll = useCallback(() => {
-        if (leaderboardData?.leaderboard && leaderboardData.leaderboard.length > 1) {
-            autoScrollInterval.current = setInterval(() => {
-                setCurrentExamIndex((prevIndex) => {
-                    const nextIndex = (prevIndex + 1) % leaderboardData.leaderboard.length;
-                    scrollViewRef.current?.scrollTo({
-                        x: nextIndex * 295, // card width + gap
-                        animated: true
-                    });
-                    return nextIndex;
-                });
-            }, 4000); // 4 seconds interval
-        }
+        // No auto-scroll needed as we only show one exam
+        // if (leaderboardData?.leaderboard && leaderboardData.leaderboard.length > 1) {
+        //     autoScrollInterval.current = setInterval(() => {
+        //         setCurrentExamIndex((prevIndex) => {
+        //             const nextIndex = (prevIndex + 1) % leaderboardData.leaderboard.length;
+        //             scrollViewRef.current?.scrollTo({
+        //                 x: nextIndex * 295, // card width + gap
+        //                 animated: true
+        //             });
+        //             return nextIndex;
+        //         });
+        //     }, 4000); // 4 seconds interval
+        // }
     }, [leaderboardData?.leaderboard]);
 
     const stopAutoScroll = useCallback(() => {
@@ -84,62 +151,76 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
         return () => stopAutoScroll();
     }, [startAutoScroll, stopAutoScroll]);
 
+    // Helper function to get current week in format YYYY-WW (ISO week)
+    const getCurrentWeek = (): string => {
+        const now = new Date();
+        const dayOfWeek = now.getDay() || 7;
+        now.setDate(now.getDate() + 4 - dayOfWeek);
+        const year = now.getFullYear();
+        const jan1 = new Date(year, 0, 1);
+        const days = Math.floor((now.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
+        const weekNumber = Math.ceil((days + 1) / 7);
+        return `${year}-${weekNumber.toString().padStart(2, '0')}`;
+    };
+
+    // Helper function to check if date is today
+    const isToday = (dateString: string): boolean => {
+        const examDate = new Date(dateString);
+        const today = new Date();
+        return examDate.toDateString() === today.toDateString();
+    };
+
+    // Helper function to filter and sort exams - today's exam first, then by date (most recent)
+    const getFilteredExams = (exams: ExamLeaderboard[]): ExamLeaderboard[] => {
+        if (!exams || exams.length === 0) return [];
+        
+        // Separate today's exams and other exams
+        const todayExams = exams.filter(exam => isToday(exam.examDate));
+        const otherExams = exams.filter(exam => !isToday(exam.examDate));
+        
+        // Sort other exams by date (most recent first)
+        otherExams.sort((a, b) => {
+            return new Date(b.examDate).getTime() - new Date(a.examDate).getTime();
+        });
+        
+        // Return today's exams first, then most recent exam
+        if (todayExams.length > 0) {
+            return [todayExams[0]]; // Show first today's exam
+        } else if (otherExams.length > 0) {
+            return [otherExams[0]]; // Show most recent exam
+        }
+        
+        return [];
+    };
+
     // Fetch weekly leaderboard data
     const fetchLeaderboardData = async () => {
         try {
             if (!user?.token) return;
             
-            const response = await apiFetchAuth('/student/weekly-leaderboard', user.token);
+            const currentWeek = getCurrentWeek();
+            const response = await apiFetchAuth(`/student/weekly-leaderboard?week=${currentWeek}`, user.token);
             
             if (response.ok) {
-                console.log('Weekly leaderboard API response:', response);
-                console.log('Response data:', response.data);
-                console.log('Leaderboard array:', response.data?.leaderboard);
                 if (response.data?.leaderboard) {
-                    console.log('Total exams in leaderboard:', response.data.leaderboard.length);
-                    response.data.leaderboard.forEach((exam: any, index: number) => {
-                        console.log(`\n=== Exam ${index} ===`);
-                        console.log('Exam ID:', exam.examId);
-                        console.log('Exam Title:', exam.examTitle);
-                        console.log('Winners array:', exam.winners);
-                        console.log('Winners length:', exam.winners?.length);
-                        console.log('Winners type:', typeof exam.winners);
-                        
-                        // Map API response fields to component expected fields
+                    // Map API response fields to component expected fields
+                    response.data.leaderboard.forEach((exam: any) => {
                         if (exam.winners && exam.winners.length > 0) {
-                            console.log('Mapping winners data...');
-                            exam.winners = exam.winners.map((winner: any, winnerIndex: number) => {
-                                console.log(`Winner ${winnerIndex}:`, winner);
-                                return {
-                                    ...winner,
-                                    name: winner.userName || winner.name, // Map userName to name
-                                    prizeAmount: winner.winnings || winner.prizeAmount, // Map winnings to prizeAmount
-                                    score: winner.score || 0 // Add default score if not present
-                                };
-                            });
-                            console.log('Mapped winners:', exam.winners);
-                        } else {
-                            console.log('No winners found for this exam, creating mock data...');
-                            // Create mock data for testing
-                            exam.winners = [
-                                { userId: 'mock1', userName: 'Rahul Kumar', rank: 1, score: 95, winnings: 500, course: 'Engineering', year: '3rd' },
-                                { userId: 'mock2', userName: 'Priya Sharma', rank: 2, score: 92, winnings: 375, course: 'Medical', year: '2nd' },
-                                { userId: 'mock3', userName: 'Amit Singh', rank: 3, score: 88, winnings: 250, course: 'Commerce', year: '4th' },
-                                { userId: 'mock4', userName: 'Sneha Patel', rank: 4, score: 85, winnings: 187, course: 'Arts', year: '1st' },
-                                { userId: 'mock5', userName: 'Vikram Joshi', rank: 5, score: 82, winnings: 140, course: 'Engineering', year: '3rd' }
-                            ];
-                            // Map the mock data
                             exam.winners = exam.winners.map((winner: any) => ({
                                 ...winner,
-                                name: winner.userName,
-                                prizeAmount: winner.winnings,
-                                score: winner.score || 0
+                                name: winner.userName || winner.name,
+                                prizeAmount: winner.winnings || winner.prizeAmount,
+                                score: winner.score || 0,
+                                userPhoto: winner.userPhoto || null // Ensure userPhoto is preserved
                             }));
-                            console.log('Created mock winners:', exam.winners);
                         }
                     });
-                } else {
-                    console.log('No leaderboard data found in response');
+                    
+                    // Filter to show today's exam or most recent exam
+                    const filteredExams = getFilteredExams(response.data.leaderboard);
+                    if (filteredExams.length > 0) {
+                        response.data.leaderboard = filteredExams;
+                    }
                 }
                 setLeaderboardData(response.data);
             } else {
@@ -334,6 +415,11 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
                                                         <View style={styles.winnerRankContainer}>
                                                             <Text style={styles.winnerRank}>{winner.rank || winnerIndex + 1}</Text>
                                                         </View>
+                                                        {/* Profile Photo */}
+                                                        <WinnerAvatar 
+                                                            userPhoto={winner.userPhoto} 
+                                                            userName={winner.name || winner.userName || 'User'} 
+                                                        />
                                                         <View style={styles.winnerInfo}>
                                                             <Text style={styles.winnerName} numberOfLines={1}>
                                                                 {winner.name ? winner.name.split(' ')[0] : 'Unknown'}
@@ -850,8 +936,60 @@ const styles = StyleSheet.create({
     },
     winnerInfo: {
         flex: 1,
-        marginLeft: 12,
+        marginLeft: 8,
         marginRight: 8,
+    },
+    avatarContainer: {
+        position: 'relative',
+        width: 40,
+        height: 40,
+    },
+    avatarLoadingContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 20,
+        zIndex: 1,
+    },
+    avatarPlaceholder: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        overflow: 'hidden',
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        shadowColor: '#6366F1',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    avatarGradient: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarInitials: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        textShadowColor: 'rgba(0, 0, 0, 0.2)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 2,
+    },
+    winnerAvatarImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#FFFFFF',
+        backgroundColor: '#F3F4F6',
     },
     winnerName: {
         fontSize: 13,

@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -127,20 +128,23 @@ const CustomBannerSlider: React.FC<CustomBannerSliderProps> = ({ onBannerPress }
             flatListRef.current?.scrollToIndex({ index, animated: true });
           }}
         >
-          <View
-            style={[
-              styles.paginationDot,
-              {
-                backgroundColor: index === currentIndex ? '#4F46E5' : 'rgba(79, 70, 229, 0.3)',
-                transform: [{ scale: index === currentIndex ? 1.2 : 1 }],
-                shadowOpacity: index === currentIndex ? 0.4 : 0,
-              }
-            ]}
-          >
-            {index === currentIndex && (
+          {index === currentIndex ? (
+            <LinearGradient
+              colors={['#6366F1', '#8B5CF6', '#A855F7']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.paginationDot, styles.activeDot]}
+            >
               <View style={styles.activeDotInner} />
-            )}
-          </View>
+            </LinearGradient>
+          ) : (
+            <View
+              style={[
+                styles.paginationDot,
+                styles.inactiveDot,
+              ]}
+            />
+          )}
         </TouchableOpacity>
       ))}
     </View>
@@ -181,15 +185,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bannerWrapper: {
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.1)',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
     position: 'relative',
   },
   bannerImage: {
@@ -207,15 +211,25 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   paginationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 4,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  activeDot: {
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
+    transform: [{ scale: 1.3 }],
+  },
+  inactiveDot: {
+    backgroundColor: 'rgba(99, 102, 241, 0.25)',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   activeDotInner: {
     width: 6,
@@ -224,9 +238,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
 

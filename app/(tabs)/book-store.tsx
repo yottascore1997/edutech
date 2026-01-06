@@ -77,9 +77,6 @@ const BookStoreScreen = () => {
   // Cart count state
   const [cartCount, setCartCount] = useState(0);
 
-  // Featured Reads marquee animation
-  const marqueeAnim = useRef(new Animated.Value(0)).current;
-
   // Banner carousel state
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerScrollX = useRef(new Animated.Value(0)).current;
@@ -104,23 +101,6 @@ const BookStoreScreen = () => {
       fetchBooks();
     }
   }, [locationEnabled, selectedRadius, userLocation?.lat, userLocation?.lng]);
-
-  // Start marquee animation
-  useEffect(() => {
-    const startMarquee = () => {
-      marqueeAnim.setValue(0);
-      Animated.timing(marqueeAnim, {
-        toValue: -600, // Adjust based on content width
-        duration: 15000, // 15 seconds for slow continuous movement
-        useNativeDriver: true,
-      }).start(() => {
-        // Restart animation when it completes
-        startMarquee();
-      });
-    };
-    
-    startMarquee();
-  }, []);
 
   // Auto-scroll banner carousel
   useEffect(() => {
@@ -283,7 +263,7 @@ const BookStoreScreen = () => {
     >
       <View style={styles.bookImageContainer}>
         <Image 
-          source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.7:3000${book.coverImage}` }} 
+          source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.5:3000${book.coverImage}` }} 
           style={styles.bookImage}
           resizeMode="cover"
         />
@@ -331,7 +311,7 @@ const BookStoreScreen = () => {
         
         <View style={styles.sellerInfo}>
           <Image 
-            source={{ uri: book.seller.image?.startsWith('http') ? book.seller.image : `http://192.168.1.7:3000${book.seller.image}` || 'https://via.placeholder.com/24' }} 
+            source={{ uri: book.seller.image?.startsWith('http') ? book.seller.image : `http://192.168.1.5:3000${book.seller.image}` || 'https://via.placeholder.com/24' }} 
             style={styles.sellerAvatar}
           />
           <View style={styles.sellerDetails}>
@@ -734,293 +714,6 @@ const BookStoreScreen = () => {
               </View>
             </View>
           </LinearGradient>
-        </View>
-
-        {/* Creative Featured Reads */}
-        <View style={styles.featuredContainer}>
-          <View style={styles.featuredHeader}>
-            <Text style={styles.sectionTitle}>Featured Reads</Text>
-            <TouchableOpacity style={styles.viewAllButton}>
-              <Text style={styles.viewAllText}>View All</Text>
-              <Ionicons name="chevron-forward" size={16} color="#8B5CF6" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.featuredBooksScroll}>
-            <Animated.View style={[styles.featuredBooksMarquee, { transform: [{ translateX: marqueeAnim }] }]}>
-              {/* First set of books */}
-              <View style={styles.featuredBookCard}>
-                <View style={styles.bookBadge}>
-                  <Text style={styles.bookBadgeText}>🏆 Bestseller</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#667EEA', '#764BA2']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>THE MIDNIGHT LIBRARY</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>✨</Text>
-                      <Text style={styles.bookDecor}>📖</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>The Midnight Library</Text>
-                <Text style={styles.featuredBookAuthor}>by Matt Haig</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.5</Text>
-                  <Text style={styles.reviewCount}>(2.3k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$19.99</Text>
-                  <Text style={styles.featuredBookPrice}>$14.99</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>25% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#FF6B6B', '#FF8E53']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.featuredBookCard}>
-                <View style={[styles.bookBadge, { backgroundColor: '#4ECDC4' }]}>
-                  <Text style={styles.bookBadgeText}>🆕 New Release</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#4ECDC4', '#44A08D']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>ATOMIC HABITS</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>⚡</Text>
-                      <Text style={styles.bookDecor}>🎯</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>Atomic Habits</Text>
-                <Text style={styles.featuredBookAuthor}>by James Clear</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.8</Text>
-                  <Text style={styles.reviewCount}>(5.1k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$16.99</Text>
-                  <Text style={styles.featuredBookPrice}>$12.50</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>26% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#4ECDC4', '#44A08D']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.featuredBookCard}>
-                <View style={[styles.bookBadge, { backgroundColor: '#FFD93D' }]}>
-                  <Text style={styles.bookBadgeText}>🔥 Hot Pick</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#FFD93D', '#FF8E53']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>THE SEVEN HUSBANDS</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>💫</Text>
-                      <Text style={styles.bookDecor}>👑</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>The Seven Husbands</Text>
-                <Text style={styles.featuredBookAuthor}>by Taylor Jenkins Reid</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.7</Text>
-                  <Text style={styles.reviewCount}>(3.8k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$18.99</Text>
-                  <Text style={styles.featuredBookPrice}>$13.99</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>26% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#FFD93D', '#FF8E53']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-
-              {/* Duplicate set for seamless loop */}
-              <View style={styles.featuredBookCard}>
-                <View style={styles.bookBadge}>
-                  <Text style={styles.bookBadgeText}>🏆 Bestseller</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#667EEA', '#764BA2']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>THE MIDNIGHT LIBRARY</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>✨</Text>
-                      <Text style={styles.bookDecor}>📖</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>The Midnight Library</Text>
-                <Text style={styles.featuredBookAuthor}>by Matt Haig</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.5</Text>
-                  <Text style={styles.reviewCount}>(2.3k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$19.99</Text>
-                  <Text style={styles.featuredBookPrice}>$14.99</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>25% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#FF6B6B', '#FF8E53']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.featuredBookCard}>
-                <View style={[styles.bookBadge, { backgroundColor: '#4ECDC4' }]}>
-                  <Text style={styles.bookBadgeText}>🆕 New Release</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#4ECDC4', '#44A08D']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>ATOMIC HABITS</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>⚡</Text>
-                      <Text style={styles.bookDecor}>🎯</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>Atomic Habits</Text>
-                <Text style={styles.featuredBookAuthor}>by James Clear</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.8</Text>
-                  <Text style={styles.reviewCount}>(5.1k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$16.99</Text>
-                  <Text style={styles.featuredBookPrice}>$12.50</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>26% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#4ECDC4', '#44A08D']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.featuredBookCard}>
-                <View style={[styles.bookBadge, { backgroundColor: '#FFD93D' }]}>
-                  <Text style={styles.bookBadgeText}>🔥 Hot Pick</Text>
-                </View>
-                <View style={styles.featuredBookImage}>
-                  <LinearGradient
-                    colors={['#FFD93D', '#FF8E53']}
-                    style={styles.bookImageGradient}
-                  >
-                    <Text style={styles.bookTitleText}>THE SEVEN HUSBANDS</Text>
-                    <View style={styles.bookDecorations}>
-                      <Text style={styles.bookDecor}>💫</Text>
-                      <Text style={styles.bookDecor}>👑</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.featuredBookTitle}>The Seven Husbands</Text>
-                <Text style={styles.featuredBookAuthor}>by Taylor Jenkins Reid</Text>
-                <View style={styles.ratingContainer}>
-                  <View style={styles.starsContainer}>
-                    {[1,2,3,4,5].map((star) => (
-                      <Ionicons key={star} name="star" size={12} color="#FFD700" />
-                    ))}
-                  </View>
-                  <Text style={styles.ratingText}>4.7</Text>
-                  <Text style={styles.reviewCount}>(3.8k reviews)</Text>
-                </View>
-                <View style={styles.priceContainer}>
-                  <Text style={styles.originalPrice}>$18.99</Text>
-                  <Text style={styles.featuredBookPrice}>$13.99</Text>
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>26% OFF</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.addToCartButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#FFD93D', '#FF8E53']}
-                    style={styles.addToCartGradient}
-                  >
-                    <Ionicons name="cart" size={14} color="#FFFFFF" />
-                    <Text style={styles.addToCartText}>Add to Cart</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </View>
         </View>
 
         {/* Filter Buttons */}

@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -32,6 +33,7 @@ interface PracticeExam {
   attempted: boolean;
   score?: number;
   attemptedAt?: string;
+  logoUrl?: string;
 }
 
 interface WeeklyProgress {
@@ -134,6 +136,13 @@ export default function PracticeCategoriesPreview() {
     return colorMap[name] || '#7C3AED';
   };
 
+  // Helper function to get full image URL
+  const getImageUrl = (logoUrl: string | undefined) => {
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith('http')) return logoUrl;
+    return `http://192.168.1.5:3000${logoUrl}`;
+  };
+
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategory(categoryId);
   };
@@ -183,12 +192,6 @@ export default function PracticeCategoriesPreview() {
     return (
       <View style={styles.analysisSection}>
         <View style={styles.sectionHeaderPremium}>
-          <View style={styles.sectionTitleContainer}>
-            <View style={styles.sectionIconBadge}>
-              <Ionicons name="analytics" size={18} color="#6366F1" />
-            </View>
-            <Text style={styles.sectionTitlePremium}>Analysis</Text>
-          </View>
         </View>
 
         <View style={styles.scoreStreakRow}>
@@ -197,15 +200,17 @@ export default function PracticeCategoriesPreview() {
               colors={['#FFFFFF', '#F0F9FF']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#06B6D4', '#0891B2']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="library" size={20} color="#FFFFFF" />
-                </LinearGradient>
+              <View style={styles.metricTopRow}>
+                <View style={styles.metricIconWrapper}>
+                  <LinearGradient
+                    colors={['#06B6D4', '#0891B2']}
+                    style={styles.metricIconGradient}
+                  >
+                    <Ionicons name="library" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.metricLabel}>Total Exams</Text>
               </View>
-              <Text style={styles.metricLabel}>Total Exams</Text>
               <Text style={styles.metricValueLarge}>{totalExams}</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#06B6D4' }]} />
             </LinearGradient>
@@ -216,15 +221,17 @@ export default function PracticeCategoriesPreview() {
               colors={['#FFFFFF', '#F0FDF4']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#10B981', '#059669']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                </LinearGradient>
+              <View style={styles.metricTopRow}>
+                <View style={styles.metricIconWrapper}>
+                  <LinearGradient
+                    colors={['#10B981', '#059669']}
+                    style={styles.metricIconGradient}
+                  >
+                    <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.metricLabel}>Completed</Text>
               </View>
-              <Text style={styles.metricLabel}>Completed</Text>
               <Text style={styles.metricValueLarge}>{completedExams}</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#10B981' }]} />
             </LinearGradient>
@@ -237,15 +244,17 @@ export default function PracticeCategoriesPreview() {
               colors={['#FFFFFF', '#FEFBFF']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#7C3AED', '#8B5CF6']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="stats-chart" size={20} color="#FFFFFF" />
-                </LinearGradient>
+              <View style={styles.metricTopRow}>
+                <View style={styles.metricIconWrapper}>
+                  <LinearGradient
+                    colors={['#7C3AED', '#8B5CF6']}
+                    style={styles.metricIconGradient}
+                  >
+                    <Ionicons name="stats-chart" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.metricLabel}>Completion</Text>
               </View>
-              <Text style={styles.metricLabel}>Completion</Text>
               <Text style={styles.metricValueLarge}>{completionPercentage}%</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#7C3AED' }]} />
             </LinearGradient>
@@ -256,51 +265,20 @@ export default function PracticeCategoriesPreview() {
               colors={['#FFFFFF', '#FFFAF5']}
               style={styles.metricCardGradient}
             >
-              <View style={styles.metricIconWrapper}>
-                <LinearGradient
-                  colors={['#F59E0B', '#FB923C']}
-                  style={styles.metricIconGradient}
-                >
-                  <Ionicons name="trophy" size={20} color="#FFFFFF" />
-                </LinearGradient>
+              <View style={styles.metricTopRow}>
+                <View style={styles.metricIconWrapper}>
+                  <LinearGradient
+                    colors={['#F59E0B', '#FB923C']}
+                    style={styles.metricIconGradient}
+                  >
+                    <Ionicons name="trophy" size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                </View>
+                <Text style={styles.metricLabel}>Average Score</Text>
               </View>
-              <Text style={styles.metricLabel}>Average Score</Text>
               <Text style={styles.metricValueLarge}>{avgScore}%</Text>
               <View style={[styles.metricCardBorder, { backgroundColor: '#F59E0B' }]} />
             </LinearGradient>
-          </View>
-        </View>
-
-        <View style={styles.weeklyGraphCard}>
-          <Text style={styles.weeklyGraphTitle}>This Week's Activity</Text>
-          <View style={styles.graphContainer}>
-            {weeklyData.map((day, index) => {
-              const barHeight = maxCount > 0 ? (day.count / maxCount) * 100 : 0;
-              const isToday = index === 6;
-              
-              return (
-                <View key={day.day} style={styles.barContainer}>
-                  <View style={styles.barWrapper}>
-                    <View style={[styles.barBackground, { height: 80 }]}>
-                      <LinearGradient
-                        colors={isToday ? ['#4F46E5', '#7C3AED'] : ['#E0E7FF', '#C7D2FE']}
-                        style={[styles.barFill, { height: `${barHeight}%` }]}
-                      >
-                        {day.count > 0 && (
-                          <Text style={[styles.barCount, isToday && styles.barCountActive]}>
-                            {day.count}
-                          </Text>
-                        )}
-                      </LinearGradient>
-                    </View>
-                  </View>
-                  <Text style={[styles.dayLabel, isToday && styles.dayLabelActive]}>
-                    {day.day}
-                  </Text>
-                  {isToday && <View style={styles.todayIndicator} />}
-                </View>
-              );
-            })}
           </View>
         </View>
       </View>
@@ -410,13 +388,23 @@ export default function PracticeCategoriesPreview() {
                     <View style={styles.examCardContentHorizontal}>
                       <View style={[
                         styles.examIconContainerHorizontal,
-                        { backgroundColor: getCategoryColor(exam.category) + '20' }
+                        exam.logoUrl && getImageUrl(exam.logoUrl) 
+                          ? { backgroundColor: 'transparent' }
+                          : { backgroundColor: getCategoryColor(exam.category) + '20' }
                       ]}>
-                        <Ionicons 
-                          name={getCategoryIcon(exam.category) as any} 
-                          size={24} 
-                          color={getCategoryColor(exam.category)} 
-                        />
+                        {exam.logoUrl && getImageUrl(exam.logoUrl) ? (
+                          <Image 
+                            source={{ uri: getImageUrl(exam.logoUrl) || '' }} 
+                            style={styles.examLogoHorizontal}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Ionicons 
+                            name={getCategoryIcon(exam.category) as any} 
+                            size={24} 
+                            color={getCategoryColor(exam.category)} 
+                          />
+                        )}
                       </View>
                       <View style={styles.examTitleContainerHorizontal}>
                         <Text style={styles.examTitleHorizontal} numberOfLines={2}>
@@ -532,12 +520,12 @@ const styles = StyleSheet.create({
   },
   scoreStreakRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 8,
   },
   premiumMetricCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -546,33 +534,39 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   metricCardGradient: {
-    padding: 16,
-    borderRadius: 16,
-    minHeight: 120,
+    padding: 12,
+    borderRadius: 12,
+    minHeight: 75,
+  },
+  metricTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   metricIconWrapper: {
-    marginBottom: 10,
+    marginRight: 8,
   },
   metricIconGradient: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   metricLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#64748B',
     fontWeight: '700',
-    marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    flex: 1,
   },
   metricValueLarge: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: '900',
     color: '#0F172A',
-    marginBottom: 8,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   metricCardBorder: {
     position: 'absolute',
@@ -732,6 +726,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
+  },
+  examLogoHorizontal: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
   },
   examTitleContainerHorizontal: {
     width: '100%',

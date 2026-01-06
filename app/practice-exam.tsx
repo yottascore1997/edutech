@@ -608,7 +608,6 @@ const PracticeExamScreen = () => {
           />
         }
       >
-        {renderHeader()}
         {renderStatsCards()}
         {renderCategoriesSection()}
         

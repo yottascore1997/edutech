@@ -189,7 +189,7 @@ export default function LiveExamResultScreen() {
   };
 
   const getBackgroundGradient = (): [string, string, string] => {
-    return ['#FAFBFC', '#F8FAFC', '#F1F5F9'];
+    return ['#FFFFFF', '#F8FAFF', '#F0F4FF'];
   };
 
   const handleShare = async () => {
@@ -315,23 +315,28 @@ export default function LiveExamResultScreen() {
                   { transform: [{ scale: scoreAnim }] }
                 ]}
               >
+                <Text style={styles.scoreLabel}>YOUR SCORE</Text>
                 <View style={styles.scoreRing}>
-                  <View style={styles.scoreInnerRing}>
-                    <Text style={styles.scoreLabel}>YOUR SCORE</Text>
-                    <Text style={styles.massiveScore}>{result.score}</Text>
-                    <Text style={styles.scorePercentage}>%</Text>
-                    <Animated.View 
-                      style={[
-                        styles.performancePill,
-                        { transform: [{ scale: pulseAnim }] }
-                      ]}
-                    >
-                      <Text style={styles.performancePillText}>
-                        {getPerformanceRating()}
-                      </Text>
-                    </Animated.View>
-                  </View>
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 1)']}
+                    style={styles.scoreInnerRing}
+                  >
+                    <View style={styles.scoreValueRow}>
+                      <Text style={styles.massiveScore}>{result.score}</Text>
+                      <Text style={styles.scorePercentage}>%</Text>
+                    </View>
+                  </LinearGradient>
                 </View>
+                <Animated.View 
+                  style={[
+                    styles.performancePill,
+                    { transform: [{ scale: pulseAnim }] }
+                  ]}
+                >
+                  <Text style={styles.performancePillText}>
+                    {getPerformanceRating()}
+                  </Text>
+                </Animated.View>
               </Animated.View>
 
             </LinearGradient>
@@ -775,124 +780,161 @@ const styles = StyleSheet.create({
 
   // Ultra-Premium Header
   ultraHeaderSection: {
-    marginBottom: 20,
-    borderRadius: 24,
+    marginBottom: 24,
+    marginHorizontal: 16,
+    borderRadius: 28,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.25,
+    shadowRadius: 32,
+    elevation: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   ultraHeaderGradient: {
-    padding: 20,
-    paddingTop: 24,
-    paddingBottom: 24,
+    padding: 28,
+    paddingTop: 32,
+    paddingBottom: 32,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
   decorativeCircle1: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    top: -50,
-    right: -30,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    top: -60,
+    right: -40,
   },
   decorativeCircle2: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    bottom: -30,
+    left: -30,
+  },
+  decorativeCircle3: {
     position: 'absolute',
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    bottom: -20,
-    left: -20,
-  },
-  decorativeCircle3: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    top: 40,
-    left: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    top: 50,
+    left: 30,
   },
   ultraHeaderTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '900',
     color: '#FFFFFF',
-    marginBottom: 4,
-    letterSpacing: 0.6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    marginBottom: 8,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 6,
+    textAlign: 'center',
   },
   ultraHeaderSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    paddingHorizontal: 16,
   },
   massiveScoreContainer: {
-    marginVertical: 12,
+    marginVertical: 16,
+    alignItems: 'center',
   },
   scoreRing: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 14,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   scoreInnerRing: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    overflow: 'hidden',
+    paddingTop: 0,
   },
   scoreLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 1,
-    marginBottom: 2,
+    fontSize: 11,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.95)',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  scoreValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
   },
   massiveScore: {
-    fontSize: 48,
+    fontSize: 52,
     fontWeight: '900',
     color: '#1F2937',
-    lineHeight: 48,
+    lineHeight: 52,
+    letterSpacing: -1.5,
   },
   scorePercentage: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#6B7280',
-    marginTop: -4,
+    color: '#64748B',
+    marginLeft: 2,
+    letterSpacing: -0.5,
   },
   performancePill: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   performancePillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#4F46E5',
-    letterSpacing: 0.3,
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   ultraShareButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',

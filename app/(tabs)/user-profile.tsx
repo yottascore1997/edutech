@@ -16,7 +16,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { apiFetchAuth } from '../../constants/api';
+import { apiFetchAuth, getImageUrl } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
@@ -289,21 +289,34 @@ export default function UserProfileScreen() {
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
         <View style={styles.postAuthorSection}>
-          <Image
-            source={profile?.profilePhoto ? { uri: profile.profilePhoto } : require('../../assets/images/avatar1.jpg')}
-            style={styles.postAuthorAvatar}
-          />
+          <View style={styles.postAuthorAvatarContainer}>
+            <Image
+              source={profile?.profilePhoto ? { 
+                uri: profile.profilePhoto.startsWith('http') 
+                  ? profile.profilePhoto 
+                  : getImageUrl(profile.profilePhoto) 
+              } : require('../../assets/images/avatar1.jpg')}
+              style={styles.postAuthorAvatar}
+            />
+          </View>
           <View style={styles.postAuthorInfo}>
             <Text style={styles.postAuthorName}>{profile?.name || 'User'}</Text>
-            <Text style={styles.postTime}>{timeAgo(item.createdAt)}</Text>
+            <View style={styles.postTimeContainer}>
+              <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+              <Text style={styles.postTime}>{timeAgo(item.createdAt)}</Text>
+            </View>
           </View>
         </View>
       </View>
-      <View style={styles.postContentContainer}>
-        <Text style={styles.postContent}>{item.content}</Text>
-      </View>
+      {item.content && (
+        <View style={styles.postContentContainer}>
+          <Text style={styles.postContent}>{item.content}</Text>
+        </View>
+      )}
       {item.imageUrl && (
-        <Image source={{ uri: item.imageUrl }} style={styles.postImage} />
+        <View style={styles.postImageContainer}>
+          <Image source={{ uri: getImageUrl(item.imageUrl) }} style={styles.postImage} />
+        </View>
       )}
     </View>
   );
@@ -333,66 +346,104 @@ export default function UserProfileScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Profile Header */}
+        {/* Enhanced Profile Header */}
         <View style={styles.profileHeader}>
           <LinearGradient
-            colors={['#667eea', '#764ba2']}
+            colors={['#4F46E5', '#7C3AED', '#9333EA', '#A855F7']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.profileGradient}
           >
             <View style={styles.profileInfo}>
-              <Image
-                source={profile?.profilePhoto ? { uri: profile.profilePhoto } : require('../../assets/images/avatar1.jpg')}
-                style={styles.profileAvatar}
-              />
-              <Text style={styles.profileName}>{profile?.name || 'Unknown User'}</Text>
-              <Text style={styles.profileEmail}>{profile?.email || ''}</Text>
-              {profile?.bio && (
-                <Text style={styles.profileBio}>{profile.bio}</Text>
-              )}
-              {profile?.course && (
-                <Text style={styles.profileCourse}>{profile.course} • Year {profile.year}</Text>
-              )}
+              <View style={styles.avatarContainer}>
+                {profile?.profilePhoto ? (
+                  <Image
+                    source={{ 
+                      uri: profile.profilePhoto.startsWith('http') 
+                        ? profile.profilePhoto 
+                        : getImageUrl(profile.profilePhoto) 
+                    }}
+                    style={styles.profileAvatar}
+                  />
+                ) : (
+                  <Image
+                    source={require('../../assets/images/avatar1.jpg')}
+                    style={styles.profileAvatar}
+                  />
+                )}
+              </View>
+              <View style={styles.profileTextContainer}>
+                <Text style={styles.profileName}>{profile?.name || 'Unknown User'}</Text>
+                {profile?.username && (
+                  <Text style={styles.profileUsername}>@{profile.username}</Text>
+                )}
+                {profile?.bio && (
+                  <Text style={styles.profileBio}>{profile.bio}</Text>
+                )}
+                {profile?.course && (
+                  <View style={styles.profileCourseContainer}>
+                    <Ionicons name="school-outline" size={14} color="#fff" />
+                    <Text style={styles.profileCourse}>{profile.course} • Year {profile.year}</Text>
+                  </View>
+                )}
+              </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Stats Section */}
+        {/* Enhanced Stats Section */}
         <View style={styles.statsSection}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile?._count?.followers || 0}</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{profile?._count?.following || 0}</Text>
-            <Text style={styles.statLabel}>Following</Text>
-          </View>
-          <View style={styles.statItem}>
+          <View style={styles.statCard}>
+            <Ionicons name="grid-outline" size={24} color="#7C3AED" style={styles.statIcon} />
             <Text style={styles.statNumber}>{profile?._count?.posts || 0}</Text>
             <Text style={styles.statLabel}>Posts</Text>
           </View>
+          <View style={styles.statCard}>
+            <Ionicons name="people-outline" size={24} color="#7C3AED" style={styles.statIcon} />
+            <Text style={styles.statNumber}>{profile?._count?.followers || 0}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="person-add-outline" size={24} color="#7C3AED" style={styles.statIcon} />
+            <Text style={styles.statNumber}>{profile?._count?.following || 0}</Text>
+            <Text style={styles.statLabel}>Following</Text>
+          </View>
         </View>
 
-        {/* Action Buttons */}
+        {/* Enhanced Action Buttons */}
         <View style={styles.actionSection}>
           <View style={styles.actionButtonsContainer}>
             <TouchableOpacity 
-              style={styles.followButton}
+              style={styles.followButtonContainer}
               onPress={handleFollow}
+              activeOpacity={0.8}
             >
-              <Text style={styles.followButtonText}>
-                {isFollowing 
-                  ? 'Following' 
-                  : profile?.followRequestStatus === 'PENDING' 
-                    ? 'Request Sent' 
-                    : 'Follow'
-                }
-              </Text>
+              <LinearGradient
+                colors={isFollowing ? ['#10B981', '#059669'] : ['#4F46E5', '#7C3AED']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.followButtonGradient}
+              >
+                <Ionicons 
+                  name={isFollowing ? "checkmark-circle" : "person-add"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.followButtonText}>
+                  {isFollowing 
+                    ? 'Following' 
+                    : profile?.followRequestStatus === 'PENDING' 
+                      ? 'Request Sent' 
+                      : 'Follow'
+                  }
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
 
             {/* Message Button - Only visible when following */}
             {isFollowing && (
               <TouchableOpacity 
-                style={styles.messageButton}
+                style={styles.messageButtonContainer}
                 onPress={() => {
                   // Navigate to advanced chat screen
                   try {
@@ -416,28 +467,58 @@ export default function UserProfileScreen() {
                     );
                   }
                 }}
+                activeOpacity={0.8}
               >
-                <Ionicons name="chatbubble-outline" size={20} color="#fff" />
-                <Text style={styles.messageButtonText}>Message</Text>
+                <LinearGradient
+                  colors={['#10B981', '#059669']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.messageButtonGradient}
+                >
+                  <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+                  <Text style={styles.messageButtonText}>Message</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={styles.blockButton}
+              style={styles.blockButtonContainer}
               onPress={isBlocked ? handleUnblockUser : handleBlockUser}
+              activeOpacity={0.8}
             >
-              <Text style={styles.blockButtonText}>
-                {isBlocked ? 'Unblock' : 'Block'}
-              </Text>
+              <LinearGradient
+                colors={isBlocked ? ['#6B7280', '#4B5563'] : ['#EF4444', '#DC2626']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.blockButtonGradient}
+              >
+                <Ionicons 
+                  name={isBlocked ? "checkmark-circle" : "ban-outline"} 
+                  size={20} 
+                  color="#fff" 
+                />
+                <Text style={styles.blockButtonText}>
+                  {isBlocked ? 'Unblock' : 'Block'}
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Posts Section */}
+        {/* Enhanced Posts Section */}
         <View style={styles.postsSection}>
-          <Text style={styles.postsTitle}>Posts</Text>
+          <View style={styles.postsHeader}>
+            <View style={styles.postsTitleContainer}>
+              <Ionicons name="grid-outline" size={24} color="#4F46E5" />
+              <Text style={styles.postsTitle}>Posts</Text>
+            </View>
+            <Text style={styles.postsCount}>{userPosts.length} {userPosts.length === 1 ? 'post' : 'posts'}</Text>
+          </View>
           {postsLoading ? (
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <View style={styles.postsLoadingContainer}>
+              <ActivityIndicator size="large" color="#4F46E5" />
+              <Text style={styles.postsLoadingText}>Loading posts...</Text>
+            </View>
           ) : userPosts.length > 0 ? (
             <FlatList
               data={userPosts}
@@ -446,7 +527,11 @@ export default function UserProfileScreen() {
               scrollEnabled={false}
             />
           ) : (
-            <Text style={styles.emptyPostsText}>No posts yet</Text>
+            <View style={styles.emptyPostsContainer}>
+              <Ionicons name="document-text-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyPostsText}>No posts yet</Text>
+              <Text style={styles.emptyPostsSubtext}>This user hasn't shared any posts</Text>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -568,61 +653,102 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   profileGradient: {
-    padding: 30,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
     alignItems: 'center',
   },
   profileInfo: {
+    flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    gap: 16,
+  },
+  avatarContainer: {
+    marginBottom: 0,
   },
   profileAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  profileTextContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
   },
   profileName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: 4,
+    textAlign: 'left',
   },
-  profileEmail: {
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 5,
+  profileUsername: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 6,
+    fontWeight: '500',
+    textAlign: 'left',
   },
   profileBio: {
-    fontSize: 14,
-    color: '#fff',
-    marginBottom: 5,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 6,
+    textAlign: 'left',
+    paddingHorizontal: 0,
+    lineHeight: 18,
+  },
+  profileCourseContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   profileCourse: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#fff',
+    fontWeight: '600',
   },
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    paddingVertical: 20,
     marginHorizontal: 20,
-    borderRadius: 15,
     marginBottom: 20,
+    gap: 12,
   },
-  statItem: {
+  statCard: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  statIcon: {
+    marginBottom: 8,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F2937',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   actionSection: {
     marginHorizontal: 20,
@@ -633,84 +759,171 @@ const styles = StyleSheet.create({
     gap: 12,
     flexWrap: 'wrap',
   },
-  followButton: {
+  followButtonContainer: {
     flex: 1,
-    backgroundColor: '#4F46E5',
-    paddingVertical: 15,
-    borderRadius: 25,
+    minWidth: 120,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  followButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   followButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
-  blockButton: {
+  messageButtonContainer: {
     flex: 1,
-    backgroundColor: '#EF4444',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
+    minWidth: 120,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  blockButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  messageButton: {
-    flex: 1,
-    backgroundColor: '#10B981',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
+  messageButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   messageButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  blockButtonContainer: {
+    flex: 1,
+    minWidth: 120,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  blockButtonGradient: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  blockButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   postsSection: {
     backgroundColor: '#fff',
     marginHorizontal: 20,
-    borderRadius: 15,
+    borderRadius: 20,
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  postsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  postsTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   postsTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+    color: '#1F2937',
+  },
+  postsCount: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  postsLoadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  postsLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  emptyPostsContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
   },
   emptyPostsText: {
     textAlign: 'center',
-    color: '#666',
-    fontSize: 16,
-    marginVertical: 20,
+    color: '#374151',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  emptyPostsSubtext: {
+    textAlign: 'center',
+    color: '#9CA3AF',
+    fontSize: 14,
   },
   postCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   postAuthorSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
+  postAuthorAvatarContainer: {
+    marginRight: 12,
+  },
   postAuthorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   postAuthorInfo: {
     flex: 1,
@@ -718,25 +931,37 @@ const styles = StyleSheet.create({
   postAuthorName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  postTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   postTime: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   postContentContainer: {
-    marginBottom: 10,
+    marginBottom: 12,
+    paddingLeft: 56,
   },
   postContent: {
     fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
+    color: '#374151',
+    lineHeight: 24,
+  },
+  postImageContainer: {
+    marginTop: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   postImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 10,
+    height: 250,
+    backgroundColor: '#E5E7EB',
   },
   modalOverlay: {
     flex: 1,

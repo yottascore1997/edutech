@@ -514,62 +514,6 @@ const PracticeExamDetailsScreen = () => {
                         </View>
                     </View>
 
-                    {/* Info Section - Like Live Exam */}
-                    <View style={styles.headerInfoSection}>
-                        <LinearGradient
-                            colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.12)']}
-                            style={styles.headerInfoGradient}
-                        >
-                            <View style={styles.headerInfoContent}>
-                                <View style={styles.infoItem}>
-                                    <View style={styles.infoIconContainer}>
-                                        <LinearGradient
-                                            colors={["#FF6CAB", "#7366FF"]}
-                                            style={styles.infoIconGradient}
-                                        >
-                                            <Ionicons name="person" size={18} color="#fff" />
-                                        </LinearGradient>
-                                    </View>
-                                    <Text style={styles.infoLabel}>Status</Text>
-                                    <Text style={styles.infoValue}>{exam?.attempted ? 'Completed' : 'Available'}</Text>
-                                </View>
-                                
-                                <View style={styles.vsContainer}>
-                                    <LinearGradient
-                                        colors={["#FFD452", "#FF6CAB"]}
-                                        style={styles.vsGradient}
-                                    >
-                                        <Text style={styles.vsText}>VS</Text>
-                                    </LinearGradient>
-                                </View>
-                                
-                                <View style={styles.infoItem}>
-                                    <View style={styles.infoIconContainer}>
-                                        <LinearGradient
-                                            colors={["#6C63FF", "#FF6CAB"]}
-                                            style={styles.infoIconGradient}
-                                        >
-                                            <Ionicons name="trophy" size={18} color="#fff" />
-                                        </LinearGradient>
-                                    </View>
-                                    <Text style={styles.infoLabel}>Best Score</Text>
-                                    <Text style={styles.infoValue}>{result?.score || '0'}</Text>
-                                </View>
-                                
-                                <View style={styles.timerContainer}>
-                                    <LinearGradient
-                                        colors={["#6C63FF", "#7366FF"]}
-                                        style={styles.timerGradient}
-                                    >
-                                        <Ionicons name="time" size={16} color="#fff" />
-                                        <Text style={styles.timerText}>
-                                            {exam?.duration}m
-                                        </Text>
-                                    </LinearGradient>
-                                </View>
-                            </View>
-                        </LinearGradient>
-                    </View>
 
                 </View>
             </LinearGradient>
@@ -598,12 +542,6 @@ const PracticeExamDetailsScreen = () => {
 
                       {/* Exam Details */}
                       <View style={styles.enhancedOverviewCard}>
-                        <View style={styles.cardHeader}>
-                          <View style={styles.iconContainer}>
-                            <Ionicons name="information-circle" size={24} color="#667eea" />
-                          </View>
-                          <Text style={styles.enhancedOverviewTitle}>Exam Details</Text>
-                        </View>
                         <View style={styles.enhancedDetailsGrid}>
                           {exam.description && (
                             <View style={styles.descriptionItem}>
@@ -3091,7 +3029,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 12,
         elevation: 8,
-        marginTop: 8,
+        marginTop: 4,
         marginBottom: 20,
     },
     enhancedActionButtonDisabled: {

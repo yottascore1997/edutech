@@ -113,35 +113,59 @@ const MyListingsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={['#4F46E5', '#7C3AED']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>My Listings</Text>
-        <Text style={styles.headerSubtitle}>Manage your book listings</Text>
-      </LinearGradient>
+      {/* Simple Heading */}
+      <View style={styles.simpleHeader}>
+        <Text style={styles.simpleHeaderTitle}>My Listings</Text>
+      </View>
 
       {/* Summary Stats */}
       <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
+        <LinearGradient
+          colors={['#6366F1', '#8B5CF6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.summaryCard}
+        >
+          <View style={styles.summaryIconContainer}>
+            <Ionicons name="book" size={16} color="#FFFFFF" />
+          </View>
           <Text style={styles.summaryNumber}>{summary.total}</Text>
           <Text style={styles.summaryLabel}>Total</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryNumber, { color: '#10B981' }]}>{summary.active}</Text>
+        </LinearGradient>
+        
+        <LinearGradient
+          colors={['#10B981', '#059669']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.summaryCard}
+        >
+          <View style={styles.summaryIconContainer}>
+            <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+          </View>
+          <Text style={styles.summaryNumber}>{summary.active}</Text>
           <Text style={styles.summaryLabel}>Active</Text>
+        </LinearGradient>
+        
+        <View style={styles.summaryCardPlain}>
+          <View style={[styles.summaryIconContainerPlain, { backgroundColor: '#F3F4F6' }]}>
+            <Ionicons name="checkmark-done" size={16} color="#6B7280" />
+          </View>
+          <Text style={[styles.summaryNumberPlain, { color: '#6B7280' }]}>{summary.sold}</Text>
+          <Text style={styles.summaryLabelPlain}>Sold</Text>
         </View>
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryNumber, { color: '#6B7280' }]}>{summary.sold}</Text>
-          <Text style={styles.summaryLabel}>Sold</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={[styles.summaryNumber, { color: '#3B82F6' }]}>{summary.rented}</Text>
+        
+        <LinearGradient
+          colors={['#3B82F6', '#2563EB']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.summaryCard}
+        >
+          <View style={styles.summaryIconContainer}>
+            <Ionicons name="time" size={16} color="#FFFFFF" />
+          </View>
+          <Text style={styles.summaryNumber}>{summary.rented}</Text>
           <Text style={styles.summaryLabel}>Rented</Text>
-        </View>
+        </LinearGradient>
       </View>
 
       <ScrollView
@@ -152,7 +176,9 @@ const MyListingsScreen = () => {
       >
         {books.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="book-outline" size={64} color="#D1D5DB" />
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="book-outline" size={64} color="#9CA3AF" />
+            </View>
             <Text style={styles.emptyTitle}>No Listings Yet</Text>
             <Text style={styles.emptySubtitle}>Start listing your books to share with students</Text>
           </View>
@@ -164,38 +190,53 @@ const MyListingsScreen = () => {
               onPress={() => router.push(`/(tabs)/book-details?bookId=${book.id}`)}
               activeOpacity={0.8}
             >
-              <Image
-                source={{ uri: book.coverImage }}
-                style={styles.bookImage}
-                resizeMode="cover"
-              />
+              <View style={styles.bookImageContainer}>
+                <Image
+                  source={{ uri: book.coverImage }}
+                  style={styles.bookImage}
+                  resizeMode="cover"
+                />
+                <View style={[styles.statusBadgeAbsolute, { backgroundColor: getStatusColor(book.status) }]}>
+                  <Text style={styles.statusText}>{book.status}</Text>
+                </View>
+              </View>
               
               <View style={styles.bookInfo}>
                 <View style={styles.bookHeader}>
-                  <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(book.status) }]}>
-                    <Text style={styles.statusText}>{book.status}</Text>
+                  <View style={styles.bookTitleContainer}>
+                    <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+                    <Text style={styles.bookAuthor}>{book.author}</Text>
                   </View>
                 </View>
-                
-                <Text style={styles.bookAuthor}>{book.author}</Text>
                 
                 <View style={styles.bookMeta}>
                   <View style={[styles.typeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
                     <Text style={styles.typeText}>{book.listingType}</Text>
                   </View>
                   <View style={styles.conditionBadge}>
+                    <Ionicons name="star" size={12} color="#F59E0B" />
                     <Text style={styles.conditionText}>{book.condition}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.bookFooter}>
-                  <Text style={styles.price}>
-                    {book.listingType === 'DONATE' ? 'Free' : `₹${book.price}`}
-                  </Text>
+                  <View>
+                    <Text style={styles.price}>
+                      {book.listingType === 'DONATE' ? 'Free' : `₹${book.price}`}
+                    </Text>
+                    {book.listingType === 'RENT' && book.rentPrice && (
+                      <Text style={styles.rentPrice}>₹{book.rentPrice}/month</Text>
+                    )}
+                  </View>
                   <View style={styles.stats}>
-                    <Text style={styles.statText}>👁️ {book.views}</Text>
-                    <Text style={styles.statText}>❤️ {book.likes}</Text>
+                    <View style={styles.statItem}>
+                      <Ionicons name="eye-outline" size={14} color="#6B7280" />
+                      <Text style={styles.statText}>{book.views}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Ionicons name="heart-outline" size={14} color="#6B7280" />
+                      <Text style={styles.statText}>{book.likes}</Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -210,60 +251,103 @@ const MyListingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
     color: '#6B7280',
   },
-  header: {
+  simpleHeader: {
     paddingTop: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
     paddingHorizontal: 20,
   },
-  headerTitle: {
+  simpleHeaderTitle: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+    fontWeight: '700',
+    color: '#1F2937',
+    letterSpacing: 0.3,
   },
   summaryContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
+    paddingVertical: 12,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
   },
   summaryCard: {
     flex: 1,
+    borderRadius: 12,
+    padding: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  summaryCardPlain: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  summaryIconContainerPlain: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   summaryNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#4F46E5',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 2,
+    letterSpacing: 0.3,
+  },
+  summaryNumberPlain: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
+    letterSpacing: 0.3,
   },
   summaryLabel: {
-    fontSize: 12,
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  summaryLabelPlain: {
+    fontSize: 10,
     color: '#6B7280',
-    fontWeight: '500',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   content: {
     flex: 1,
@@ -272,108 +356,175 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 100,
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#1F2937',
-    marginTop: 16,
     marginBottom: 8,
+    letterSpacing: 0.3,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#6B7280',
     textAlign: 'center',
+    lineHeight: 22,
   },
   bookCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 16,
+    marginBottom: 20,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F1F5F9',
+  },
+  bookImageContainer: {
+    position: 'relative',
   },
   bookImage: {
-    width: 100,
-    height: 140,
+    width: 110,
+    height: 150,
+  },
+  statusBadgeAbsolute: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   bookInfo: {
     flex: 1,
-    padding: 12,
+    padding: 16,
+    justifyContent: 'space-between',
   },
   bookHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+    marginBottom: 12,
+  },
+  bookTitleContainer: {
+    flex: 1,
   },
   bookTitle: {
-    flex: 1,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#1F2937',
-    marginRight: 8,
+    marginBottom: 6,
+    lineHeight: 22,
+    letterSpacing: 0.2,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   bookAuthor: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
-    marginBottom: 8,
+    fontWeight: '500',
   },
   bookMeta: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
   },
   typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   typeText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   conditionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    gap: 4,
   },
   conditionText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#92400E',
   },
   bookFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   price: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '800',
     color: '#1F2937',
+    letterSpacing: 0.3,
+  },
+  rentPrice: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginTop: 2,
   },
   stats: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
+    alignItems: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   statText: {
     fontSize: 12,
     color: '#6B7280',
+    fontWeight: '600',
   },
 });
 

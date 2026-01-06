@@ -23,7 +23,7 @@ let socketInstance: Socket<ServerToClientEvents, ClientToServerEvents> | null = 
 
 // Configure your socket server URL here
 // For React Native development, use your computer's IP address instead of localhost
-const SOCKET_SERVER_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://192.168.1.7:3001';
+const SOCKET_SERVER_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://192.168.1.5:3001';
 
 export const useSocket = () => {
   const [socket, setSocket] = useState<typeof socketInstance>(null);

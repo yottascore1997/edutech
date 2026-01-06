@@ -97,7 +97,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     if (currentUser?.token) {
       console.log('🔌 Initializing socket connection...');
       
-      const newSocket = io('http://192.168.1.7:3001', {
+      const newSocket = io('http://192.168.1.5:3001', {
         auth: {
           token: currentUser.token
         },
@@ -383,7 +383,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         throw new Error('No authentication token');
       }
 
-      const uploadResponse = await fetch('http://192.168.1.7:3000/api/upload', {
+      const uploadResponse = await fetch('http://192.168.1.5:3000/api/upload', {
         method: 'POST',
         body: formData,
         headers: {

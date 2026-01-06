@@ -98,16 +98,12 @@ export default function TimetableScreen() {
 
   // Form state
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [isWeekly, setIsWeekly] = useState(false);
   const [slots, setSlots] = useState<any[]>([{
     day: 1,
     startTime: '',
     endTime: '',
     subject: '',
-    topic: '',
-    notes: '',
-    reminder: false,
   }]);
 
   const calendarDays = getCalendarDays(currentMonth);
@@ -243,16 +239,12 @@ export default function TimetableScreen() {
 
   const resetForm = () => {
     setName('');
-    setDescription('');
     setIsWeekly(false);
     setSlots([{
       day: 1,
       startTime: '',
       endTime: '',
       subject: '',
-      topic: '',
-      notes: '',
-      reminder: false,
     }]);
   };
 
@@ -268,9 +260,14 @@ export default function TimetableScreen() {
         method: 'POST',
         body: {
           name,
-          description,
+          description: '',
           isWeekly,
-          slots: slots.filter(s => s.subject.trim() && s.startTime && s.endTime)
+          slots: slots.filter(s => s.subject.trim() && s.startTime && s.endTime).map(s => ({
+            ...s,
+            topic: '',
+            notes: '',
+            reminder: false,
+          }))
         }
       });
 
@@ -582,18 +579,6 @@ export default function TimetableScreen() {
                 />
               </View>
               
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Description</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Add a description"
-                  value={description}
-                  onChangeText={setDescription}
-                  placeholderTextColor="#999"
-                  multiline
-                />
-              </View>
-              
               <View style={styles.switchContainer}>
                 <View style={styles.switchLabelContainer}>
                   <Ionicons name="repeat" size={20} color="#8B5CF6" />
@@ -607,18 +592,18 @@ export default function TimetableScreen() {
                 />
               </View>
               
-              <Text style={styles.sectionTitle}>Study Sessions</Text>
+              <Text style={styles.sectionTitle}>Study Session</Text>
               
               {slots.map((slot, idx) => (
                 <View key={idx} style={styles.slotFormCard}>
-                  <View style={styles.slotFormHeader}>
-                    <Text style={styles.slotFormTitle}>Session {idx + 1}</Text>
-                    {slots.length > 1 && (
+                  {slots.length > 1 && (
+                    <View style={styles.slotFormHeader}>
+                      <Text style={styles.slotFormTitle}>Session {idx + 1}</Text>
                       <TouchableOpacity onPress={() => handleRemoveSlot(idx)} style={styles.removeSlotBtn}>
                         <Ionicons name="trash-outline" size={20} color="#ff6b6b" />
                       </TouchableOpacity>
-                    )}
-                  </View>
+                    </View>
+                  )}
                   
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Day</Text>
@@ -672,42 +657,6 @@ export default function TimetableScreen() {
                       value={slot.subject}
                       onChangeText={v => handleSlotChange(idx, 'subject', v)}
                       placeholderTextColor="#999"
-                    />
-                  </View>
-                  
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Topic</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g., Algebra"
-                      value={slot.topic}
-                      onChangeText={v => handleSlotChange(idx, 'topic', v)}
-                      placeholderTextColor="#999"
-                    />
-                  </View>
-                  
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Notes</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Additional notes..."
-                      value={slot.notes}
-                      onChangeText={v => handleSlotChange(idx, 'notes', v)}
-                      placeholderTextColor="#999"
-                      multiline
-                    />
-                  </View>
-                  
-                  <View style={styles.switchContainer}>
-                    <View style={styles.switchLabelContainer}>
-                      <Ionicons name="notifications" size={20} color="#8B5CF6" />
-                      <Text style={styles.switchLabel}>Set Reminder</Text>
-                    </View>
-                    <Switch 
-                      value={slot.reminder} 
-                      onValueChange={v => handleSlotChange(idx, 'reminder', v)} 
-                      thumbColor={slot.reminder ? '#8B5CF6' : '#f4f3f4'} 
-                      trackColor={{ true: '#e0d5ff', false: '#f4f3f4' }} 
                     />
                   </View>
                 </View>
@@ -1205,6 +1154,8 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(139, 92, 246, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    marginTop: 4,
+    marginBottom: 12,
   },
   scheduleTitleRow: {
     flexDirection: 'row',
@@ -1985,7 +1936,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   switchLabelContainer: {
     flexDirection: 'row',
@@ -2498,7 +2449,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingTop: 0,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
   },
   appTitle: {

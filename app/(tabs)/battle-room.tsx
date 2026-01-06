@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SoundManager } from '@/utils/sounds';
+import * as Haptics from 'expo-haptics';
 import {
     Animated,
     Dimensions,
@@ -281,7 +283,7 @@ export default function BattleRoomScreen() {
 
 
       
-      const newSocket = io('http://192.168.1.7:3001', {
+      const newSocket = io('http://192.168.1.5:3001', {
         auth: {
           token: user.token
         },
@@ -400,6 +402,8 @@ export default function BattleRoomScreen() {
         question: data.question,
         timeLeft: data.timeLimit
       }));
+      
+      // Start timer (sound will play inside startQuestionTimer)
       startQuestionTimer(data.timeLimit);
       
 
@@ -501,6 +505,9 @@ const handleMatchEnded = (data: {
     clearInterval(questionTimerRef.current);
     questionTimerRef.current = null;
   }
+  
+  // Stop all playing sounds when battle ends
+  SoundManager.cleanup();
   
   setBattleState(prev => ({
     ...prev,
@@ -737,6 +744,10 @@ const handleMatchEnded = (data: {
     
     setBattleState(prev => ({ ...prev, timeLeft: timeLimit }));
     
+    // Play question start sound when timer actually starts
+    SoundManager.playQuestionStartSound();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
     questionTimerRef.current = setInterval(() => {
       setBattleState(prev => {
         if (prev.timeLeft <= 1) {
@@ -764,6 +775,10 @@ const handleMatchEnded = (data: {
 
 
 
+    
+    // Play answer sound
+    SoundManager.playAnswerSound();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     // Record answer locally
     setBattleState(prev => ({

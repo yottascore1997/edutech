@@ -13,6 +13,7 @@ const Register = () => {
     const { showError, showSuccess } = useToast();
     const router = useRouter();
     const [name, setName] = useState('');
+    const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -23,7 +24,7 @@ const Register = () => {
         try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
 
         
-        if (!name || !email || !password || !phoneNumber) {
+        if (!name || !username || !email || !password || !phoneNumber) {
             showError('Please fill all the required fields.');
             return;
         }
@@ -41,7 +42,7 @@ const Register = () => {
         
         try {
 
-            const userData = { name, email, password, phoneNumber, referralCode };
+            const userData = { name, username, email, password, phoneNumber, referralCode };
 
             
             await register(userData);
@@ -107,6 +108,20 @@ const Register = () => {
                                 placeholderTextColor="#B0B3C6"
                                 value={name}
                                 onChangeText={setName}
+                            />
+                        </View>
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.label}>Username</Text>
+                        <View style={styles.inputWrapper}>
+                            <Ionicons name="at-outline" size={20} color="#B0B3C6" style={styles.inputIcon} />
+                            <TextInput
+                                style={styles.input}
+                                placeholder="e.g. priyasharma123"
+                                placeholderTextColor="#B0B3C6"
+                                value={username}
+                                onChangeText={setUsername}
+                                autoCapitalize="none"
                             />
                         </View>
                     </View>

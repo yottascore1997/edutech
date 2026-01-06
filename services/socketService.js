@@ -11,7 +11,7 @@ class SocketService {
       this.disconnect();
     }
 
-    this.socket = io('http://192.168.1.7:3000', {
+    this.socket = io('http://192.168.1.5:3000', {
       auth: { token },
       transports: ['websocket', 'polling']
     });

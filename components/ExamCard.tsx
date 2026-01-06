@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Animated, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage = false }: any) => {
     const router = useRouter();
@@ -184,6 +184,13 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
 
     const progress = exam.spots > 0 ? ((exam.spots - exam.spotsLeft) / exam.spots) * 100 : 0;
 
+    // Helper function to get full image URL
+    const getImageUrl = (imageUrl: string | undefined) => {
+        if (!imageUrl) return null;
+        if (imageUrl.startsWith('http')) return imageUrl;
+        return `http://192.168.1.5:3000${imageUrl}`;
+    };
+
     const handleCardPress = () => {
         router.push({
             pathname: "/exam/[id]",
@@ -299,9 +306,19 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
     return (
         <>
         <TouchableOpacity style={styles.card} onPress={handleCardPress} activeOpacity={0.8}>
-            {/* Enhanced Header */}
+            {/* Enhanced Header with Logo */}
             <View style={styles.header}>
                 <View style={styles.headerContent}>
+                    {/* Exam Image Logo */}
+                    {exam.imageUrl && getImageUrl(exam.imageUrl) && (
+                        <View style={styles.imageContainer}>
+                            <Image 
+                                source={{ uri: getImageUrl(exam.imageUrl) || '' }} 
+                                style={styles.examImage}
+                                resizeMode="cover"
+                            />
+                        </View>
+                    )}
                     <View style={styles.titleContainer}>
                         <Text style={fonts.subheaderLarge} numberOfLines={2}>{exam.title}</Text>
                         <View style={styles.categoryContainer}>
@@ -1307,6 +1324,20 @@ const styles = StyleSheet.create({
         color: '#333',
         fontSize: 14,
         lineHeight: 20,
+    },
+    imageContainer: {
+        width: 50,
+        height: 50,
+        marginBottom: 0,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#F3F4F6',
+        alignSelf: 'flex-start',
+        marginRight: 10,
+    },
+    examImage: {
+        width: '100%',
+        height: '100%',
     },
 
 });

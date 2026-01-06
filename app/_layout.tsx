@@ -141,6 +141,18 @@ function RootNavigator() {
                       title: '', // Remove the title for user-profile
                     }}
                 />
+                <Drawer.Screen
+                    name="exam-notifications"
+                    options={{
+                      title: '', // Remove the title for exam-notifications
+                    }}
+                />
+                <Drawer.Screen
+                    name="(tabs)/follow-requests"
+                    options={{
+                      title: '', // Remove the title for follow-requests
+                    }}
+                />
             </Drawer>
         </WalletProvider>
     );
