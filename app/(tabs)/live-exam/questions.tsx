@@ -149,7 +149,8 @@ const LiveExamQuestionsScreen = () => {
       setTimer((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleSubmit();
+          // Auto-submit when timer reaches 0
+          autoSubmitExam();
           return 0;
         }
         return prev - 1;
@@ -304,6 +305,78 @@ const LiveExamQuestionsScreen = () => {
 
     // Show enhanced submit modal
     setShowSubmitModal(true);
+  };
+
+  const autoSubmitExam = async () => {
+    // Auto-submit without showing modal when timer expires
+    setSubmitting(true);
+    try {
+      // Wait a bit to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Save current selection before submitting
+      if (currentSelection !== undefined) {
+        setStatuses((prev) => {
+          const updated = [...prev];
+          updated[current] = {
+            ...updated[current],
+            answered: true,
+            selectedOption: currentSelection,
+            visited: true,
+          };
+          return updated;
+        });
+      }
+      
+      // Prepare answers payload - include current selection if it exists
+      const answers: { [key: string]: number } = {};
+      
+      // Add all previously answered questions
+      statuses.forEach((status, index) => {
+        if (status.answered && status.selectedOption !== undefined) {
+          answers[questions[index].id] = status.selectedOption;
+        }
+      });
+      
+      // Add current question if it has a selection
+      if (currentSelection !== undefined) {
+        answers[questions[current].id] = currentSelection;
+      }
+
+      console.log('Auto-submitting live exam (timer expired):', answers);
+
+      const response = await apiFetchAuth(`/student/live-exams/${id}/submit`, user!.token, {
+        method: 'POST',
+        body: { answers }
+      });
+
+      if (response.ok) {
+        console.log('Live exam auto-submitted successfully');
+        
+        // Store the result data
+        const resultData = response.data;
+        
+        // Navigate directly to result page with the exam ID and result data
+        router.push({
+          pathname: '/(tabs)/live-exam/result/[id]' as any,
+          params: { 
+            id: id,
+            resultData: JSON.stringify(resultData)
+          }
+        });
+      } else {
+        throw new Error(response.data?.message || 'Failed to submit exam');
+      }
+    } catch (error: any) {
+      console.error('❌ Error auto-submitting live exam:', error);
+      setSubmitting(false);
+      Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
+      // Even if error occurs, try to navigate to result page
+      router.push({
+        pathname: '/(tabs)/live-exam/result/[id]' as any,
+        params: { id: id }
+      });
+    }
   };
 
   const confirmSubmit = async () => {

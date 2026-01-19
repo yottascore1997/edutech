@@ -1,6 +1,7 @@
 // Environment-based API configuration
 // Using yottascore.com for both development and production
 const BASE_URL = 'https://www.yottascore.com/api';
+// const BASE_URL = 'http://192.168.1.6:3000/api';
 
 type ApiOptions = {
   method?: string;

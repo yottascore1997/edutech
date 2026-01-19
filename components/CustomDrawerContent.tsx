@@ -201,14 +201,17 @@ const CustomDrawerContent = (props: any) => {
                                 iconColor="#96CEB4"
                             />
                             
-                            <MenuItem 
-                                icon="person-outline" 
-                                label="My Profile" 
-                                onPress={navigateToProfile}
-                                isActive={activeMenu === 'profile'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#FF4757"
-                            />
+                            {/* My Profile - Temporarily hidden */}
+                            {false && (
+                                <MenuItem 
+                                    icon="person-outline" 
+                                    label="My Profile" 
+                                    onPress={navigateToProfile}
+                                    isActive={activeMenu === 'profile'}
+                                    isDarkMode={isDarkMode}
+                                    iconColor="#FF4757"
+                                />
+                            )}
                             
                             {/* Messages - Temporarily hidden */}
                             {false && (

@@ -1,5 +1,5 @@
-import { useAuth } from '@/context/AuthContext';
 import { apiFetchAuth } from '@/constants/api';
+import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,6 +30,44 @@ interface PracticeExamResult {
   topScore?: number;
   totalParticipants?: number;
   rank?: number;
+  totalMarks?: number;
+  earnedMarks?: number;
+  answers?: { [questionId: string]: number };
+}
+
+interface RankPreview {
+  hasEnoughData: boolean;
+  projectedScore: number;
+  rankRange: [number, number];
+  performanceIndex: number;
+  breakdown: {
+    accuracy: number;
+    attemptRatio: number;
+    speedScore: number;
+    consistency: number;
+  };
+  disclaimer: string;
+  examType?: string;
+}
+
+interface SuggestionItem {
+  area: string;
+  current: number;
+  target: number;
+  improvement: number;
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+}
+
+interface ImprovementSuggestion {
+  hasEnoughData?: boolean;
+  suggestions?: SuggestionItem[];
+  summary?: {
+    totalAreas: number;
+    avgImprovement: number;
+    estimatedRankImprovement: string;
+  };
+  nextSteps?: string[];
 }
 
 export default function PracticeExamResultScreen() {
@@ -39,6 +77,8 @@ export default function PracticeExamResultScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PracticeExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview');
+  const [rankPreview, setRankPreview] = useState<RankPreview | null>(null);
+  const [improvementData, setImprovementData] = useState<ImprovementSuggestion | null>(null);
   
   // Animation values
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -59,14 +99,36 @@ export default function PracticeExamResultScreen() {
         
         // First, try to parse from params
         if (resultData) {
-          console.log('📊 Result data from params:', resultData);
+          console.log('📊 Result data from params (raw length):', resultData.length);
+          console.log('📊 Result data from params (first 500 chars):', resultData.substring(0, 500));
           try {
             const parsed = JSON.parse(resultData);
-            // Handle nested response structure: { success, result: {...} } or direct result object
+            console.log('📊 Parsed full response keys:', Object.keys(parsed));
+            console.log('📊 Parsed full response:', JSON.stringify(parsed, null, 2));
+            console.log('📊 parsed.result exists?', !!parsed.result);
+            console.log('📊 parsed.rankPreview exists?', !!parsed.rankPreview);
+            console.log('📊 parsed.rankPreview value:', parsed.rankPreview);
+            
+            // Handle nested response structure: { success, result: {...}, rankPreview: {...} } or direct result object
             parsedResult = parsed.result || parsed;
+            
+            // Extract rankPreview from response if available
+            if (parsed.rankPreview) {
+              console.log('📊 Rank preview data found:', parsed.rankPreview);
+              console.log('📊 hasEnoughData:', parsed.rankPreview.hasEnoughData);
+              console.log('📊 Setting rankPreview state...');
+              setRankPreview(parsed.rankPreview);
+              console.log('✅ Rank preview extracted and set in state:', parsed.rankPreview);
+            } else {
+              console.log('⚠️ No rankPreview found in parsed data');
+              console.log('⚠️ Available keys in parsed:', Object.keys(parsed));
+              console.log('⚠️ Full parsed object:', parsed);
+            }
+            
             console.log('✅ Parsed result data:', parsedResult);
           } catch (parseError) {
             console.error('❌ Error parsing result data from params:', parseError);
+            console.error('❌ Raw data that failed to parse:', resultData);
           }
         }
         
@@ -76,8 +138,19 @@ export default function PracticeExamResultScreen() {
           const response = await apiFetchAuth(`/student/practice-exams/${id}/result`, user.token);
           
           if (response.ok && response.data) {
-            // Handle nested response structure: { success, result: {...} } or direct result object
+            // Handle nested response structure: { success, result: {...}, rankPreview: {...} } or direct result object
             parsedResult = response.data.result || response.data;
+            
+            // Extract rankPreview from response if available
+            if (response.data.rankPreview) {
+              console.log('📊 Rank preview data found in API:', response.data.rankPreview);
+              console.log('📊 hasEnoughData:', response.data.rankPreview.hasEnoughData);
+              setRankPreview(response.data.rankPreview);
+              console.log('✅ Rank preview extracted from API response:', response.data.rankPreview);
+            } else {
+              console.log('⚠️ No rankPreview found in API response');
+            }
+            
             console.log('✅ Fetched result from API:', parsedResult);
           } else {
             console.error('❌ Failed to fetch result from API:', response);
@@ -115,7 +188,7 @@ export default function PracticeExamResultScreen() {
             correctAnswers: parsedResult.correctAnswers ?? 0,
             wrongAnswers: parsedResult.wrongAnswers ?? 0,
             unattempted: parsedResult.unattempted ?? 0,
-            examDuration: parsedResult.examDuration ?? parsedResult.duration ?? 0,
+            examDuration: parsedResult.examDuration ?? (parsedResult as any).duration ?? 0,
             timeTakenSeconds: parsedResult.timeTakenSeconds ?? 0,
             timeTakenMinutes: timeTakenMinutes,
             timeTakenFormatted: parsedResult.timeTakenFormatted ?? `${timeTakenMinutes}m`,
@@ -128,11 +201,19 @@ export default function PracticeExamResultScreen() {
             averageScore: parsedResult.averageScore,
             topScore: parsedResult.topScore,
             totalParticipants: parsedResult.totalParticipants ?? parsedResult.totalParticipants,
-            rank: parsedResult.rank ?? parsedResult.currentRank,
+            rank: parsedResult.rank ?? (parsedResult as any).currentRank,
+            totalMarks: parsedResult.totalMarks,
+            earnedMarks: parsedResult.earnedMarks,
+            answers: parsedResult.answers,
           };
           
           console.log('📊 Final result data:', finalResult);
           setResult(finalResult);
+          
+          // Fetch improvement suggestions after result is loaded
+          if (user?.token) {
+            fetchImprovementSuggestions();
+          }
           
           // Enhanced animations sequence
           Animated.sequence([
@@ -195,6 +276,23 @@ export default function PracticeExamResultScreen() {
     
     loadResultData();
   }, [resultData, id, user?.token]);
+
+  const fetchImprovementSuggestions = async () => {
+    try {
+      if (!user?.token) return;
+
+      const response = await apiFetchAuth('/student/performance/improvement-suggestions', user.token);
+      
+      if (response.ok && response.data) {
+        setImprovementData(response.data);
+        console.log('✅ Improvement suggestions fetched:', response.data);
+      } else {
+        console.error('❌ Failed to fetch improvement suggestions:', response);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching improvement suggestions:', err);
+    }
+  };
 
   const startConfetti = () => {
     setShowConfetti(true);
@@ -615,6 +713,295 @@ export default function PracticeExamResultScreen() {
                     )}
                   </View>
                 </View>
+
+                {/* Rank Preview Card */}
+                {rankPreview && rankPreview.hasEnoughData && (
+                  <View style={styles.rankPreviewCard}>
+                    <LinearGradient
+                      colors={['#F0F9FF', '#E0F2FE']}
+                      style={styles.rankPreviewGradient}
+                    >
+                      <View style={styles.rankPreviewHeader}>
+                        <Ionicons name="trending-up" size={28} color="#0284C7" />
+                        <View style={styles.rankPreviewTitleContainer}>
+                          <Text style={styles.rankPreviewTitle}>Future Rank Projection</Text>
+                          {rankPreview.examType && (
+                            <View style={styles.examTypeBadge}>
+                              <Text style={styles.examTypeText}>{rankPreview.examType}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      
+                      {/* Projected Score - Prominent Display */}
+                      <View style={styles.projectedScoreContainer}>
+                        <LinearGradient
+                          colors={['#FFFFFF', '#F8FAFF']}
+                          style={styles.projectedScoreBox}
+                        >
+                          <Text style={styles.projectedScoreLabel}>Projected Score</Text>
+                          <View style={styles.projectedScoreValueContainer}>
+                            <Text style={styles.projectedScoreValue}>
+                              {rankPreview.projectedScore != null ? rankPreview.projectedScore.toFixed(1) : '0.0'}
+                            </Text>
+                            <Text style={styles.projectedScoreUnit}>%</Text>
+                          </View>
+                        </LinearGradient>
+                      </View>
+
+                      {/* Key Metrics Row */}
+                      <View style={styles.rankPreviewMetricsRow}>
+                        <View style={styles.rankPreviewMetricItem}>
+                          <View style={styles.rankRangeBox}>
+                            <View style={styles.rankRangeIconContainer}>
+                              <Ionicons name="trophy-outline" size={20} color="#0284C7" />
+                            </View>
+                            <Text style={styles.rankRangeLabel}>Expected Rank Range</Text>
+                            <Text style={styles.rankRangeValue}>
+                              #{rankPreview.rankRange?.[0]?.toLocaleString() ?? '0'} - #{rankPreview.rankRange?.[1]?.toLocaleString() ?? '0'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <View style={styles.rankPreviewMetricItem}>
+                          <View style={styles.performanceIndexBox}>
+                            <View style={styles.rankRangeIconContainer}>
+                              <Ionicons name="analytics-outline" size={20} color="#0284C7" />
+                            </View>
+                            <Text style={styles.performanceIndexLabel}>Performance Index</Text>
+                            <Text style={styles.performanceIndexValue}>
+                              {rankPreview.performanceIndex != null ? rankPreview.performanceIndex.toFixed(1) : '0.0'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Performance Breakdown with Progress Bars */}
+                      {rankPreview.breakdown && (
+                        <View style={styles.breakdownSection}>
+                          <Text style={styles.breakdownTitle}>Performance Breakdown</Text>
+                          <View style={styles.breakdownList}>
+                            <View style={styles.breakdownItem}>
+                              <View style={styles.breakdownItemHeader}>
+                                <Text style={styles.breakdownLabel}>Accuracy</Text>
+                                <Text style={styles.breakdownValue}>{rankPreview.breakdown.accuracy?.toFixed(1) ?? '0.0'}%</Text>
+                              </View>
+                              <View style={styles.breakdownProgressBar}>
+                                <View style={[
+                                  styles.breakdownProgressFill,
+                                  { width: `${Math.min(rankPreview.breakdown.accuracy ?? 0, 100)}%`, backgroundColor: '#EF4444' }
+                                ]} />
+                              </View>
+                            </View>
+                            
+                            <View style={styles.breakdownItem}>
+                              <View style={styles.breakdownItemHeader}>
+                                <Text style={styles.breakdownLabel}>Attempt Ratio</Text>
+                                <Text style={styles.breakdownValue}>{rankPreview.breakdown.attemptRatio?.toFixed(1) ?? '0.0'}%</Text>
+                              </View>
+                              <View style={styles.breakdownProgressBar}>
+                                <View style={[
+                                  styles.breakdownProgressFill,
+                                  { width: `${Math.min(rankPreview.breakdown.attemptRatio ?? 0, 100)}%`, backgroundColor: '#10B981' }
+                                ]} />
+                              </View>
+                            </View>
+                            
+                            <View style={styles.breakdownItem}>
+                              <View style={styles.breakdownItemHeader}>
+                                <Text style={styles.breakdownLabel}>Speed Score</Text>
+                                <Text style={styles.breakdownValue}>{rankPreview.breakdown.speedScore?.toFixed(1) ?? '0.0'}%</Text>
+                              </View>
+                              <View style={styles.breakdownProgressBar}>
+                                <View style={[
+                                  styles.breakdownProgressFill,
+                                  { width: `${Math.min(rankPreview.breakdown.speedScore ?? 0, 100)}%`, backgroundColor: '#F59E0B' }
+                                ]} />
+                              </View>
+                            </View>
+                            
+                            <View style={styles.breakdownItem}>
+                              <View style={styles.breakdownItemHeader}>
+                                <Text style={styles.breakdownLabel}>Consistency</Text>
+                                <Text style={styles.breakdownValue}>{rankPreview.breakdown.consistency?.toFixed(1) ?? '0.0'}%</Text>
+                              </View>
+                              <View style={styles.breakdownProgressBar}>
+                                <View style={[
+                                  styles.breakdownProgressFill,
+                                  { width: `${Math.min(rankPreview.breakdown.consistency ?? 0, 100)}%`, backgroundColor: '#8B5CF6' }
+                                ]} />
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Disclaimer */}
+                      {rankPreview.disclaimer && (
+                        <View style={styles.disclaimerBox}>
+                          <Ionicons name="information-circle" size={16} color="#64748B" />
+                          <Text style={styles.disclaimerText}>{rankPreview.disclaimer}</Text>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </View>
+                )}
+
+                {/* Marks Display Card */}
+                {(result.totalMarks !== undefined || result.earnedMarks !== undefined) && (
+                  <View style={styles.marksCard}>
+                    <LinearGradient
+                      colors={['#FEF3C7', '#FDE68A']}
+                      style={styles.marksGradient}
+                    >
+                      <View style={styles.marksHeader}>
+                        <Ionicons name="medal" size={28} color="#D97706" />
+                        <Text style={styles.marksTitle}>Marks Breakdown</Text>
+                      </View>
+                      
+                      <View style={styles.marksContent}>
+                        <View style={styles.marksItem}>
+                          <Text style={styles.marksLabel}>Earned Marks</Text>
+                          <Text style={styles.marksValue}>{result.earnedMarks ?? 0}</Text>
+                        </View>
+                        <View style={styles.marksDivider} />
+                        <View style={styles.marksItem}>
+                          <Text style={styles.marksLabel}>Total Marks</Text>
+                          <Text style={styles.marksValue}>{result.totalMarks ?? 0}</Text>
+                        </View>
+                      </View>
+                      
+                      {result.totalMarks !== undefined && result.totalMarks > 0 && (
+                        <View style={styles.marksPercentageBox}>
+                          <Text style={styles.marksPercentageLabel}>Marks Percentage</Text>
+                          <Text style={styles.marksPercentageValue}>
+                            {((result.earnedMarks ?? 0) / result.totalMarks * 100).toFixed(1)}%
+                          </Text>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </View>
+                )}
+
+                {/* Improvement Suggestions Card */}
+                {improvementData && improvementData.hasEnoughData && improvementData.suggestions && improvementData.suggestions.length > 0 && (
+                  <View style={styles.improvementCard}>
+                    <LinearGradient
+                      colors={['#FEF3C7', '#FDE68A']}
+                      style={styles.improvementGradient}
+                    >
+                      <View style={styles.improvementHeader}>
+                        <Ionicons name="bulb" size={28} color="#D97706" />
+                        <Text style={styles.improvementTitle}>💡 Improvement Suggestions</Text>
+                      </View>
+                      <Text style={styles.improvementSubtext}>
+                        Personalized recommendations to boost your performance
+                      </Text>
+
+                      {/* Summary Section */}
+                      {improvementData.summary && (
+                        <View style={styles.improvementSummary}>
+                          <View style={styles.summaryRow}>
+                            <View style={styles.summaryItem}>
+                              <Text style={styles.summaryLabel}>Areas to Improve</Text>
+                              <Text style={styles.summaryValue}>{improvementData.summary.totalAreas}</Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                              <Text style={styles.summaryLabel}>Avg Improvement</Text>
+                              <Text style={styles.summaryValue}>{improvementData.summary.avgImprovement.toFixed(1)}%</Text>
+                            </View>
+                            <View style={styles.summaryDivider} />
+                            <View style={styles.summaryItem}>
+                              <Text style={styles.summaryLabel}>Rank Impact</Text>
+                              <Text style={[styles.summaryValue, styles.summaryValueSmall]}>
+                                {improvementData.summary.estimatedRankImprovement}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Suggestions List */}
+                      <View style={styles.suggestionsList}>
+                        {improvementData.suggestions.map((suggestion: SuggestionItem, index: number) => {
+                          const priorityColor = suggestion.priority === 'high' ? '#DC2626' : 
+                                                suggestion.priority === 'medium' ? '#D97706' : '#059669';
+                          const priorityBgColor = suggestion.priority === 'high' ? '#FEE2E2' : 
+                                                  suggestion.priority === 'medium' ? '#FEF3C7' : '#D1FAE5';
+                          
+                          return (
+                            <View key={index} style={styles.suggestionCard}>
+                              <View style={styles.suggestionCardHeader}>
+                                <View style={styles.suggestionAreaRow}>
+                                  <Text style={styles.suggestionArea}>{suggestion.area}</Text>
+                                  <View style={[styles.priorityBadge, { backgroundColor: priorityBgColor }]}>
+                                    <Text style={[styles.priorityText, { color: priorityColor }]}>
+                                      {suggestion.priority.toUpperCase()}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text style={styles.improvementBadge}>+{suggestion.improvement.toFixed(1)}%</Text>
+                              </View>
+
+                              {/* Current vs Target */}
+                              <View style={styles.progressSection}>
+                                <View style={styles.progressRow}>
+                                  <Text style={styles.progressLabel}>Current</Text>
+                                  <Text style={styles.progressValue}>{suggestion.current.toFixed(1)}%</Text>
+                                </View>
+                                <View style={styles.progressBarContainer}>
+                                  <View style={styles.progressBarBg}>
+                                    {/* Current progress */}
+                                    <View style={[
+                                      styles.progressBarFill,
+                                      { 
+                                        width: `${Math.min(suggestion.current, 100)}%`,
+                                        backgroundColor: priorityColor
+                                      }
+                                    ]} />
+                                    {/* Target indicator line */}
+                                    <View style={[
+                                      styles.targetIndicator,
+                                      { left: `${Math.min(suggestion.target, 100)}%` }
+                                    ]} />
+                                  </View>
+                                </View>
+                                <View style={styles.progressRow}>
+                                  <Text style={styles.progressLabel}>Target</Text>
+                                  <Text style={[styles.progressValue, styles.targetValue]}>
+                                    {suggestion.target.toFixed(1)}%
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* Action Text */}
+                              <View style={styles.actionSection}>
+                                <Ionicons name="arrow-forward-circle" size={18} color="#D97706" />
+                                <Text style={styles.actionText}>{suggestion.action}</Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* Next Steps Section */}
+                      {improvementData.nextSteps && improvementData.nextSteps.length > 0 && (
+                        <View style={styles.nextStepsSection}>
+                          <Text style={styles.nextStepsTitle}>📋 Next Steps</Text>
+                          {improvementData.nextSteps.map((step: string, index: number) => (
+                            <View key={index} style={styles.nextStepItem}>
+                              <View style={styles.nextStepNumber}>
+                                <Text style={styles.nextStepNumberText}>{index + 1}</Text>
+                              </View>
+                              <Text style={styles.nextStepText}>{step}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </View>
+                )}
               </Animated.View>
             )}
 
@@ -1407,6 +1794,531 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#6B7280',
+  },
+  rankPreviewCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  rankPreviewGradient: {
+    padding: 24,
+  },
+  rankPreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  rankPreviewTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  rankPreviewTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0C4A6E',
+    flex: 1,
+  },
+  examTypeBadge: {
+    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  examTypeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#0284C7',
+    textTransform: 'uppercase',
+  },
+  projectedScoreContainer: {
+    marginBottom: 20,
+  },
+  projectedScoreBox: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  projectedScoreLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#075985',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  projectedScoreValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  projectedScoreValue: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#0284C7',
+    lineHeight: 52,
+  },
+  projectedScoreUnit: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0284C7',
+    marginLeft: 2,
+  },
+  rankPreviewMetricsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  rankPreviewMetricItem: {
+    flex: 1,
+  },
+  rankRangeBox: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  rankRangeIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(2, 132, 199, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  rankRangeLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#075985',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  rankRangeValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0284C7',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  performanceIndexBox: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    minHeight: 100,
+    justifyContent: 'center',
+  },
+  performanceIndexLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#075985',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  performanceIndexValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0284C7',
+    textAlign: 'center',
+  },
+  breakdownSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(2, 132, 199, 0.2)',
+  },
+  breakdownTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0C4A6E',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  breakdownList: {
+    gap: 12,
+  },
+  breakdownItem: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    padding: 12,
+  },
+  breakdownItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  breakdownValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0284C7',
+  },
+  breakdownLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#075985',
+  },
+  breakdownProgressBar: {
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  breakdownProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+    minWidth: 4,
+  },
+  disclaimerBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 8,
+    gap: 8,
+  },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  improvementCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  improvementGradient: {
+    padding: 24,
+  },
+  improvementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  improvementTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#92400E',
+  },
+  improvementSubtext: {
+    fontSize: 14,
+    color: '#B45309',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  improvementContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  improvementText: {
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 10,
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400E',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  improvementSummary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(146, 64, 14, 0.2)',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#D97706',
+    textAlign: 'center',
+  },
+  summaryValueSmall: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  suggestionsList: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  suggestionCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  suggestionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  suggestionAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  suggestionArea: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+    flex: 1,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  priorityText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  improvementBadge: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#059669',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  progressSection: {
+    marginBottom: 12,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  progressValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  progressBarContainer: {
+    marginVertical: 8,
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+    minWidth: 4,
+  },
+  targetIndicator: {
+    position: 'absolute',
+    top: -2,
+    width: 2,
+    height: 12,
+    backgroundColor: '#1F2937',
+    borderRadius: 1,
+  },
+  targetValue: {
+    color: '#059669',
+    fontWeight: '800',
+  },
+  actionSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(217, 119, 6, 0.1)',
+    padding: 12,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#D97706',
+  },
+  actionText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  nextStepsSection: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 12,
+    padding: 16,
+  },
+  nextStepsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 12,
+  },
+  nextStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    gap: 12,
+  },
+  nextStepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#D97706',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  nextStepNumberText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  nextStepText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1F2937',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  marksCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  marksGradient: {
+    padding: 24,
+  },
+  marksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  marksTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#92400E',
+  },
+  marksContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    borderRadius: 12,
+    paddingVertical: 16,
+  },
+  marksItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  marksDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(146, 64, 14, 0.3)',
+  },
+  marksLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 8,
+  },
+  marksValue: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#D97706',
+  },
+  marksPercentageBox: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+  },
+  marksPercentageLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 6,
+  },
+  marksPercentageValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#D97706',
   },
 });
 

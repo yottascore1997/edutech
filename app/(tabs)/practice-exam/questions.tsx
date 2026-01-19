@@ -80,7 +80,8 @@ const PracticeExamQuestionsScreen = () => {
       setTimer((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleSubmit();
+          // Auto-submit when timer reaches 0
+          autoSubmitExam();
           return 0;
         }
         return prev - 1;
@@ -156,6 +157,65 @@ const PracticeExamQuestionsScreen = () => {
 
   const handleSubmit = async () => {
     setShowSubmitModal(true);
+  };
+
+  const autoSubmitExam = async () => {
+    // Auto-submit without showing modal when timer expires
+    setSubmitting(true);
+    try {
+      // Prepare answers payload
+      const answers: { [key: string]: number } = {};
+      statuses.forEach((status, index) => {
+        if (status.answered && status.selectedOption !== undefined) {
+          answers[questions[index].id] = status.selectedOption;
+        }
+      });
+
+      console.log('Auto-submitting exam (timer expired):', answers);
+
+      // Make API call to submit the test
+      const response = await apiFetchAuth(`/student/practice-exams/${id}/submit`, user?.token || '', {
+        method: 'POST',
+        body: { answers }
+      });
+
+      if (response.ok) {
+        console.log('Exam auto-submitted successfully');
+        console.log('Submit response:', response.data);
+        setSubmitting(false);
+        
+        // Extract result from nested response structure
+        const resultData = response.data?.result || response.data;
+        console.log('Result data to pass:', resultData);
+        
+        // Store result data and redirect to result page
+        router.push({
+          pathname: '/(tabs)/practice-exam/result/[id]' as any,
+          params: { 
+            id: id,
+            resultData: JSON.stringify(resultData) 
+          }
+        });
+      } else {
+        console.error('Failed to auto-submit test:', response);
+        setSubmitting(false);
+        Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
+        // Even if API fails, try to navigate to result page
+        router.push({
+          pathname: '/(tabs)/practice-exam/result/[id]' as any,
+          params: { id: id }
+        });
+      }
+    } catch (error) {
+      console.error('Error auto-submitting exam:', error);
+      setSubmitting(false);
+      Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
+      // Even if error occurs, try to navigate to result page
+      router.push({
+        pathname: '/(tabs)/practice-exam/result/[id]' as any,
+        params: { id: id }
+      });
+    }
   };
 
   const confirmSubmit = async () => {
