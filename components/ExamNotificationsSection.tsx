@@ -1,6 +1,7 @@
 import { apiFetchAuth } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useCategory } from '@/context/CategoryContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -54,6 +55,7 @@ const statusColors = {
 const ExamNotificationsSection = () => {
     const { user } = useAuth();
     const router = useRouter();
+    const { selectedCategory } = useCategory();
     const [notifications, setNotifications] = useState<ExamNotification[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -230,11 +232,19 @@ const ExamNotificationsSection = () => {
     };
 
     const displayNotifications = getDummyNotifications();
-    // Filter out expired notifications
-    const activeNotifications = displayNotifications.filter(item => {
+    // Filter out expired notifications and apply category filter
+    let activeNotifications = displayNotifications.filter(item => {
         const daysRemaining = getDaysRemaining(item.applyLastDate);
         return daysRemaining >= 0; // Only show non-expired notifications
     });
+    
+    // Apply global category filter if selected
+    if (selectedCategory) {
+        activeNotifications = activeNotifications.filter(item =>
+            item.title.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+            item.description?.toLowerCase().includes(selectedCategory.toLowerCase())
+        );
+    }
     const monthYear = getMonthYear(notifications.length > 0 ? notifications : displayNotifications);
     const examCount = activeNotifications.length;
 

@@ -276,13 +276,11 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
   };
 
   const getOptionIcon = (index: number) => {
-    // Only show icons for attempted questions
     if (!questionData?.hasAttempted) return null;
-    
     if (index === (questionData?.correct || 0)) {
-      return <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />;
+      return <Ionicons name="checkmark-circle" size={20} color="#10B981" />;
     } else if ((questionData?.selectedOption || 0) === index && index !== (questionData?.correct || 0)) {
-      return <Ionicons name="close-circle" size={24} color="#F44336" />;
+      return <Ionicons name="close-circle" size={20} color="#F87171" />;
     }
     return null;
   };
@@ -386,9 +384,9 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
                 {/* Victory Celebration */}
                 <View style={styles.victoryContainer}>
                   <View style={styles.victoryIconContainer}>
-                    <Ionicons name="trophy" size={48} color="#FFD700" />
+                    <Ionicons name="trophy" size={32} color="#F59E0B" />
                   </View>
-                  <Text style={[styles.resultTitle, { color: '#4CAF50' }]}>🎉 Correct! 🎉</Text>
+                  <Text style={[styles.resultTitle, styles.resultTitleCorrect]}>🎉 Correct! 🎉</Text>
                   <Text style={styles.resultSubtext}>Excellent! You got it right!</Text>
                   <View style={styles.celebrationContainer}>
                     <Text style={styles.celebrationText}>🏆 Great Job! 🏆</Text>
@@ -400,9 +398,9 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
                 {/* Wrong Answer Result */}
                 <View style={styles.wrongAnswerContainer}>
                   <View style={styles.resultIconContainer}>
-                    <Ionicons name="close-circle" size={48} color="#F44336" />
+                    <Ionicons name="close-circle" size={32} color="#F87171" />
                   </View>
-                  <Text style={[styles.resultTitle, { color: '#F44336' }]}>Incorrect!</Text>
+                  <Text style={[styles.resultTitle, styles.resultTitleIncorrect]}>Incorrect!</Text>
                   <Text style={styles.resultSubtext}>
                     Your answer: <Text style={styles.userAnswerText}>
                       {questionData.options[questionData.selectedOption || 0]}
@@ -517,114 +515,123 @@ const styles = StyleSheet.create({
     color: '#F44336',
   },
   questionContainer: {
-    marginBottom: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
-    borderRadius: 16,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    padding: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    minHeight: 80,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderColor: 'rgba(255, 237, 213, 0.5)',
+    minHeight: 64,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   questionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: '#1F2937',
     lineHeight: 22,
   },
   optionsContainer: {
-    gap: 10,
+    gap: 6,
   },
   optionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16,
-    padding: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 12,
+    padding: 10,
+    paddingVertical: 10,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    borderColor: 'rgba(255, 237, 213, 0.6)',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
   },
   selectedOption: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderColor: '#7C3AED',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    backgroundColor: 'rgba(255, 251, 235, 0.98)',
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 3,
   },
   correctOption: {
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderColor: '#4CAF50',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: '#10B981',
   },
   incorrectOption: {
-    backgroundColor: 'rgba(244, 67, 54, 0.1)',
-    borderColor: '#F44336',
+    backgroundColor: 'rgba(248, 113, 113, 0.12)',
+    borderColor: '#F87171',
   },
   disabledOption: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
   },
   optionContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   optionText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#333',
+    color: '#000000',
     flex: 1,
+    lineHeight: 19,
   },
   selectedOptionText: {
-    color: '#a08efe',
+    color: '#000000',
     fontWeight: '600',
   },
   correctOptionText: {
-    color: '#4CAF50',
+    color: '#059669',
     fontWeight: '600',
   },
   incorrectOptionText: {
-    color: '#F44336',
+    color: '#DC2626',
     fontWeight: '600',
   },
   disabledOptionText: {
-    color: '#999',
+    color: '#000000',
     fontWeight: '400',
   },
   resultContainer: {
-    marginTop: 24,
-    padding: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
+    marginTop: 12,
+    padding: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   resultContent: {
     alignItems: 'center',
   },
   resultIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: 'rgba(241, 245, 249, 0.9)',
+    borderRadius: 18,
+    padding: 6,
+    marginBottom: 8,
   },
   resultTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 8,
+    marginTop: 2,
+  },
+  resultTitleCorrect: {
+    color: '#059669',
+  },
+  resultTitleIncorrect: {
+    color: '#DC2626',
   },
   resultSubtext: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 8,
+    fontSize: 13,
+    color: '#334155',
+    marginTop: 4,
     textAlign: 'center',
+    fontWeight: '500',
   },
   questionHeader: {
     flexDirection: 'row',
@@ -652,77 +659,79 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   optionNumber: {
-    backgroundColor: 'rgba(160, 142, 254, 0.2)',
-    borderRadius: 10,
-    width: 26,
-    height: 26,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    borderRadius: 8,
+    width: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 8,
   },
   optionNumberText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#a08efe',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
   },
   victoryContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 0,
   },
   victoryIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24,
-    padding: 12,
-    marginBottom: 16,
+    backgroundColor: 'rgba(245, 158, 11, 0.25)',
+    borderRadius: 18,
+    padding: 6,
+    marginBottom: 6,
   },
   celebrationContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+    padding: 6,
+    marginTop: 6,
   },
   celebrationText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#059669',
     textAlign: 'center',
   },
   wrongAnswerContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 0,
   },
   userAnswerText: {
     fontWeight: 'bold',
-    color: '#F44336',
+    color: '#DC2626',
   },
   correctAnswerText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 8,
+    fontSize: 13,
+    color: '#475569',
+    marginTop: 4,
     textAlign: 'center',
+    fontWeight: '500',
   },
   correctAnswerHighlight: {
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#059669',
   },
   attemptedMessageContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 10,
+    backgroundColor: 'rgba(248, 250, 252, 0.95)',
+    borderRadius: 10,
+    padding: 8,
+    marginTop: 8,
     alignItems: 'center',
   },
   attemptedMessage: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: 'bold',
-    color: '#F44336',
+    color: '#DC2626',
     textAlign: 'center',
   },
   attemptedSubtext: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
     textAlign: 'center',
+    fontWeight: '500',
   },
   completedCard: {
     flexDirection: 'row',

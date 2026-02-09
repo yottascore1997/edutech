@@ -1,5 +1,6 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
+import { useCategory } from '@/context/CategoryContext';
 import { useToast } from '@/context/ToastContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,12 +39,14 @@ interface CategoryStats {
   totalExams: number;
   attemptedExams: number;
   subcategories: string[];
+  categoryLogoUrl?: string;
 }
 
 const PracticeExamScreen = () => {
   const router = useRouter();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
+  const { selectedCategory } = useCategory();
   const [exams, setExams] = useState<PracticeExam[]>([]);
   const [categoryStats, setCategoryStats] = useState<{ [key: string]: CategoryStats }>({});
   const [loading, setLoading] = useState(true);
@@ -63,6 +66,13 @@ const PracticeExamScreen = () => {
     fetchPracticeExams();
     startAnimations();
   }, []);
+
+  // Refetch exams when global category changes
+  useEffect(() => {
+    if (user?.token) {
+      fetchPracticeExams();
+    }
+  }, [selectedCategory]);
 
   // Start header animations
   const startAnimations = () => {
@@ -222,7 +232,13 @@ const PracticeExamScreen = () => {
     try {
       setLoading(true);
       console.log('🔄 Fetching practice exams...');
-      const response = await apiFetchAuth('/student/practice-exams', user.token);
+      
+      // Add category parameter if global category is selected
+      const apiUrl = selectedCategory 
+        ? `/student/practice-exams?category=${encodeURIComponent(selectedCategory)}`
+        : '/student/practice-exams';
+      
+      const response = await apiFetchAuth(apiUrl, user.token);
       if (response.ok) {
         console.log('✅ Practice exams fetched successfully:', response.data.length, 'exams');
         console.log('📊 Sample exam data:', response.data[0]);
@@ -242,12 +258,13 @@ const PracticeExamScreen = () => {
   const calculateCategoryStats = () => {
     const stats: { [key: string]: CategoryStats } = {};
     
-    exams.forEach(exam => {
+    exams.forEach((exam: any) => {
       if (!stats[exam.category]) {
         stats[exam.category] = {
           totalExams: 0,
           attemptedExams: 0,
-          subcategories: []
+          subcategories: [],
+          categoryLogoUrl: exam.categoryLogoUrl || undefined
         };
       }
       
@@ -259,10 +276,16 @@ const PracticeExamScreen = () => {
       if (!stats[exam.category].subcategories.includes(exam.subcategory)) {
         stats[exam.category].subcategories.push(exam.subcategory);
       }
+      
+      // Update categoryLogoUrl if not set and exam has it
+      if (!stats[exam.category].categoryLogoUrl && exam.categoryLogoUrl) {
+        stats[exam.category].categoryLogoUrl = exam.categoryLogoUrl;
+      }
     });
     
     setCategoryStats(stats);
     console.log('📊 Category stats calculated:', stats);
+    console.log('🖼️ Category logos:', Object.keys(stats).map(cat => ({ category: cat, logoUrl: stats[cat].categoryLogoUrl })));
   };
 
   const handleRefresh = async () => {
@@ -521,6 +544,20 @@ const PracticeExamScreen = () => {
       'Bank': 'card',
     };
 
+    // Helper function to get full image URL
+    const getImageUrl = (logoUrl: string | undefined) => {
+      if (!logoUrl) return null;
+      if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+        return logoUrl;
+      }
+      try {
+        return getImageUrlFromApi(logoUrl);
+      } catch (error) {
+        console.error('Error getting image URL:', error);
+        return null;
+      }
+    };
+
     return (
       <View style={styles.categoriesSection}>
         <Text style={styles.categoriesSectionTitle}>Categories</Text>
@@ -548,7 +585,21 @@ const PracticeExamScreen = () => {
                       colors={colors as [string, string]}
                       style={styles.categoryIconContainer}
                     >
-                      <Ionicons name={iconName} size={20} color="#FFFFFF" />
+                      {stats.categoryLogoUrl ? (
+                        <Image 
+                          source={{ uri: getImageUrl(stats.categoryLogoUrl) || stats.categoryLogoUrl }} 
+                          style={{ width: 40, height: 40, borderRadius: 20 }}
+                          resizeMode="cover"
+                          onError={(error) => {
+                            console.error('Image load error for category:', category, 'URL:', stats.categoryLogoUrl, 'Processed URL:', getImageUrl(stats.categoryLogoUrl));
+                          }}
+                          onLoad={() => {
+                            console.log('✅ Image loaded successfully for category:', category, 'URL:', stats.categoryLogoUrl);
+                          }}
+                        />
+                      ) : (
+                        <Ionicons name={iconName} size={20} color="#FFFFFF" />
+                      )}
                     </LinearGradient>
                     
                     <View style={styles.categoryInfo}>

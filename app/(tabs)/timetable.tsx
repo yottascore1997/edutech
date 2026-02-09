@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, LayoutAnimation, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Animated, LayoutAnimation, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, UIManager, View, Image } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiFetchAuth } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -78,6 +78,7 @@ const scheduleBackgroundColors = [
 
 export default function TimetableScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [timetables, setTimetables] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -86,6 +87,11 @@ export default function TimetableScreen() {
   const [creating, setCreating] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  
+  // Delete states
+  const [selectedSlot, setSelectedSlot] = useState<any>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Animation values
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -286,6 +292,53 @@ export default function TimetableScreen() {
     }
   };
 
+  // Handle delete slot
+  const handleDeleteSlot = (slot: any) => {
+    setSelectedSlot(slot);
+    setDeleteModalVisible(true);
+  };
+
+  // Confirm delete slot
+  const confirmDeleteSlot = async () => {
+    if (!selectedSlot || !user?.token) return;
+    const slotId = selectedSlot.id || selectedSlot._id;
+    if (!slotId) {
+      Alert.alert('Error', 'Invalid slot id');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const response = await apiFetchAuth(
+        `/student/timetable/${slotId}`,
+        user.token,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      if (response.ok) {
+        Alert.alert('Success', 'Event deleted successfully');
+        setDeleteModalVisible(false);
+        setSelectedSlot(null);
+        // Refresh timetable list
+        fetchTimetable();
+      } else {
+        Alert.alert('Error', response.data?.message || 'Failed to delete event. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      Alert.alert('Error', 'Failed to delete event. Please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    setDeleteModalVisible(false);
+    setSelectedSlot(null);
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good Morning';
@@ -326,30 +379,54 @@ export default function TimetableScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#8B5CF6" />
+      <LinearGradient colors={['#E0F2FE', '#F0F9FF', '#FFFFFF']} style={styles.loadingContainer}>
+        <View style={styles.loadingIcon3D}>
+          <View style={styles.loadingIcon3DInner}>
+            <Ionicons name="calendar" size={48} color="#7C3AED" />
+          </View>
+        </View>
+        <ActivityIndicator size="large" color="#7C3AED" />
         <Text style={styles.loadingText}>Loading your schedule...</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.appHeader}>
-        <Text style={styles.appTitle}>Schedule</Text>
-        <TouchableOpacity 
-          style={styles.headerAddButton}
-          onPress={() => setModalVisible(true)}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container} edges={[]}>
+      {/* Light Education Header - Premium 3D feel */}
+      <LinearGradient
+        colors={['#EDE9FE', '#F5F3FF', '#FAF5FF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.appHeaderGradient, { paddingTop: insets.top + 2 }]}
+      >
+        <View style={styles.appHeader}>
+          <View style={styles.appHeaderLeft}>
+            <Image source={require('../../assets/images/icons/schedule.png')} style={styles.timetableHeaderIcon} resizeMode="contain" />
+            <View>
+              <Text style={styles.appTitle}>Timetable</Text>
+              <Text style={styles.appSubtitle}>Plan study time • Stay exam-ready</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.headerAddButton}
+            onPress={() => setModalVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Image source={require('../../assets/images/icons/plus.png')} style={styles.headerAddIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+        {/* Why Timetable matters - education CTA */}
+        <View style={styles.importanceBanner}>
+          <Image source={require('../../assets/images/icons/clock.png')} style={styles.importanceBannerIcon} resizeMode="contain" />
+          <Text style={styles.importanceBannerText}>A good timetable is key to exam success — plan revision & stay on track.</Text>
+        </View>
+      </LinearGradient>
 
       {/* Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchTimetable} />}>
           <Animated.View style={[styles.calendarContent, { opacity: fadeAnim }]}>
-            {/* Calendar Section */}
+            {/* Calendar Section - Premium card */}
             <View style={styles.calendarCard}>
               {/* Calendar Header */}
               <View style={styles.calendarHeaderNew}>
@@ -393,7 +470,7 @@ export default function TimetableScreen() {
                   const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
                   const isTodayDate = isToday(date);
                   const isSelectedDateValue = isSelectedDate(date);
-                  
+                  const hasEventsOnDay = hasEvents(date);
                   return (
                     <TouchableOpacity
                       key={index}
@@ -404,6 +481,7 @@ export default function TimetableScreen() {
                         isSelectedDateValue && styles.calendarDaySelectedNew,
                       ]}
                       onPress={() => setSelectedDate(date)}
+                      activeOpacity={0.7}
                     >
                       <Text
                         style={[
@@ -416,6 +494,9 @@ export default function TimetableScreen() {
                       >
                         {date.getDate()}
                       </Text>
+                      {hasEventsOnDay && !isSelectedDateValue && !isTodayDate && (
+                        <View style={styles.calendarDayDot} />
+                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -423,72 +504,60 @@ export default function TimetableScreen() {
             </View>
 
 
-            {/* Today's Events Section */}
+            {/* Today's Events Section - Education premium */}
             <View style={styles.eventsSection}>
-              <Text style={styles.eventsSectionTitle}>Today's Events</Text>
+              <View style={styles.eventsSectionHeader}>
+                <Image source={require('../../assets/images/icons/calendar.png')} style={styles.todayScheduleIcon} resizeMode="contain" />
+                <Text style={styles.eventsSectionTitle}>Today's schedule</Text>
+              </View>
               
               {selectedDateSlots.length === 0 ? (
                 <View style={styles.emptySchedule}>
-                  <Text style={styles.emptyScheduleText}>No events scheduled for today</Text>
+                  <View style={styles.emptyScheduleIcon3D}>
+                    <View style={styles.emptyScheduleIcon3DInner}>
+                      <Ionicons name="calendar-outline" size={40} color="#7C3AED" />
+                    </View>
+                  </View>
+                  <Text style={styles.emptyScheduleText}>No events for this day</Text>
+                  <Text style={styles.emptyScheduleSubtext}>Tap + to add a study slot</Text>
                 </View>
               ) : (
                 <View style={styles.eventsList}>
                   {selectedDateSlots.map((slot, index) => {
-                    // Colorful event card colors matching the image
                     const eventColors = [
-                      { bg: '#8B5CF6', iconBg: '#A78BFA', icon: 'school' }, // Purple - Calculus
-                      { bg: '#3B82F6', iconBg: '#60A5FA', icon: 'flask' }, // Blue - Physics
-                      { bg: '#EC4899', iconBg: '#F472B6', icon: 'book' }, // Pink - English
-                      { bg: '#10B981', iconBg: '#34D399', icon: 'calculator' }, // Green - Math
-                      { bg: '#F59E0B', iconBg: '#FBBF24', icon: 'nuclear' }, // Orange - Science
-                      { bg: '#EF4444', iconBg: '#F87171', icon: 'code-slash' }, // Red - Programming
+                      { bg: '#E0F2FE', iconBg: '#0EA5E9', text: '#0C4A6E', time: '#0369A1' },
+                      { bg: '#D1FAE5', iconBg: '#059669', text: '#064E3B', time: '#047857' },
+                      { bg: '#FEF3C7', iconBg: '#D97706', text: '#78350F', time: '#B45309' },
+                      { bg: '#EDE9FE', iconBg: '#7C3AED', text: '#4C1D95', time: '#6D28D9' },
+                      { bg: '#FCE7F3', iconBg: '#DB2777', text: '#831843', time: '#BE185D' },
+                      { bg: '#CCFBF1', iconBg: '#0D9488', text: '#134E4A', time: '#0F766E' },
                     ];
-                    
                     const eventColor = eventColors[index % eventColors.length];
-                  
-                  // Get subject icon
-                  const getSubjectIcon = (subject: string) => {
-                    const lowerSubject = subject.toLowerCase();
-                    if (lowerSubject.includes('programming') || lowerSubject.includes('coding')) {
-                      return 'code-slash';
-                    } else if (lowerSubject.includes('math') || lowerSubject.includes('mathematics')) {
-                      return 'calculator';
-                    } else if (lowerSubject.includes('physics')) {
-                      return 'nuclear';
-                    } else if (lowerSubject.includes('chemistry')) {
-                      return 'flask';
-                    } else if (lowerSubject.includes('biology')) {
-                      return 'leaf';
-                    } else if (lowerSubject.includes('english') || lowerSubject.includes('literature')) {
-                      return 'book';
-                    } else if (lowerSubject.includes('history')) {
-                      return 'time';
-                    } else if (lowerSubject.includes('art') || lowerSubject.includes('design')) {
-                      return 'brush';
-                    } else {
+                    const subjectIcon = (() => {
+                      const s = (slot.subject || '').toLowerCase();
+                      if (s.includes('programming') || s.includes('coding')) return 'code-slash';
+                      if (s.includes('math') || s.includes('mathematics')) return 'calculator';
+                      if (s.includes('physics')) return 'nuclear';
+                      if (s.includes('chemistry')) return 'flask';
+                      if (s.includes('biology')) return 'leaf';
+                      if (s.includes('english') || s.includes('literature')) return 'book';
+                      if (s.includes('history')) return 'time';
+                      if (s.includes('art') || s.includes('design')) return 'brush';
                       return 'school';
-                    }
-                  };
-                  
+                    })();
                     return (
-                      <View key={index} style={[styles.eventCard, { backgroundColor: eventColor.bg }]}>
-                        <View style={[styles.eventIcon, { backgroundColor: eventColor.iconBg }]}>
-                          <Ionicons 
-                            name={eventColor.icon as any} 
-                            size={24} 
-                            color="#FFFFFF" 
-                          />
+                      <View key={index} style={[styles.eventCard, styles.eventCardShadow, { backgroundColor: eventColor.bg }]}>
+                        <View style={[styles.eventIcon3D, { backgroundColor: eventColor.iconBg }]}>
+                          <View style={styles.eventIcon3DInner}>
+                            <Ionicons name={subjectIcon as any} size={24} color="#FFFFFF" />
+                          </View>
                         </View>
                         <View style={styles.eventContent}>
-                          <Text style={styles.eventTitle}>
-                            {slot.subject || 'Study Session'}
-                          </Text>
-                          <Text style={styles.eventTime}>
-                            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
-                          </Text>
+                          <Text style={[styles.eventTitle, { color: eventColor.text }]}>{slot.subject || 'Study Session'}</Text>
+                          <Text style={[styles.eventTime, { color: eventColor.time }]}>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</Text>
                         </View>
-                        <TouchableOpacity style={styles.eventOptions}>
-                          <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
+                        <TouchableOpacity style={styles.eventDeleteButton} onPress={() => handleDeleteSlot(slot)}>
+                          <Ionicons name="trash-outline" size={20} color="#DC2626" />
                         </TouchableOpacity>
                       </View>
                     );
@@ -509,12 +578,14 @@ export default function TimetableScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create New Schedule</Text>
-              <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
+            <LinearGradient colors={['#EDE9FE', '#F5F3FF']} style={styles.modalHeaderGradient}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitleDark}>Create New Schedule</Text>
+                <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }} style={styles.modalCloseBtnLight}>
+                  <Ionicons name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
 
             {/* Time Pickers - Inside Modal */}
             {showStartTimePicker && (
@@ -581,14 +652,14 @@ export default function TimetableScreen() {
               
               <View style={styles.switchContainer}>
                 <View style={styles.switchLabelContainer}>
-                  <Ionicons name="repeat" size={20} color="#8B5CF6" />
+                  <Ionicons name="repeat" size={20} color="#0284C7" />
                   <Text style={styles.switchLabel}>Repeat Weekly</Text>
                 </View>
                 <Switch 
                   value={isWeekly} 
                   onValueChange={setIsWeekly} 
-                  thumbColor={isWeekly ? '#8B5CF6' : '#f4f3f4'} 
-                  trackColor={{ true: '#e0d5ff', false: '#f4f3f4' }} 
+                  thumbColor={isWeekly ? '#0284C7' : '#f4f3f4'} 
+                  trackColor={{ true: '#BAE6FD', false: '#f4f3f4' }}
                 />
               </View>
               
@@ -632,7 +703,7 @@ export default function TimetableScreen() {
                         <Text style={slot.startTime ? styles.timeText : styles.timePlaceholder}>
                           {slot.startTime || '09:00'}
                         </Text>
-                        <Ionicons name="time" size={20} color="#8B5CF6" />
+                        <Ionicons name="time" size={20} color="#0284C7" />
                       </TouchableOpacity>
                     </View>
                     <View style={styles.timeInputGroup}>
@@ -644,7 +715,7 @@ export default function TimetableScreen() {
                         <Text style={slot.endTime ? styles.timeText : styles.timePlaceholder}>
                           {slot.endTime || '10:30'}
                         </Text>
-                        <Ionicons name="time" size={20} color="#8B5CF6" />
+                        <Ionicons name="time" size={20} color="#0284C7" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -674,7 +745,9 @@ export default function TimetableScreen() {
                   disabled={creating}
                 >
                   <LinearGradient
-                    colors={['#8B5CF6', '#7C3AED']}
+                    colors={['#EA580C', '#F59E0B', '#FBBF24']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                     style={styles.createBtnGradient}
                   >
                     {creating ? (
@@ -699,6 +772,64 @@ export default function TimetableScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={closeDeleteModal}
+      >
+        <View style={styles.deleteModalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <View style={styles.deleteModalHeader}>
+              <View style={styles.deleteIconContainer}>
+                <Ionicons name="trash-outline" size={36} color="#EF4444" />
+              </View>
+              <Text style={styles.deleteModalTitle}>Delete Event</Text>
+              <Text style={styles.deleteModalSubtitle}>
+                Are you sure you want to delete this event? This action cannot be undone.
+              </Text>
+            </View>
+
+            {selectedSlot && (
+              <View style={styles.deleteEventInfo}>
+                <Text style={styles.deleteEventSubject}>
+                  {selectedSlot.subject || 'Study Session'}
+                </Text>
+                <Text style={styles.deleteEventTime}>
+                  {formatTime(selectedSlot.startTime)} - {formatTime(selectedSlot.endTime)}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.deleteModalActions}>
+              <TouchableOpacity
+                style={styles.deleteCancelButton}
+                onPress={closeDeleteModal}
+                disabled={deleting}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.deleteConfirmButton, deleting && styles.deleteConfirmButtonDisabled]}
+                onPress={confirmDeleteSlot}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={18} color="#FFFFFF" />
+                    <Text style={styles.deleteConfirmText}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -706,27 +837,50 @@ export default function TimetableScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F3FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8F9FF',
+  },
+  loadingIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  loadingIcon3D: {
+    marginBottom: 20,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
+    } : {}),
+    elevation: 8,
+  },
+  loadingIcon3DInner: {
+    width: 88,
+    height: 88,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderTopColor: '#DDD6FE',
+    borderLeftColor: '#DDD6FE',
+    borderRightColor: '#7C3AED',
+    borderBottomColor: '#7C3AED',
   },
   loadingText: {
-    color: '#8B5CF6',
-    fontSize: 18,
-    marginTop: 15,
-    fontWeight: '500',
-    ...Platform.select({
-      ios: {
-        fontFamily: 'System',
-      },
-      android: {
-        fontFamily: 'sans-serif-medium',
-      },
-    }),
+    color: '#0369A1',
+    fontSize: 16,
+    marginTop: 12,
+    fontWeight: '600',
   },
   header: {
     backgroundColor: 'transparent',
@@ -905,10 +1059,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F3FF',
   },
   calendarContent: {
-    paddingTop: 0,
+    paddingTop: 24,
     paddingBottom: Platform.OS === 'ios' ? 120 : 140,
   },
   calendarSection: {
@@ -1496,16 +1650,16 @@ const styles = StyleSheet.create({
   },
   emptyScheduleText: {
     fontSize: 16,
-    color: '#4C1D95',
+    color: '#0C4A6E',
     marginTop: 6,
     fontWeight: 'bold',
   },
   emptyScheduleSubtext: {
     fontSize: 13,
-    color: '#7C3AED',
+    color: '#0369A1',
     marginTop: 4,
     textAlign: 'center',
-    opacity: 0.8,
+    opacity: 0.9,
   },
   scheduleCards: {
     backgroundColor: 'transparent',
@@ -1858,27 +2012,63 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 25,
-    maxHeight: '75%',
-    shadowColor: '#000',
+    backgroundColor: '#F5F3FF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 0,
+    maxHeight: '80%',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.25)',
+    shadowColor: '#4F46E5',
     shadowOffset: { width: 0, height: Platform.OS === 'ios' ? -4 : -6 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.15 : 0.2,
-    shadowRadius: Platform.OS === 'ios' ? 15 : 18,
-    elevation: Platform.OS === 'android' ? 15 : 0,
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  modalHeaderGradient: {
+    paddingTop: 20,
+    paddingBottom: 18,
+    paddingHorizontal: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(139, 92, 246, 0.2)',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalTitleDark: {
+    fontWeight: 'bold',
+    fontSize: 20,
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalCloseBtnLight: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
+    borderWidth: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalTitle: {
     fontWeight: 'bold',
-    fontSize: 22,
-    color: '#333',
+    fontSize: 20,
+    color: '#FFFFFF',
+    flex: 1,
     textAlign: 'center',
     ...Platform.select({
       ios: {
@@ -1890,6 +2080,7 @@ const styles = StyleSheet.create({
     }),
   },
   modalContent: {
+    padding: 24,
     paddingBottom: 40,
   },
   inputGroup: {
@@ -1911,14 +2102,14 @@ const styles = StyleSheet.create({
     }),
   },
   input: {
-    backgroundColor: '#f8f9ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 15,
     padding: 16,
-    color: '#333',
+    color: '#1F2937',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-    shadowColor: '#8B5CF6',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 2 : 3 },
     shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.15,
     shadowRadius: Platform.OS === 'ios' ? 4 : 6,
@@ -1943,7 +2134,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   switchLabel: {
-    color: '#8B5CF6',
+    color: '#0284C7',
     fontWeight: 'bold',
     fontSize: 15,
     marginLeft: 10,
@@ -1963,9 +2154,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 15,
-    shadowColor: '#8B5CF6',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 4 : 6 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.3 : 0.4,
+    shadowOpacity: Platform.OS === 'ios' ? 0.25 : 0.35,
     shadowRadius: Platform.OS === 'ios' ? 8 : 10,
     elevation: Platform.OS === 'android' ? 5 : 0,
   },
@@ -2012,13 +2203,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 15,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-    shadowColor: '#8B5CF6',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 2 : 3 },
     shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.15,
     shadowRadius: Platform.OS === 'ios' ? 4 : 6,
@@ -2073,12 +2264,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139, 92, 246, 0.2)',
   },
   dayPillActive: {
-    backgroundColor: '#8B5CF6',
-    borderColor: '#8B5CF6',
+    backgroundColor: '#0284C7',
+    borderColor: '#0284C7',
   },
   dayPillText: {
     fontSize: 13,
-    color: '#8B5CF6',
+    color: '#0284C7',
     fontWeight: 'bold',
     ...Platform.select({
       ios: {
@@ -2100,7 +2291,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   addSlotText: {
-    color: '#8B5CF6',
+    color: '#0284C7',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 10,
@@ -2114,13 +2305,13 @@ const styles = StyleSheet.create({
     }),
   },
   slotFormCard: {
-    backgroundColor: '#f8f9ff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.1)',
-    shadowColor: '#8B5CF6',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 2 : 3 },
     shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.15,
     shadowRadius: Platform.OS === 'ios' ? 6 : 8,
@@ -2162,14 +2353,16 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   modalTimePickerContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: Platform.OS === 'ios' ? 8 : 10 },
-    shadowOpacity: Platform.OS === 'ios' ? 0.3 : 0.4,
-    shadowRadius: Platform.OS === 'ios' ? 15 : 18,
-    elevation: Platform.OS === 'android' ? 15 : 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
     minWidth: 320,
     maxWidth: 380,
     minHeight: 250,
@@ -2181,10 +2374,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(139, 92, 246, 0.2)',
+    borderBottomColor: '#E0E7FF',
   },
   timePickerCancel: {
-    color: '#666',
+    color: '#6B7280',
     fontSize: 16,
     fontWeight: '500',
     ...Platform.select({
@@ -2199,7 +2392,7 @@ const styles = StyleSheet.create({
   timePickerTitle: {
     fontWeight: 'bold',
     fontSize: 18,
-    color: '#333',
+    color: '#1F2937',
     ...Platform.select({
       ios: {
         fontFamily: 'System',
@@ -2210,7 +2403,7 @@ const styles = StyleSheet.create({
     }),
   },
   timePickerDone: {
-    color: '#8B5CF6',
+    color: '#0284C7',
     fontSize: 16,
     fontWeight: 'bold',
     ...Platform.select({
@@ -2443,61 +2636,134 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // ===== NEW IMAGE-BASED STYLES =====
+  // ===== LIGHT EDUCATION PREMIUM STYLES =====
+  appHeaderGradient: {
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(139, 92, 246, 0.2)',
+  },
   appHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 12,
+  },
+  appHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  icon3DWrapper: {
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 2, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6,
+    } : {}),
+    elevation: 6,
+  },
+  icon3DInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
-  },
-  appTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000000',
-  },
-  headerAddButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#8B5CF6',
+    borderWidth: 2,
+    borderTopColor: '#DDD6FE',
+    borderLeftColor: '#DDD6FE',
+    borderRightColor: '#7C3AED',
+    borderBottomColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  timetableHeaderIcon: {
+    width: 44,
+    height: 44,
+    marginRight: 12,
+  },
+  appTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0C4A6E',
+    letterSpacing: 0.2,
+  },
+  appSubtitle: {
+    fontSize: 12,
+    color: '#0369A1',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  importanceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.25)',
+  },
+  importanceBannerIcon: {
+    width: 20,
+    height: 20,
+  },
+  importanceBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#0C4A6E',
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  headerAddButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+  },
+  headerAddIcon: {
+    width: 42,
+    height: 42,
+  },
   
-  // Calendar Card
+  // Calendar Card - Premium
   calendarCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 20,
     marginHorizontal: 20,
-    marginBottom: 15,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    marginTop: 0,
+    marginBottom: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(14, 165, 233, 0.2)',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#0284C7',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+    } : {}),
+    elevation: 4,
   },
   calendarHeaderNew: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   navButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
     justifyContent: 'center',
     alignItems: 'center',
   },
   monthYearText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#0C4A6E',
   },
   
   // Day Headers
@@ -2512,8 +2778,17 @@ const styles = StyleSheet.create({
   },
   dayHeaderText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+
+  calendarDayDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#0EA5E9',
   },
   
   // Calendar Grid
@@ -2536,7 +2811,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   calendarDaySelectedNew: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#0284C7',
     borderRadius: 12,
   },
   calendarDayTextNew: {
@@ -2563,14 +2838,68 @@ const styles = StyleSheet.create({
   eventsSection: {
     paddingHorizontal: 20,
   },
+  eventsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 14,
+  },
+  todayScheduleIcon: {
+    width: 36,
+    height: 36,
+  },
+  eventsSectionIcon3D: {
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 2, height: 3 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    } : {}),
+    elevation: 4,
+  },
+  eventsSectionIcon3DInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderTopColor: '#EDE9FE',
+    borderLeftColor: '#EDE9FE',
+    borderRightColor: '#7C3AED',
+    borderBottomColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   eventsSectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 16,
+    color: '#0C4A6E',
   },
   eventsList: {
     gap: 12,
+  },
+  emptyScheduleIcon3D: {
+    marginBottom: 14,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+    } : {}),
+    elevation: 6,
+  },
+  emptyScheduleIcon3DInner: {
+    width: 76,
+    height: 76,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderTopColor: '#DDD6FE',
+    borderLeftColor: '#DDD6FE',
+    borderRightColor: '#7C3AED',
+    borderBottomColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   // Event Cards
@@ -2578,16 +2907,46 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(14, 165, 233, 0.2)',
   },
-  eventIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  eventCardShadow: {
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.12,
+      shadowRadius: 8,
+    } : {}),
+    elevation: 4,
+  },
+  eventIcon3D: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 2, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 5,
+    } : {}),
+    elevation: 5,
+  },
+  eventIcon3DInner: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.6)',
+    borderLeftColor: 'rgba(255,255,255,0.6)',
+    borderRightColor: 'rgba(124, 58, 237, 0.4)',
+    borderBottomColor: 'rgba(124, 58, 237, 0.4)',
   },
   eventContent: {
     flex: 1,
@@ -2595,16 +2954,131 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: '#FFFFFF',
-    opacity: 0.9,
+    fontWeight: '500',
   },
   eventOptions: {
     padding: 8,
+  },
+  eventDeleteButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Delete Modal Styles
+  deleteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  deleteModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: 'rgba(14, 165, 233, 0.2)',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  deleteModalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  deleteIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: '#FECACA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  deleteModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  deleteEventInfo: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 22,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  deleteEventSubject: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  deleteEventTime: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  deleteModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0369A1',
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#EF4444',
+    borderWidth: 1,
+    borderColor: '#DC2626',
+  },
+  deleteConfirmButtonDisabled: {
+    opacity: 0.6,
+  },
+  deleteConfirmText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   
   // FAB

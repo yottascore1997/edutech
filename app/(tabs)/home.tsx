@@ -1,14 +1,14 @@
 import { apiFetchAuth } from '@/constants/api';
-import { AppColors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useCategory } from '@/context/CategoryContext';
 import { useWallet } from '@/context/WalletContext';
-import { filterActiveExams } from '@/utils/examFilter';
+import { applyExamFilters } from '@/utils/examFilter';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CustomBannerSlider from '../../components/CustomBannerSlider';
 import ExamCard from '../../components/ExamCard';
 import ExamNotificationsSection from '../../components/ExamNotificationsSection';
@@ -23,6 +23,7 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function HomeScreen() {
     const { user } = useAuth();
     const { walletAmount, refreshWalletAmount } = useWallet();
+    const { selectedCategory } = useCategory();
     const router = useRouter();
     const navigation = useNavigation();
 
@@ -43,8 +44,10 @@ export default function HomeScreen() {
         }
     }, [user]);
     const [exams, setExams] = useState<any[]>([]);
+    const [joinedLiveExamIds, setJoinedLiveExamIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [weeklyToppersRefreshTrigger, setWeeklyToppersRefreshTrigger] = useState(0);
     
     // Refs for sliders and components
     const examSliderRef = useRef<FlatList<any>>(null);
@@ -73,11 +76,35 @@ export default function HomeScreen() {
         }
     };
 
-    // Data for sliders - filter out expired exams
-    const activeExams = filterActiveExams(exams);
+    // Data for sliders - filter out expired exams and apply category filter
+    const activeExams = applyExamFilters(exams, {
+      category: selectedCategory || undefined,
+      includeExpired: false,
+      userId: user?.id,
+      joinedExamIds: joinedLiveExamIds
+    });
     const featuredExams = activeExams.slice(0, 5);
 
     // Fetch Exams Function
+    const fetchJoinedLiveExams = async () => {
+        if (!user?.token) return;
+        try {
+            const res = await apiFetchAuth('/student/my-exams', user.token);
+            if (res.ok && Array.isArray(res.data)) {
+                const ids = res.data
+                    .filter((e: any) => e.examType === 'LIVE' && e.status !== 'COMPLETED')
+                    .map((e: any) => e.examId || e.id)
+                    .filter(Boolean);
+                setJoinedLiveExamIds(ids);
+            } else {
+                setJoinedLiveExamIds([]);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching joined live exams:', error);
+            setJoinedLiveExamIds([]);
+        }
+    };
+
     const fetchExams = async () => {
         console.log('🏠 Home screen - User data:', {
             hasUser: !!user,
@@ -99,6 +126,7 @@ export default function HomeScreen() {
             const response = await apiFetchAuth('/student/exams', user.token);
 
             if (response.ok) setExams(response.data);
+            await fetchJoinedLiveExams();
         } catch (error) {
             console.error('❌ Error fetching exams:', error);
         } finally {
@@ -106,11 +134,12 @@ export default function HomeScreen() {
         }
     };
 
-    // Simple Refresh Function
+    // Simple Refresh Function (also refreshes Weekly Toppers)
     const onRefresh = async () => {
         setRefreshing(true);
         try {
             await fetchExams();
+            setWeeklyToppersRefreshTrigger((t) => t + 1);
         } catch (error) {
             console.error('Error refreshing home page:', error);
         } finally {
@@ -165,34 +194,31 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Premium Categories Section */}
+        {/* Categories - clean premium grid, no boxes */}
         <View style={styles.categoriesSection}>
           <View style={styles.categoriesGrid}>
             {[
-              { id: '1', name: 'Live Exam', icon: 'flash', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'], route: '/(tabs)/exam' },
-              { id: '2', name: 'Practice', icon: 'school', color: '#8B5CF6', gradient: ['#8B5CF6', '#A78BFA'], route: '/(tabs)/practice-categories' },
-              { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', gradient: ['#10B981', '#34D399'], route: '/(tabs)/quiz' },
-              { id: '4', name: 'Social', icon: 'people', color: '#EC4899', gradient: ['#EC4899', '#F472B6'], route: '/(tabs)/social' },
-              { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable' },
-              { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store' },
+              { id: '1', name: 'Live Exam', icon: 'flash', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'], route: '/(tabs)/exam', image: require('../../assets/images/icons/exam.png') },
+              { id: '2', name: 'Practice', icon: 'school', color: '#8B5CF6', gradient: ['#8B5CF6', '#A78BFA'], route: '/(tabs)/practice-categories', image: require('../../assets/images/icons/exam-time.png') },
+              { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', gradient: ['#10B981', '#34D399'], route: '/(tabs)/quiz', image: require('../../assets/images/icons/quiz.png') },
+              { id: '4', name: 'Social', icon: 'people', color: '#EC4899', gradient: ['#EC4899', '#F472B6'], route: '/(tabs)/social', image: require('../../assets/images/icons/social-media.png') },
+              { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable', image: require('../../assets/images/icons/study-time.png') },
+              { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store', image: require('../../assets/images/icons/book-shop.png') },
             ].map((item) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={item.id}
                 style={styles.categoryCard}
                 onPress={() => router.push(item.route as any)}
-                activeOpacity={0.7}
+                activeOpacity={0.75}
               >
-                <View style={styles.categoryCardInner}>
-                  <LinearGradient
-                    colors={item.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.categoryIconWrapper}
-                  >
-                    <Ionicons name={item.icon as any} size={20} color="#FFFFFF" />
-                  </LinearGradient>
-                  <Text style={styles.categoryName}>{item.name}</Text>
+                <View style={[styles.categoryIconCircle, { backgroundColor: item.color + '14' }]}>
+                  {'image' in item && item.image ? (
+                    <Image source={item.image} style={styles.categoryIconImage} resizeMode="contain" />
+                  ) : (
+                    <Ionicons name={item.icon as any} size={24} color={item.color} />
+                  )}
                 </View>
+                <Text style={styles.categoryName}>{item.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -329,9 +355,12 @@ export default function HomeScreen() {
             }} /> */}
 
             {/* Top Performers Section */}
-            <TopPerformersSection onPress={() => {
-                // router.push('/leaderboard'); // Example navigation
-            }} />
+            <TopPerformersSection
+                refreshTrigger={weeklyToppersRefreshTrigger}
+                onPress={() => {
+                    // router.push('/leaderboard'); // Example navigation
+                }}
+            />
 
             {/* Exam Notifications Section */}
             <ExamNotificationsSection />
@@ -346,13 +375,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8F9FA',
     },
     
-    // Premium Categories Section
+    // Categories - open, no boxes, professional
     categoriesSection: {
-        backgroundColor: '#FFFFFF',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        marginTop: 8,
+        marginHorizontal: 14,
+        marginTop: 12,
         marginBottom: 8,
+        paddingHorizontal: 0,
     },
     categoriesGrid: {
         flexDirection: 'row',
@@ -360,43 +388,30 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
     },
     categoryCard: {
-        width: (screenWidth - 48) / 3,
-        marginBottom: 10,
-    },
-    categoryCardInner: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 20,
-        paddingVertical: 10,
-        paddingHorizontal: 4,
+        width: (screenWidth - 28 - 12) / 3,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: '#F3F4F6',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        elevation: 2,
+        marginBottom: 8,
     },
-    categoryIconWrapper: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+    categoryIconCircle: {
+        width: 62,
+        height: 62,
+        borderRadius: 31,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 6,
-        elevation: 4,
+        marginBottom: 2,
+    },
+    categoryIconImage: {
+        width: 36,
+        height: 36,
     },
     categoryName: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: '600',
-        color: '#1F2937',
+        color: '#111827',
         textAlign: 'center',
         marginTop: 0,
+        letterSpacing: 0.1,
     },
     
     // Professional Live Exams Section

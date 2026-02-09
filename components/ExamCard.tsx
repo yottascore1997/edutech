@@ -1,20 +1,24 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { useFonts } from '@/hooks/useFonts';
+import { formatTimeUntilStart, formatDateTime, hasExamStarted } from '@/utils/timeUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage = false }: any) => {
+const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage = false, onJoinSuccess, attemptStatus, hideSpotsSection = false }: any) => {
     const router = useRouter();
     const { user } = useAuth();
     const fonts = useFonts();
     const [remainingTime, setRemainingTime] = useState('');
     const [showInstructionsModal, setShowInstructionsModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [examStatus, setExamStatus] = useState<'UPCOMING' | 'LIVE' | 'ENDED'>('UPCOMING');
+    const [timeUntilStart, setTimeUntilStart] = useState<string>('');
+    const [examHasEnded, setExamHasEnded] = useState(false);
     
     // Flash animation
     const flashAnim = useRef(new Animated.Value(0.4)).current;
@@ -42,12 +46,35 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
     const [walletBalance, setWalletBalance] = useState(0);
     const [walletLoading, setWalletLoading] = useState(false);
     const [paymentLoading, setPaymentLoading] = useState(false);
+    const joinInFlightRef = useRef(false);
+    const [isParticipant, setIsParticipant] = useState(false);
+    const [checkingParticipant, setCheckingParticipant] = useState(false);
     
     // Animation refs
     const modalScale = useRef(new Animated.Value(0)).current;
     const modalOpacity = useRef(new Animated.Value(0)).current;
     const headerSlide = useRef(new Animated.Value(-50)).current;
     const contentSlide = useRef(new Animated.Value(50)).current;
+
+    // Check if user is a participant in this exam
+    const checkParticipantStatus = async () => {
+        if (!user?.token || !exam?.id) return;
+        
+        try {
+            setCheckingParticipant(true);
+            const response = await apiFetchAuth(`/student/live-exams/${exam.id}/participant`, user.token);
+            if (response.ok) {
+                setIsParticipant(true);
+            } else {
+                setIsParticipant(false);
+            }
+        } catch (error) {
+            console.error('Error checking participant status:', error);
+            setIsParticipant(false);
+        } finally {
+            setCheckingParticipant(false);
+        }
+    };
 
     // Fetch wallet balance
     const fetchWalletBalance = async () => {
@@ -66,6 +93,13 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
         }
     };
 
+    // Check participant status on mount
+    useEffect(() => {
+        if (exam?.id && user?.token) {
+            checkParticipantStatus();
+        }
+    }, [exam?.id, user?.token]);
+
     // Check if user has sufficient balance
     const hasSufficientBalance = () => {
         return walletBalance >= exam.entryFee;
@@ -73,8 +107,53 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
 
     // Handle payment and join exam
     const handlePaymentAndJoin = async () => {
+        if (joinInFlightRef.current || paymentLoading) {
+            return;
+        }
+        joinInFlightRef.current = true;
         if (!user?.token) {
             Alert.alert('Error', 'You must be logged in to attempt this exam.');
+            joinInFlightRef.current = false;
+            return;
+        }
+
+        // Check if exam has ended
+        const now = new Date();
+        if (exam.endTime) {
+            const endTime = new Date(exam.endTime);
+            if (now.getTime() > endTime.getTime()) {
+                Alert.alert(
+                    'Exam Ended',
+                    'The exam time has ended. You cannot join this exam now.',
+                    [{ text: 'OK' }]
+                );
+                joinInFlightRef.current = false;
+                return;
+            }
+        }
+
+        // Check if exam has already started - users cannot join after start time
+        if (exam.startTime) {
+            const startTime = new Date(exam.startTime);
+            if (now.getTime() >= startTime.getTime()) {
+                Alert.alert(
+                    'Exam Already Started',
+                    'The exam has already started. You can only join before the exam start time.',
+                    [{ text: 'OK' }]
+                );
+                joinInFlightRef.current = false;
+                return;
+            }
+        }
+
+        // Check if spots are available
+        if (exam.spotsLeft !== undefined && exam.spotsLeft !== null && exam.spotsLeft <= 0) {
+            Alert.alert(
+                'No Spots Available',
+                'All spots for this exam have been filled. You cannot join this exam.',
+                [{ text: 'OK' }]
+            );
+            joinInFlightRef.current = false;
             return;
         }
 
@@ -87,6 +166,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                     { text: 'Add Money', onPress: () => router.push('/(tabs)/wallet') }
                 ]
             );
+            joinInFlightRef.current = false;
             return;
         }
 
@@ -98,7 +178,8 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 body: { 
                     amount: exam.entryFee,
                     examId: exam.id,
-                    description: `Payment for ${exam.title}`
+                    description: `Payment for ${exam.title}`,
+                    requestId: `${exam.id}_${user.id}_${Date.now()}`
                 }
             });
 
@@ -116,39 +197,35 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 throw new Error(joinRes.data?.message || 'Failed to join exam');
             }
 
-            // 3. Get participant info
-            const participantRes = await apiFetchAuth(`/student/live-exams/${exam.id}/participant`, user.token);
-            if (!participantRes.ok) {
-                throw new Error('Failed to get participant info');
-            }
-
-            // 4. Fetch questions
-            const questionsRes = await apiFetchAuth(`/student/live-exams/${exam.id}/questions`, user.token);
-            if (!questionsRes.ok) {
-                throw new Error('Failed to fetch questions');
-            }
-
-            // 5. Update wallet balance locally
+            // 3. Update wallet balance locally
             setWalletBalance(prev => prev - exam.entryFee);
             
-            // 6. Close modals and start exam directly
+            // 4. Update participant status (local state for card)
+            setIsParticipant(true);
+            
+            // 5. Close modals
             setShowPaymentModal(false);
             setShowInstructionsModal(false);
             
-            // Navigate directly to questions page to start the exam
-            router.push({ 
-                pathname: '/(tabs)/live-exam/questions', 
-                params: { 
-                    id: exam.id, 
-                    duration: exam.duration, 
-                    questions: JSON.stringify(questionsRes.data) 
-                } 
-            });
+            // 6. If parent (e.g. exam details) passed onJoinSuccess, call it so "You're in" shows
+            onJoinSuccess?.();
+            
+            // 7. If not already on exam details page, navigate there
+            if (!isDetailsPage) {
+                router.push({ 
+                    pathname: '/(tabs)/exam/[id]', 
+                    params: { 
+                        id: exam.id,
+                        joined: '1',
+                    } 
+                });
+            }
 
         } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to process payment and join exam.');
         } finally {
             setPaymentLoading(false);
+            joinInFlightRef.current = false;
         }
     };
 
@@ -182,14 +259,44 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
         return () => clearInterval(timer);
     }, [exam.endTime]);
 
-    const progress = exam.spots > 0 ? ((exam.spots - exam.spotsLeft) / exam.spots) * 100 : 0;
+    // Check exam start time, end time and status
+    useEffect(() => {
+        if (!exam.startTime) return;
 
-    // Helper function to get full image URL
-    const getImageUrl = (imageUrl: string | undefined) => {
-        if (!imageUrl) return null;
-        if (imageUrl.startsWith('http')) return imageUrl;
-        return `http://192.168.1.5:3000${imageUrl}`;
-    };
+        const checkExamStatus = () => {
+            const now = new Date();
+            
+            // Check if exam has ended
+            if (exam.endTime) {
+                const endTime = new Date(exam.endTime);
+                if (now.getTime() > endTime.getTime()) {
+                    setExamHasEnded(true);
+                    setExamStatus('ENDED');
+                    setTimeUntilStart('');
+                    return;
+                }
+            }
+            
+            // Check if exam has started
+            const started = hasExamStarted(exam.startTime);
+            setExamStatus(started ? 'LIVE' : 'UPCOMING');
+            setExamHasEnded(false);
+            
+            if (!started) {
+                const timeUntil = formatTimeUntilStart(exam.startTime);
+                setTimeUntilStart(timeUntil);
+            } else {
+                setTimeUntilStart('');
+            }
+        };
+
+        checkExamStatus();
+        const interval = setInterval(checkExamStatus, 1000);
+        
+        return () => clearInterval(interval);
+    }, [exam.startTime, exam.endTime]);
+
+    const progress = exam.spots > 0 ? ((exam.spots - exam.spotsLeft) / exam.spots) * 100 : 0;
 
     const handleCardPress = () => {
         router.push({
@@ -259,6 +366,12 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
 
     // Handle View Details or Attempt Now based on page
     const handleAttemptLiveExam = async () => {
+        // If user has already joined, just navigate to details
+        if (isParticipant) {
+            router.push(`/(tabs)/exam/${exam.id}`);
+            return;
+        }
+
         // If on home page, just navigate to details
         if (!isDetailsPage) {
             router.push(`/(tabs)/exam/${exam.id}`);
@@ -268,6 +381,50 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
         // If on details page, show payment flow
         if (!user?.token) {
             Alert.alert('Error', 'You must be logged in to attempt this exam.');
+            return;
+        }
+
+        // Check if already joined
+        if (isParticipant) {
+            Alert.alert('Already Joined', 'You have already joined this exam.');
+            router.push(`/(tabs)/exam/${exam.id}`);
+            return;
+        }
+
+        // Check if exam has ended
+        const now = new Date();
+        if (exam.endTime) {
+            const endTime = new Date(exam.endTime);
+            if (now.getTime() > endTime.getTime()) {
+                Alert.alert(
+                    'Exam Ended',
+                    'The exam time has ended. You cannot join this exam now.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+        }
+
+        // Check if exam has already started - users cannot join after start time
+        if (exam.startTime) {
+            const startTime = new Date(exam.startTime);
+            if (now.getTime() >= startTime.getTime()) {
+                Alert.alert(
+                    'Exam Already Started',
+                    'The exam has already started. You can only join before the exam start time.',
+                    [{ text: 'OK' }]
+                );
+                return;
+            }
+        }
+
+        // Check if spots are available
+        if (exam.spotsLeft !== undefined && exam.spotsLeft !== null && exam.spotsLeft <= 0) {
+            Alert.alert(
+                'No Spots Available',
+                'All spots for this exam have been filled. You cannot join this exam.',
+                [{ text: 'OK' }]
+            );
             return;
         }
 
@@ -310,72 +467,121 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
             <View style={styles.header}>
                 <View style={styles.headerContent}>
                     {/* Exam Image Logo */}
-                    {exam.imageUrl && getImageUrl(exam.imageUrl) && (
+                    {exam.imageUrl && getImageUrl(exam.imageUrl) ? (
                         <View style={styles.imageContainer}>
                             <Image 
-                                source={{ uri: getImageUrl(exam.imageUrl) || '' }} 
+                                source={{ uri: getImageUrl(exam.imageUrl) }} 
                                 style={styles.examImage}
                                 resizeMode="cover"
                             />
                         </View>
-                    )}
+                    ) : null}
                     <View style={styles.titleContainer}>
                         <Text style={fonts.subheaderLarge} numberOfLines={2}>{exam.title}</Text>
                         <View style={styles.categoryContainer}>
                             <View style={styles.categoryBadge}>
-                                <Text style={fonts.captionSmall}>{exam.category || 'General Knowledge'}</Text>
+                                <Text style={fonts.captionSmall} numberOfLines={3}>
+                                    {exam.category || 'General Knowledge'}
+                                </Text>
                             </View>
                         </View>
                     </View>
                     <View style={styles.endTimeContainer}>
-                        <LinearGradient
-                            colors={['#FF4444', '#FF6B6B']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
-                            style={styles.liveIndicator}>
-                            <View style={styles.liveContent}>
-                                <Animated.View style={[styles.flashDot, { opacity: flashAnim }]} />
-                                <Text style={styles.liveText}>LIVE</Text>
-                            </View>
-                        </LinearGradient>
+                        {attemptStatus === 'COMPLETED' ? (
+                            <LinearGradient
+                                colors={['#10B981', '#059669']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.liveIndicator}>
+                                <View style={styles.liveContent}>
+                                    <Ionicons name="checkmark-done" size={12} color="#FFFFFF" />
+                                    <Text style={styles.liveText}>COMPLETED</Text>
+                                </View>
+                            </LinearGradient>
+                        ) : examStatus === 'LIVE' ? (
+                            <LinearGradient
+                                colors={['#FF4444', '#FF6B6B']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.liveIndicator}>
+                                <View style={styles.liveContent}>
+                                    <Animated.View style={[styles.flashDot, { opacity: flashAnim }]} />
+                                    <Text style={styles.liveText}>LIVE</Text>
+                                </View>
+                            </LinearGradient>
+                        ) : (
+                            <LinearGradient
+                                colors={['#F59E0B', '#D97706']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                                style={styles.liveIndicator}>
+                                <View style={styles.liveContent}>
+                                    <Ionicons name="time-outline" size={12} color="#FFFFFF" />
+                                    <Text style={styles.liveText}>UPCOMING</Text>
+                                </View>
+                            </LinearGradient>
+                        )}
                     </View>
                 </View>
             </View>
 
-            {/* Enhanced Spots Section */}
-            <View style={styles.spotsContainer}>
-                <View style={styles.spotsHeader}>
-                    <View style={styles.spotsLeftSection}>
-                        <Text style={fonts.bodySmall}>Available Spots</Text>
+            {/* Enhanced Spots Section - hidden when opened from My Exams */}
+            {!hideSpotsSection && (
+                <View style={styles.spotsContainer}>
+                    <View style={styles.spotsHeader}>
+                        <View style={styles.spotsLeftSection}>
+                            <Text style={fonts.bodySmall}>Available Spots</Text>
+                        </View>
+                        <View style={styles.timerSection}>
+                            {examStatus === 'UPCOMING' && exam.startTime && timeUntilStart ? (
+                                <View style={styles.endTimeContent}>
+                                    <View style={styles.clockIconContainer}>
+                                        <Ionicons name="time-outline" size={15} color="#F59E0B" />
+                                    </View>
+                                    <Text style={styles.endsInText}>Starts in</Text>
+                                    <Text style={styles.timeText}>{timeUntilStart}</Text>
+                                </View>
+                            ) : (
+                                <View style={styles.endTimeContent}>
+                                    <View style={styles.clockIconContainer}>
+                                        <Ionicons name="time-outline" size={15} color="#DC2626" />
+                                    </View>
+                                    <Text style={styles.endsInText}>Ends in</Text>
+                                    <Text style={styles.timeText}>{remainingTime}</Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
-                    <View style={styles.timerSection}>
-                        <View style={styles.endTimeContent}>
-                            <View style={styles.clockIconContainer}>
-                                <Ionicons name="time-outline" size={15} color="#DC2626" />
+                    <View style={styles.spotsProgressContainer}>
+                        <View style={styles.spotsTextContainer}>
+                            <Text style={fonts.bodyMedium}>
+                                <Text style={fonts.subheaderMedium}>{exam.spotsLeft}</Text> spots left
+                            </Text>
+                            <Text style={fonts.greySmall}>out of {exam.spots}</Text>
+                        </View>
+                        <View style={styles.progressBarContainer}>
+                            <View style={styles.progressBar}>
+                                <View style={[styles.progress, { width: `${progress}%` }]} />
                             </View>
-                            <Text style={styles.endsInText}>Ends in</Text>
-                            <Text style={styles.timeText}>{remainingTime}</Text>
+                            <Text style={styles.progressPercentage}>{Math.round(progress)}% filled</Text>
                         </View>
                     </View>
                 </View>
-                <View style={styles.spotsProgressContainer}>
-                    <View style={styles.spotsTextContainer}>
-                        <Text style={fonts.bodyMedium}>
-                            <Text style={fonts.subheaderMedium}>{exam.spotsLeft}</Text> spots left
-                        </Text>
-                        <Text style={fonts.greySmall}>out of {exam.spots}</Text>
-                    </View>
-                    <View style={styles.progressBarContainer}>
-                        <View style={styles.progressBar}>
-                            <View style={[styles.progress, { width: `${progress}%` }]} />
-                        </View>
-                        <Text style={styles.progressPercentage}>{Math.round(progress)}% filled</Text>
-                    </View>
-                </View>
-            </View>
+            )}
 
             {/* Enhanced Details Section */}
             {/* Removed tags section as requested */}
+
+            {/* Start Time Display */}
+            {exam.startTime && examStatus === 'UPCOMING' && (
+                <View style={styles.startTimeContainer}>
+                    <View style={styles.startTimeContent}>
+                        <Ionicons name="calendar-outline" size={14} color="#6B7280" />
+                        <Text style={styles.startTimeLabel}>Start Time: </Text>
+                        <Text style={styles.startTimeValue}>{formatDateTime(exam.startTime)}</Text>
+                    </View>
+                </View>
+            )}
 
             {/* Enhanced Footer */}
             <View style={styles.footer}>
@@ -386,19 +592,181 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 </View>
                 
                 {!hideAttemptButton && (
-                    <TouchableOpacity style={styles.attemptButton} onPress={handleAttemptLiveExam}>
-                        <LinearGradient
-                            colors={['#10B981', '#059669']}
-                            style={styles.attemptButtonGradient}
-                        >
-                            <View style={styles.attemptButtonContent}>
-                                <Text style={styles.attemptButtonText}>
-                                    {isDetailsPage ? 'Attempt Now' : 'View Details'}
-                                </Text>
-                                <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
-                            </View>
-                        </LinearGradient>
-                    </TouchableOpacity>
+                    <>
+                        {isParticipant ? (
+                            // If exam has ended, show "Exam Ended", else if exam has started (LIVE), show "Start Attempt", otherwise show "Joined"
+                            examStatus === 'ENDED' || examHasEnded ? (
+                                <TouchableOpacity 
+                                    style={[styles.attemptButton, styles.joinedButtonDisabled]} 
+                                    disabled={true}
+                                >
+                                    <LinearGradient
+                                        colors={['#EF4444', '#DC2626']}
+                                        style={styles.attemptButtonGradient}
+                                    >
+                                        <View style={styles.attemptButtonContent}>
+                                            <Ionicons name="lock-closed" size={16} color="#FFFFFF" />
+                                            <Text style={styles.attemptButtonText}>
+                                                Exam Ended
+                                            </Text>
+                                        </View>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            ) : examStatus === 'LIVE' ? (
+                                <TouchableOpacity 
+                                    style={styles.attemptButton} 
+                                    onPress={async () => {
+                                        if (!user?.token || !exam?.id) return;
+                                        
+                                        // Check if exam has ended
+                                        const now = new Date();
+                                        if (exam.endTime) {
+                                            const endTime = new Date(exam.endTime);
+                                            if (now.getTime() > endTime.getTime()) {
+                                                Alert.alert(
+                                                    'Exam Ended',
+                                                    'The exam time has ended. You cannot start the exam now.',
+                                                    [{ text: 'OK' }]
+                                                );
+                                                return;
+                                            }
+                                        }
+                                        
+                                        // Check if exam has started
+                                        if (exam.startTime) {
+                                            const startTime = new Date(exam.startTime);
+                                            if (now.getTime() < startTime.getTime()) {
+                                                Alert.alert('Wait', 'Exam has not started yet. Please wait for the start time.');
+                                                return;
+                                            }
+                                        }
+                                        
+                                        try {
+                                            // Fetch questions directly
+                                            const questionsRes = await apiFetchAuth(`/student/live-exams/${exam.id}/questions`, user.token);
+                                            if (!questionsRes.ok) {
+                                                if (questionsRes.data?.message?.includes('not started') || questionsRes.data?.message?.includes('start time')) {
+                                                    Alert.alert('Wait', 'Exam has not started yet. Please wait for the start time.');
+                                                    return;
+                                                }
+                                                if (questionsRes.data?.message?.includes('ended') || questionsRes.data?.message?.includes('end time')) {
+                                                    Alert.alert('Exam Ended', 'The exam time has ended. You cannot start the exam now.');
+                                                    return;
+                                                }
+                                                Alert.alert('Error', questionsRes.data?.message || 'Failed to fetch questions');
+                                                return;
+                                            }
+                                            
+                                            // Navigate directly to questions page
+                                            router.push({ 
+                                                pathname: '/(tabs)/live-exam/questions', 
+                                                params: { 
+                                                    id: exam.id, 
+                                                    duration: exam.duration, 
+                                                    questions: JSON.stringify(questionsRes.data) 
+                                                } 
+                                            });
+                                        } catch (error: any) {
+                                            Alert.alert('Error', error.message || 'Failed to start exam.');
+                                        }
+                                    }}
+                                >
+                                    <LinearGradient
+                                        colors={['#10B981', '#059669']}
+                                        style={styles.attemptButtonGradient}
+                                    >
+                                        <View style={styles.attemptButtonContent}>
+                                            <Ionicons name="play" size={16} color="#FFFFFF" />
+                                            <Text style={styles.attemptButtonText}>
+                                                Start Attempt
+                                            </Text>
+                                        </View>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity 
+                                    style={[styles.attemptButton, styles.joinedButtonDisabled]} 
+                                    disabled={true}
+                                >
+                                    <LinearGradient
+                                        colors={['#10B981', '#059669']}
+                                        style={styles.attemptButtonGradient}
+                                    >
+                                        <View style={styles.attemptButtonContent}>
+                                            <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                                            <Text style={styles.attemptButtonText}>
+                                                Joined
+                                            </Text>
+                                        </View>
+                                    </LinearGradient>
+                                </TouchableOpacity>
+                            )
+                        ) : (
+                            (() => {
+                                // Check if exam has started - if yes, disable join button
+                                const now = new Date();
+                                let canJoin = true;
+                                let disabledReason = '';
+                                
+                                if (exam.startTime) {
+                                    const startTime = new Date(exam.startTime);
+                                    if (now.getTime() >= startTime.getTime()) {
+                                        canJoin = false;
+                                        disabledReason = 'Exam Already Started';
+                                    }
+                                }
+                                
+                                if (exam.endTime) {
+                                    const endTime = new Date(exam.endTime);
+                                    if (now.getTime() > endTime.getTime()) {
+                                        canJoin = false;
+                                        disabledReason = 'Exam Ended';
+                                    }
+                                }
+                                
+                                if (exam.spotsLeft !== undefined && exam.spotsLeft !== null && exam.spotsLeft <= 0) {
+                                    canJoin = false;
+                                    disabledReason = 'No Spots Available';
+                                }
+                                
+                                return (
+                                    <TouchableOpacity 
+                                        style={[styles.attemptButton, !canJoin && styles.joinedButtonDisabled]} 
+                                        onPress={canJoin ? handleAttemptLiveExam : () => {
+                                            Alert.alert(
+                                                disabledReason,
+                                                canJoin 
+                                                    ? 'You cannot join this exam.' 
+                                                    : disabledReason === 'Exam Already Started'
+                                                        ? 'The exam has already started. You can only join before the exam start time.'
+                                                        : disabledReason === 'Exam Ended'
+                                                            ? 'The exam time has ended. You cannot join this exam now.'
+                                                            : 'All spots for this exam have been filled.'
+                                            );
+                                        }}
+                                        disabled={!canJoin}
+                                    >
+                                        <LinearGradient
+                                            colors={canJoin ? ['#10B981', '#059669'] : ['#9CA3AF', '#6B7280']}
+                                            style={styles.attemptButtonGradient}
+                                        >
+                                            <View style={styles.attemptButtonContent}>
+                                                <Text style={styles.attemptButtonText}>
+                                                    {!canJoin 
+                                                        ? disabledReason 
+                                                        : isDetailsPage 
+                                                            ? 'Attempt Now' 
+                                                            : 'View Details'
+                                                    }
+                                                </Text>
+                                                {canJoin && <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />}
+                                            </View>
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                );
+                            })()
+                        )}
+                    </>
                 )}
             </View>
         </TouchableOpacity>
@@ -432,7 +800,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                   >
                     <View style={styles.modalHeaderContent}>
                       <View style={styles.modalIconContainer}>
-                        <Ionicons name="card" size={28} color="#fff" />
+                        <Image source={require('@/assets/images/icons/rupee.png')} style={styles.modalHeaderRupeeIcon} resizeMode="contain" />
                       </View>
                       <View style={styles.modalTitleContainer}>
                         <Text style={styles.modalTitleEnhanced}>Payment Confirmation</Text>
@@ -651,7 +1019,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         borderRadius: 10,
-        overflow: 'hidden',
+        overflow: 'visible',
         marginBottom: 6,
     },
     headerGradient: {
@@ -665,6 +1033,7 @@ const styles = StyleSheet.create({
     },
     titleContainer: {
         flex: 1,
+        minWidth: 0,
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         padding: 6,
         borderRadius: 6,
@@ -672,13 +1041,18 @@ const styles = StyleSheet.create({
     },
     categoryContainer: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 4,
     },
     categoryBadge: {
+        alignSelf: 'flex-start',
         marginRight: 4,
+        marginBottom: 2,
         backgroundColor: 'rgba(230, 81, 0, 0.1)',
         borderRadius: 6,
         paddingHorizontal: 6,
         paddingVertical: 2,
+        maxWidth: '100%',
     },
     endTimeContainer: {
         position: 'relative',
@@ -813,6 +1187,32 @@ const styles = StyleSheet.create({
         color: AppColors.grey,
         marginTop: 4, // Reduced from 5
     },
+    startTimeContainer: {
+        marginTop: 10,
+        marginBottom: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: '#FEF3C7',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FCD34D',
+    },
+    startTimeContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    startTimeLabel: {
+        fontSize: 12,
+        color: '#92400E',
+        fontWeight: '600',
+        marginLeft: 6,
+    },
+    startTimeValue: {
+        fontSize: 12,
+        color: '#92400E',
+        fontWeight: '700',
+    },
     detailsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -916,6 +1316,9 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 1 },
         textShadowRadius: 2,
     },
+    joinedButtonDisabled: {
+        opacity: 0.8,
+    },
     // Modal Styles
     modalOverlay: {
         flex: 1,
@@ -950,16 +1353,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     modalIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        elevation: 0,
+        marginRight: 12,
+    },
+    modalHeaderRupeeIcon: {
+        width: 38,
+        height: 38,
     },
     modalTitleContainer: {
         flex: 1,

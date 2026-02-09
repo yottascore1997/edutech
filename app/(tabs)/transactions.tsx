@@ -45,7 +45,8 @@ export default function TransactionsScreen() {
   const filteredTransactions = React.useMemo(() => {
     if (activeFilter === 'deposit') return transactions.filter(t => t.type === 'DEPOSIT');
     if (activeFilter === 'withdrawal') return transactions.filter(t => t.type === 'WITHDRAWAL');
-    if (activeFilter === 'winning') return transactions.filter(t => t.type === 'WINNING');
+    if (activeFilter === 'winning') return transactions.filter(t => t.type === 'EXAM_WIN' || t.type === 'WINNING');
+    if (activeFilter === 'deduction') return transactions.filter(t => t.type === 'DEDUCTION' || t.type === 'EXAM_ENTRY');
     return transactions.filter(t => t.type === 'DEPOSIT');
   }, [transactions, activeFilter]);
 
@@ -412,6 +413,27 @@ export default function TransactionsScreen() {
               ]}>Winnings</Text>
             </View>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[
+              styles.filterTab, 
+              activeFilter === 'deduction' && styles.activeFilterTab,
+              { backgroundColor: activeFilter === 'deduction' ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }
+            ]}
+            onPress={() => setActiveFilter('deduction')}
+          >
+            <View style={styles.filterContent}>
+              <MaterialIcons 
+                name="payments" 
+                size={18} 
+                color={activeFilter === 'deduction' ? '#6366F1' : '#6B7280'} 
+                style={styles.filterIcon}
+              />
+              <Text style={[
+                fonts.bodyMedium, 
+                activeFilter === 'deduction' && { ...styles.activeFilterText, color: '#6366F1' }
+              ]}>Deductions</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       </Animated.View>
     );
@@ -529,6 +551,8 @@ export default function TransactionsScreen() {
                 ? 'Start your journey by adding funds to your wallet. Make a deposit to participate in quizzes and win exciting rewards!'
                 : activeFilter === 'withdrawal'
                 ? 'No withdraw transactions found. Win some quizzes and earn rewards to make withdrawals!'
+                : activeFilter === 'deduction'
+                ? 'No deduction transactions found. Exam entry fees and deductions will appear here.'
                 : 'No winnings yet. Participate in quizzes to win rewards and see your earnings here!'}
             </Text>
           </View>
@@ -706,6 +730,7 @@ const styles = StyleSheet.create({
 
   filterContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     marginHorizontal: 16,
@@ -718,13 +743,15 @@ const styles = StyleSheet.create({
     elevation: 5,
     padding: 4,
     zIndex: 20,
+    rowGap: 6,
+    columnGap: 6,
   },
   filterTab: {
-    flex: 1,
+    width: '48%',
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 16,
-    marginHorizontal: 2,
+    marginHorizontal: 0,
   },
   activeFilterTab: {
     backgroundColor: 'rgba(79, 70, 229, 0.1)',

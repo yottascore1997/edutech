@@ -7,7 +7,6 @@ function TabLayout() {
   return (
     <View style={styles.container}>
       <CommonHeader 
-        showSearchBar={true} 
         showMainOptions={false}
       />
       <Tabs
@@ -65,6 +64,20 @@ function TabLayout() {
         name="my-exams"
         options={{
           title: 'My Exams',
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="my-certificates"
+        options={{
+          title: 'My Certificates',
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="exam-notifications"
+        options={{
+          title: 'Exam Notifications',
           href: null, // Hide from tab bar
         }}
       />

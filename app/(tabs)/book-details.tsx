@@ -1,19 +1,21 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
-import { ShadowUtils } from '@/utils/shadowUtils';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
@@ -83,9 +85,12 @@ const BookDetailsScreen = () => {
   const { bookId } = useLocalSearchParams();
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [book, setBook] = useState<BookDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+
+  const coverImageUri = book?.coverImage ? (book.coverImage.startsWith('http') ? book.coverImage : getImageUrl(book.coverImage)) : null;
 
   useEffect(() => {
 
@@ -208,15 +213,19 @@ const BookDetailsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading book details...</Text>
+      <View style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+        <View style={styles.loadingCard}>
+          <Ionicons name="book" size={48} color="#6366F1" />
+          <Text style={styles.loadingText}>Loading book details...</Text>
+        </View>
       </View>
     );
   }
 
   if (!book) {
     return (
-      <View style={styles.errorContainer}>
+      <View style={[styles.errorContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="book-outline" size={56} color="#94A3B8" />
         <Text style={styles.errorText}>Book not found</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
@@ -228,150 +237,146 @@ const BookDetailsScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header Image */}
+        {/* Cover + Back */}
         <View style={styles.imageContainer}>
-          <Image 
-            source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.5:3000${book.coverImage}` }} 
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-          <View style={styles.imageOverlay}>
-             <TouchableOpacity 
-               style={styles.backButton}
-               onPress={() => router.back()}
-             >
-              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+          {coverImageUri ? (
+            <Image source={{ uri: coverImageUri }} style={styles.coverImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.coverImagePlaceholder}>
+              <Ionicons name="book" size={64} color="#94A3B8" />
+            </View>
+          )}
+          <LinearGradient colors={['rgba(0,0,0,0.5)', 'transparent']} style={styles.imageGradient} />
+          <TouchableOpacity style={[styles.backButtonOverlay, { top: insets.top + 8 }]} onPress={() => router.back()}>
+            <View style={styles.backButtonCircle}>
+              <Ionicons name="arrow-back" size={22} color="#1F2937" />
+            </View>
+          </TouchableOpacity>
           <View style={[styles.listingTypeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
             <Text style={styles.listingTypeText}>{book.listingType}</Text>
           </View>
         </View>
 
-        {/* Book Info */}
+        {/* Content cards */}
         <View style={styles.content}>
-          <Text style={styles.title}>{book.title}</Text>
-          <Text style={styles.author}>by {book.author}</Text>
-          
-          <View style={styles.priceContainer}>
-            <View style={styles.priceInfo}>
+          {/* Title + Price card */}
+          <View style={styles.card}>
+            <Text style={styles.title}>{book.title}</Text>
+            {book.author ? <Text style={styles.author}>{book.author}</Text> : null}
+            <View style={styles.priceRow}>
               {book.listingType === 'DONATE' ? (
                 <Text style={styles.price}>Free</Text>
               ) : (
                 <>
                   <Text style={styles.price}>₹{book.price}</Text>
-                  {book.rentPrice && (
-                    <Text style={styles.rentPrice}>Rent: ₹{book.rentPrice}/month</Text>
-                  )}
+                  {book.rentPrice ? <Text style={styles.rentPrice}>Rent ₹{book.rentPrice}/mo</Text> : null}
                 </>
               )}
             </View>
           </View>
 
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Category</Text>
-              <Text style={styles.detailValue}>{book.category}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Condition</Text>
-              <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '20' }]}>
-                <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>
-                  {book.condition}
-                </Text>
+          {/* Details card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Details</Text>
+            <View style={styles.detailsGrid}>
+              <View style={styles.detailRow}>
+                <Ionicons name="folder-open-outline" size={18} color="#6366F1" />
+                <Text style={styles.detailLabel}>Category</Text>
+                <Text style={styles.detailValue}>{book.category}</Text>
               </View>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Language</Text>
-              <Text style={styles.detailValue}>{book.language}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Location</Text>
-              <Text style={styles.detailValue}>📍 {book.location}</Text>
+              <View style={styles.detailRow}>
+                <Ionicons name="ribbon-outline" size={18} color="#6366F1" />
+                <Text style={styles.detailLabel}>Condition</Text>
+                <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '20' }]}>
+                  <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>{book.condition}</Text>
+                </View>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="language-outline" size={18} color="#6366F1" />
+                <Text style={styles.detailLabel}>Language</Text>
+                <Text style={styles.detailValue}>{book.language}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={18} color="#6366F1" />
+                <Text style={styles.detailLabel}>Location</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{book.location}</Text>
+              </View>
             </View>
           </View>
 
-          {book.description && (
-            <View style={styles.descriptionContainer}>
-              <Text style={styles.descriptionTitle}>Description</Text>
+          {book.description ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Description</Text>
               <Text style={styles.descriptionText}>{book.description}</Text>
             </View>
-          )}
+          ) : null}
 
-          {/* Additional Images */}
-          {book.additionalImages && book.additionalImages.length > 0 && (
-            <View style={styles.additionalImagesContainer}>
-              <Text style={styles.additionalImagesTitle}>More Images</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {book.additionalImages.map((image, index) => (
+          {book.additionalImages && book.additionalImages.length > 0 ? (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>More Images</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
+                {book.additionalImages.map((img, index) => (
                   <Image
                     key={index}
-                    source={{ uri: image.startsWith('http') ? image : `http://192.168.1.5:3000${image}` }}
+                    source={{ uri: img.startsWith('http') ? img : getImageUrl(img) }}
                     style={styles.additionalImage}
                     resizeMode="cover"
                   />
                 ))}
               </ScrollView>
             </View>
-          )}
+          ) : null}
 
-          {/* Seller Info */}
-          <View style={styles.sellerContainer}>
-            <Text style={styles.sellerTitle}>Seller Information</Text>
+          {/* Seller card - trust */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Seller</Text>
             <View style={styles.sellerInfo}>
-              <Image 
-                source={{ uri: book.seller.image || 'https://via.placeholder.com/50' }} 
-                style={styles.sellerAvatar}
-              />
+              <View style={styles.sellerAvatarWrap}>
+                {book.seller.image && getImageUrl(book.seller.image) ? (
+                  <Image source={{ uri: getImageUrl(book.seller.image) }} style={styles.sellerAvatar} />
+                ) : (
+                  <View style={[styles.sellerAvatar, styles.sellerAvatarPlaceholder]}>
+                    <Ionicons name="person" size={28} color="#94A3B8" />
+                  </View>
+                )}
+                {book.seller.bookProfile.isVerified ? (
+                  <View style={styles.verifiedBadge}>
+                    <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                  </View>
+                ) : null}
+              </View>
               <View style={styles.sellerDetails}>
                 <Text style={styles.sellerName}>{book.seller.name}</Text>
-                <Text style={styles.sellerLocation}>📍 {book.seller.bookProfile.city}</Text>
-                <View style={styles.sellerStats}>
-                  <Text style={styles.sellerStat}>📚 {book.seller.bookProfile.totalListings} listings</Text>
-                </View>
+                <Text style={styles.sellerLocation}>{book.seller.bookProfile.city}</Text>
+                <Text style={styles.sellerStat}>{book.seller.bookProfile.totalListings} listings</Text>
               </View>
-              {book.seller.bookProfile.isVerified && (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                </View>
+            </View>
+            <View style={styles.sellerActionsRow}>
+              {String(book.seller.id) !== String(user?.id ?? '') ? (
+                <>
+                  <TouchableOpacity style={styles.sellerContactButtonWrap} onPress={handleContactSeller} activeOpacity={0.9}>
+                    <LinearGradient colors={['#6366F1', '#8B5CF6']} style={styles.sellerContactButton}>
+                      <Ionicons name="call" size={18} color="#FFFFFF" />
+                      <Text style={styles.sellerContactButtonText}>Contact Seller</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.sellerMessageButton} onPress={handleMessageSeller} activeOpacity={0.8}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.sellerMessageButtonText}>Message</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteListing} activeOpacity={0.8}>
+                  <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.deleteButtonText}>Delete Listing</Text>
+                </TouchableOpacity>
               )}
             </View>
-            
-            {/* Send Message Button - Only show if seller is not current user */}
-            {book.seller.id !== user?.id ? (
-              <TouchableOpacity 
-                style={styles.sellerMessageButton}
-                onPress={handleMessageSeller}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" />
-                <Text style={styles.sellerMessageButtonText}>Send Message</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={styles.deleteButton}
-                onPress={handleDeleteListing}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="trash" size={18} color="#FFFFFF" />
-                <Text style={styles.deleteButtonText}>Delete Listing</Text>
-              </TouchableOpacity>
-            )}
           </View>
-
+          <View style={{ height: 24 + Math.max(insets.bottom, 16) }} />
         </View>
       </ScrollView>
 
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.contactButton} onPress={handleContactSeller}>
-          <Ionicons name="call" size={20} color="#FFFFFF" />
-          <Text style={styles.contactButtonText}>Contact Seller</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton}>
-          <Ionicons name="share" size={20} color="#4F46E5" />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
@@ -379,7 +384,7 @@ const BookDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F1F5F9',
   },
   loadingContainer: {
     flex: 1,
@@ -387,67 +392,90 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
   },
+  loadingCard: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 32,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.12)',
+  },
   loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 15,
+    color: '#6366F1',
+    fontWeight: '600',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
+    padding: 24,
   },
   errorText: {
     fontSize: 18,
-    color: '#EF4444',
-    marginBottom: 20,
+    color: '#64748B',
+    marginTop: 16,
+    marginBottom: 24,
+    fontWeight: '600',
   },
   backButton: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
   },
   backButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   imageContainer: {
     position: 'relative',
-    height: 300,
+    height: 280,
+    backgroundColor: '#E2E8F0',
   },
   coverImage: {
     width: '100%',
     height: '100%',
   },
-  imageOverlay: {
+  coverImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingTop: 50,
-    paddingHorizontal: 20,
+    height: 120,
   },
-  likeButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+  backButtonOverlay: {
+    position: 'absolute',
+    left: 16,
+    zIndex: 2,
+  },
+  backButtonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    ...(Platform.OS === 'ios' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 } : {}),
+    elevation: 3,
   },
   listingTypeBadge: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
+    bottom: 16,
+    right: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 10,
   },
   listingTypeText: {
     color: '#FFFFFF',
@@ -455,199 +483,183 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   content: {
-    padding: 20,
+    padding: 16,
+    paddingTop: 20,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.08)',
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12 } : {}),
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6366F1',
+    marginBottom: 14,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#1F2937',
     marginBottom: 4,
+    lineHeight: 28,
   },
   author: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 16,
+    fontSize: 15,
+    color: '#64748B',
+    marginBottom: 14,
   },
-  priceContainer: {
-    marginBottom: 20,
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 10,
   },
   price: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#1F2937',
   },
-  priceInfo: {
-    flex: 1,
-  },
   rentPrice: {
-    fontSize: 16,
-    color: '#3B82F6',
+    fontSize: 14,
+    color: '#6366F1',
     fontWeight: '600',
-    marginTop: 4,
   },
   detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 20,
-    gap: 16,
+    gap: 12,
   },
-  detailItem: {
-    flex: 1,
-    minWidth: '45%',
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   detailLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 4,
+    fontSize: 13,
+    color: '#64748B',
+    width: 80,
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#1F2937',
     fontWeight: '600',
+    flex: 1,
   },
   conditionBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    alignSelf: 'flex-start',
   },
   conditionText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  descriptionContainer: {
-    marginBottom: 20,
-  },
-  descriptionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
   descriptionText: {
-    fontSize: 16,
-    color: '#6B7280',
-    lineHeight: 24,
+    fontSize: 15,
+    color: '#475569',
+    lineHeight: 23,
   },
-  additionalImagesContainer: {
-    marginBottom: 20,
-  },
-  additionalImagesTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 12,
+  additionalImagesScroll: {
+    marginHorizontal: -4,
   },
   additionalImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  sellerContainer: {
-    backgroundColor: '#FFFFFF',
+    width: 88,
+    height: 88,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 100,
-    ...ShadowUtils.medium(),
-  },
-  sellerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 12,
+    marginRight: 10,
+    backgroundColor: '#F1F5F9',
   },
   sellerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 14,
+  },
+  sellerAvatarWrap: {
+    position: 'relative',
+    marginRight: 14,
   },
   sellerAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  sellerAvatarPlaceholder: {
+    backgroundColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   sellerDetails: {
     flex: 1,
   },
   sellerName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   sellerLocation: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  sellerStats: {
-    flexDirection: 'row',
-    gap: 16,
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 2,
   },
   sellerStat: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#94A3B8',
   },
-  verifiedBadge: {
-    marginLeft: 8,
-  },
-  statsContainer: {
+  sellerActionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 100,
-    ...ShadowUtils.medium(),
+    gap: 10,
+    marginTop: 14,
+    minHeight: 48,
   },
-  statItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    ...ShadowUtils.large(),
-  },
-  contactButton: {
+  sellerContactButtonWrap: {
     flex: 1,
-    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    overflow: 'hidden',
+    minWidth: 0,
+  },
+  sellerContactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginRight: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  contactButtonText: {
+  sellerContactButtonText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '700',
   },
   sellerMessageButton: {
-    backgroundColor: '#10B981',
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 8,
+    backgroundColor: '#10B981',
   },
   sellerMessageButtonText: {
     color: '#FFFFFF',
@@ -655,27 +667,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: '#EF4444',
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
     gap: 6,
+    backgroundColor: '#EF4444',
   },
   deleteButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
-  },
-  shareButton: {
-    backgroundColor: '#F3F4F6',
-    width: 48,
-    height: 48,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
 

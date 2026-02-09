@@ -1,35 +1,43 @@
 import * as SecureStore from 'expo-secure-store';
 
 const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user_data';
 
-// Store all auth data
-export async function storeAuthData(token: string, user: any) {
+/** Store access token, optional refresh token, and user. Use for login/refresh. */
+export async function storeAuthData(token: string, user: any, refreshToken?: string | null) {
   try {
-    console.log('💾 Storing auth data:', {
-      tokenLength: token.length,
-      userId: user.id,
-      userName: user.name,
-      hasPhoneNumber: !!user.phoneNumber,
-      hasToken: !!user.token
-    });
-
+    if (__DEV__) {
+      console.log('💾 Storing auth data:', { userId: user?.id, hasToken: !!token, hasRefresh: !!refreshToken });
+    }
     await SecureStore.setItemAsync(TOKEN_KEY, token);
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
-    console.log('✅ Auth data stored successfully');
+    if (refreshToken != null) {
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+    }
   } catch (error) {
     console.error('❌ Failed to save auth data to storage:', error);
   }
 }
 
-// Get the auth token
+// Get the auth token (never log token value or substring)
 export async function getToken() {
   try {
     const token = await SecureStore.getItemAsync(TOKEN_KEY);
-    console.log('Retrieved token:', token ? token.substring(0, 10) + '...' : 'null');
+    if (__DEV__) console.log('Retrieved token: present=', !!token);
     return token;
   } catch (error) {
     console.error('Failed to fetch token from storage', error);
+    return null;
+  }
+}
+
+// Get the refresh token (never log value or substring)
+export async function getRefreshToken() {
+  try {
+    return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  } catch (error) {
+    console.error('Failed to fetch refresh token from storage', error);
     return null;
   }
 }
@@ -44,12 +52,7 @@ export async function getUser() {
     }
 
     const user = JSON.parse(userStr);
-    console.log('Retrieved user data:', {
-      id: user.id,
-      name: user.name,
-      hasToken: !!user.token,
-      phoneNumber: user.phoneNumber
-    });
+    if (__DEV__) console.log('Retrieved user data:', { id: user?.id, hasData: !!user });
     return user;
   } catch (error) {
     console.error('❌ Failed to fetch user from storage:', error);
@@ -60,13 +63,13 @@ export async function getUser() {
   }
 }
 
-// Clear all auth data
+// Clear all auth data (token, refresh token, user)
 export async function clearAuthData() {
   try {
-    console.log('🗑️ Clearing auth data from storage');
+    if (__DEV__) console.log('🗑️ Clearing auth data from storage');
     await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(USER_KEY);
-    console.log('✅ Auth data cleared successfully');
   } catch (error) {
     console.error('❌ Failed to clear auth data from storage:', error);
   }

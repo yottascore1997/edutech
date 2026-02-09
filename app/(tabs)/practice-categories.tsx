@@ -5,16 +5,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -24,6 +26,7 @@ interface Category {
   name: string;
   icon: string;
   color: string;
+  categoryLogoUrl?: string;
 }
 
 interface SubCategory {
@@ -95,6 +98,7 @@ export default function PracticeCategoriesScreen() {
   const [exams, setExams] = useState<PracticeExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [examsLoading, setExamsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch categories from API
   useEffect(() => {
@@ -131,8 +135,15 @@ export default function PracticeCategoriesScreen() {
               name: exam.category,
               icon: getCategoryIcon(exam.category),
               color: getCategoryColor(exam.category),
-              subcategories: new Set()
+              subcategories: new Set(),
+              categoryLogoUrl: exam.categoryLogoUrl || undefined
             });
+          } else {
+            // Update categoryLogoUrl if not set and exam has it
+            const existingCategory = categoryMap.get(exam.category);
+            if (existingCategory && !existingCategory.categoryLogoUrl && exam.categoryLogoUrl) {
+              existingCategory.categoryLogoUrl = exam.categoryLogoUrl;
+            }
           }
           // Add subcategories
           if (exam.subcategory) {
@@ -146,6 +157,7 @@ export default function PracticeCategoriesScreen() {
           name: category.name,
           icon: category.icon,
           color: category.color,
+          categoryLogoUrl: category.categoryLogoUrl || undefined
         }));
         
         const allCategories = transformedCategories;
@@ -172,6 +184,17 @@ export default function PracticeCategoriesScreen() {
       setCategories(defaultCategories);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchCategories();
+    } catch (error) {
+      console.error('Error refreshing practice categories:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -267,16 +290,36 @@ export default function PracticeCategoriesScreen() {
     setSelectedCategory(categoryId);
   };
 
-  // Helper function to get full image URL
-  const getImageUrl = (logoUrl: string | undefined) => {
-    if (!logoUrl) return null;
-    if (logoUrl.startsWith('http')) return logoUrl;
-    try {
-      return getImageUrlFromApi(logoUrl);
-    } catch (error) {
-      console.error('Error getting image URL:', error);
-      return null;
+  // Helper function to get full image URL with validation
+  const getImageUrl = (logoUrl: string | undefined): string | null => {
+    if (!logoUrl || logoUrl.trim() === '') return null;
+    
+    let finalUrl: string | null = null;
+    
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+      finalUrl = logoUrl.trim();
+    } else {
+      try {
+        finalUrl = getImageUrlFromApi(logoUrl);
+      } catch (error) {
+        console.error('Error getting image URL:', error);
+        return null;
+      }
     }
+    
+    // Validate URL format
+    if (finalUrl && (finalUrl.startsWith('http://') || finalUrl.startsWith('https://'))) {
+      try {
+        // Basic URL validation
+        new URL(finalUrl);
+        return finalUrl;
+      } catch (error) {
+        console.error('Invalid URL format:', finalUrl);
+        return null;
+      }
+    }
+    
+    return null;
   };
 
   const handleExamPress = (exam: PracticeExam) => {
@@ -376,7 +419,7 @@ export default function PracticeCategoriesScreen() {
         <View style={styles.sectionHeaderPremium}>
           <View style={styles.sectionTitleContainer}>
             <View style={styles.sectionIconBadge}>
-              <Ionicons name="analytics" size={14} color="#6366F1" />
+              <Image source={require('@/assets/images/icons/analysis.png')} style={styles.analysisSectionIcon} resizeMode="contain" />
             </View>
             <Text style={styles.sectionTitlePremium}>Analysis</Text>
           </View>
@@ -472,7 +515,21 @@ export default function PracticeCategoriesScreen() {
                 activeOpacity={0.8}
               >
                 <View style={[styles.categoryIconContainer, { backgroundColor: item.color }]}>
-                  <Ionicons name={item.icon as any} size={16} color="#FFFFFF" />
+                  {item.categoryLogoUrl && getImageUrl(item.categoryLogoUrl) ? (
+                    <Image 
+                      source={{ uri: getImageUrl(item.categoryLogoUrl)! }} 
+                      style={styles.categoryImage}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.error('❌ Image load error for category:', item.name, 'URL:', item.categoryLogoUrl);
+                      }}
+                      onLoad={() => {
+                        console.log('✅ Image loaded successfully for category:', item.name);
+                      }}
+                    />
+                  ) : (
+                    <Ionicons name={item.icon as any} size={20} color="#FFFFFF" />
+                  )}
                 </View>
                 <Text style={[
                   styles.categoryText,
@@ -490,6 +547,14 @@ export default function PracticeCategoriesScreen() {
           style={styles.rightContent}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.rightContentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#7C3AED']}
+              tintColor="#7C3AED"
+            />
+          }
         >
           {/* Analysis Section */}
           {renderAnalysisSection()}
@@ -499,7 +564,7 @@ export default function PracticeCategoriesScreen() {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
                 <View style={styles.sectionIconContainer}>
-                  <Ionicons name="library" size={24} color="#7C3AED" />
+                  <Image source={require('@/assets/images/icons/exam.png')} style={styles.examSectionHeaderIcon} resizeMode="contain" />
                 </View>
                 <View>
             <Text style={styles.sectionTitle}>
@@ -539,34 +604,40 @@ export default function PracticeCategoriesScreen() {
                       .map((exam) => {
                         const category = categories.find(c => c.id === selectedCategory);
                         
+                        const accentColor = category?.color || '#7C3AED';
+                        const gradientEnd = `${accentColor}12`;
                         return (
                           <TouchableOpacity
                             key={exam.id}
-                            style={styles.examCardHorizontal}
+                            style={styles.examCardHorizontalWrap}
                             onPress={() => handleExamPress(exam)}
-                            activeOpacity={0.9}
+                            activeOpacity={0.85}
                           >
-                            <View style={styles.examCardContentHorizontal}>
-                              <View style={[styles.examIconContainerHorizontal, { backgroundColor: category?.color || '#7C3AED' }]}>
-                                {exam.logoUrl && getImageUrl(exam.logoUrl) ? (
-                                  <Image 
-                                    source={{ uri: getImageUrl(exam.logoUrl) || '' }} 
-                                    style={styles.examLogoHorizontal}
-                                    resizeMode="cover"
-                                    onError={(error) => {
-                                      console.error('Image load error for exam:', exam.title, 'URL:', getImageUrl(exam.logoUrl));
-                                    }}
-                                  />
-                                ) : (
-                                  <Ionicons name={category?.icon as any || 'library'} size={24} color="#FFFFFF" />
-                                )}
-                              </View>
-                              <View style={styles.examTitleContainerHorizontal}>
+                            <LinearGradient
+                              colors={['#FFFFFF', gradientEnd]}
+                              style={[
+                                styles.examCardHorizontal,
+                                { borderTopColor: accentColor },
+                              ]}
+                            >
+                              <View style={styles.examCardContentHorizontal}>
+                                <View style={[styles.examPhotoSquare, { backgroundColor: accentColor }]}>
+                                  {exam.logoUrl && getImageUrl(exam.logoUrl) ? (
+                                    <Image 
+                                      source={{ uri: getImageUrl(exam.logoUrl) || '' }} 
+                                      style={styles.examPhotoSquareImage}
+                                      resizeMode="cover"
+                                      onError={() => {}}
+                                    />
+                                  ) : (
+                                    <Ionicons name={category?.icon as any || 'library'} size={28} color="#FFFFFF" />
+                                  )}
+                                </View>
                                 <Text style={styles.examTitleHorizontal} numberOfLines={2}>
                                   {exam.title}
                                 </Text>
                               </View>
-                            </View>
+                            </LinearGradient>
                           </TouchableOpacity>
                         );
                       })}
@@ -672,10 +743,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   sidebar: {
-    width: screenWidth * 0.28,
+    width: screenWidth * 0.22,
     backgroundColor: '#F8FAFC',
     paddingVertical: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     borderRightWidth: 1,
     borderRightColor: '#E2E8F0',
   },
@@ -692,35 +763,28 @@ const styles = StyleSheet.create({
   categoryCard: {
     flexDirection: 'column',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
+    backgroundColor: 'transparent',
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+    marginBottom: 12,
+  },
+  categoryCardSelected: {
+    opacity: 1,
+  },
+  categoryIconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  categoryCardSelected: {
-    backgroundColor: '#F3E8FF',
-    borderColor: '#7C3AED',
-    borderWidth: 2,
-    shadowColor: '#7C3AED',
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  categoryIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
+  categoryImage: {
+    width: '100%',
+    height: '100%',
   },
   categoryText: {
     fontSize: 11,
@@ -813,6 +877,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  examSectionHeaderIcon: {
+    width: 36,
+    height: 36,
+  },
   examsSection: {
     marginBottom: 20,
   },
@@ -834,38 +902,52 @@ const styles = StyleSheet.create({
   examRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
+    gap: 10,
+    marginBottom: 10,
+  },
+  examCardHorizontalWrap: {
+    flex: 1,
+    maxWidth: '33%',
   },
   examCardHorizontal: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 10,
+    borderTopWidth: 3,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    maxWidth: '33%',
+    borderColor: '#E8ECF4',
+    overflow: 'hidden',
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: '#7C3AED',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+        }
+      : {}),
+    elevation: 2,
   },
   examCardContentHorizontal: {
     alignItems: 'center',
-    gap: 12,
   },
-  examIconContainerHorizontal: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  examPhotoSquare: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  examPhotoSquareImage: {
+    width: '100%',
+    height: '100%',
+  },
+  examIconContainerHorizontal: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
   },
   examLogoHorizontal: {
@@ -877,11 +959,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   examTitleHorizontal: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#1E293B',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 16,
+    maxWidth: '100%',
+  },
+  examSubcategoryLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
+    opacity: 0.9,
   },
   examCardSimple: {
     backgroundColor: '#FFFFFF',
@@ -1132,12 +1221,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionIconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  analysisSectionIcon: {
+    width: 24,
+    height: 24,
   },
   sectionTitlePremium: {
     fontSize: 16,
@@ -1154,16 +1247,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    elevation: 0,
   },
   metricCardGradient: {
     padding: 12,
     borderRadius: 14,
-    minHeight: 85,
+    height: 95,
     justifyContent: 'center',
   },
   metricIconWrapper: {

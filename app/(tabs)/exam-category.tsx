@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,13 +97,6 @@ const ExamCategoryPage = () => {
 
   const handleReviewExam = (exam: PracticeExam) => {
     router.push(`/practice-exam/${exam.id}/result`);
-  };
-
-  // Helper function to get full image URL
-  const getImageUrl = (logoUrl: string | undefined) => {
-    if (!logoUrl) return null;
-    if (logoUrl.startsWith('http')) return logoUrl;
-    return `http://192.168.1.5:3000${logoUrl}`;
   };
 
   const getCategoryIcon = (category: string) => {

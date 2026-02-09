@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Dimensions, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -39,9 +39,15 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
     };
 
+    const navigateToMyCertificates = () => {
+        setActiveMenu('my-certificates');
+        navigation.navigate('(tabs)', { screen: 'my-certificates' });
+        navigation.closeDrawer();
+    };
+
     const navigateToExamNotifications = () => {
         setActiveMenu('exam-notifications');
-        navigation.navigate('exam-notifications');
+        navigation.navigate('(tabs)', { screen: 'exam-notifications' });
         navigation.closeDrawer();
     };
 
@@ -122,26 +128,40 @@ const CustomDrawerContent = (props: any) => {
             <SafeAreaView style={{ flex: 1 }}>
                 <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent}>
                     
-                    {/* Top Section */}
-                    <View style={styles.topSection}>
-                        {/* Logo and App Name */}
-                        <View style={styles.logoSection}>
-                            <View style={styles.logoContainer}>
-                                <LinearGradient
-                                    colors={['#8B5CF6', '#7C3AED']}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                    style={styles.logoSquare}
-                                >
-                                    <Ionicons name="school" size={20} color="#FFFFFF" />
-                                </LinearGradient>
+                    {/* Header - User profile */}
+                    <View style={styles.headerWrapper}>
+                        <LinearGradient
+                            colors={['#4F46E5', '#6366F1', '#7C3AED']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.headerGradient}
+                        >
+                            <View style={styles.logoSection}>
+                                <View style={styles.logoContainer}>
+                                    <View style={styles.avatarWrapper}>
+                                        {(user?.profilePicture || user?.profilePhoto) ? (
+                                            <Image
+                                                source={{ uri: user.profilePicture || user.profilePhoto || '' }}
+                                                style={styles.avatarImage}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <Image source={require('../assets/images/icons/students.png')} style={styles.avatarStudentIcon} resizeMode="contain" />
+                                        )}
+                                    </View>
+                                </View>
+                                <View style={styles.appNameContainer}>
+                                    {(user?.name || (user as any)?.user?.name) ? (
+                                        <Text style={styles.appName} numberOfLines={1}>
+                                            {(user?.name || (user as any)?.user?.name || '').split(' ')[0]}
+                                        </Text>
+                                    ) : (
+                                        <Text style={styles.appName}>Guest</Text>
+                                    )}
+                                    <Text style={styles.tagline}>Yottascore</Text>
+                                </View>
                             </View>
-                            <View style={styles.appNameContainer}>
-                                <Text style={[styles.appName, isDarkMode && styles.darkText]}>Yottascore</Text>
-                            </View>
-                        </View>
-
-
+                        </LinearGradient>
                     </View>
 
                     {/* Menu Section */}
@@ -154,17 +174,25 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'my-exams'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#2ED573"
+                                iconImage={require('../assets/images/icons/exam.png')}
                             />
-                            
+                            <MenuItem 
+                                icon="ribbon-outline" 
+                                label="My Certificates" 
+                                onPress={navigateToMyCertificates}
+                                isActive={activeMenu === 'my-certificates'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#aa35ce"
+                            />
                             <MenuItem 
                                 icon="notifications-outline" 
                                 label="Exam Notifications" 
                                 onPress={navigateToExamNotifications}
                                 isActive={activeMenu === 'exam-notifications'}
                                 isDarkMode={isDarkMode}
-                                iconColor="#FF6B6B"
+                                iconColor="#F59E0B"
+                                iconImage={require('../assets/images/icons/push-notification.png')}
                             />
-                            
                             <MenuItem 
                                 icon="book-outline" 
                                 label="Book Store" 
@@ -172,6 +200,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'book-store'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#8B5CF6"
+                                iconImage={require('../assets/images/icons/book-shop.png')}
                             />
                             
                             <MenuItem 
@@ -190,6 +219,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'practice-exam'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#1E90FF"
+                                iconImage={require('../assets/images/icons/exam-time.png')}
                             />
                             
                             <MenuItem 
@@ -199,6 +229,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'quiz'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#96CEB4"
+                                iconImage={require('../assets/images/icons/quiz.png')}
                             />
                             
                             {/* My Profile - Temporarily hidden */}
@@ -232,6 +263,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'leaderboard'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#FF6348"
+                                iconImage={require('../assets/images/trophy.jpg')}
                             />
                             
                             <MenuItem 
@@ -241,6 +273,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'timetable'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#9C88FF"
+                                iconImage={require('../assets/images/icons/study-time.png')}
                             />
                             
                             <MenuItem 
@@ -250,6 +283,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'refer'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#FF9FF3"
+                                iconImage={require('../assets/images/icons/budget.png')}
                             />
                             
                             {/* Membership - Hidden for now */}
@@ -326,13 +360,11 @@ const CustomDrawerContent = (props: any) => {
                         </View>
                     </View>
 
-                    {/* Logout Button */}
+                    {/* Logout */}
                     <View style={styles.logoutSection}>
-                        <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-                            <View style={styles.logoutButtonContent}>
-                                <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
-                                <Text style={styles.logoutButtonText}>Logout</Text>
-                            </View>
+                        <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.85}>
+                            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
+                            <Text style={styles.logoutButtonText}>Log out</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -342,18 +374,22 @@ const CustomDrawerContent = (props: any) => {
     );
 };
 
-const MenuItem = ({ icon, label, onPress, isActive, isDarkMode, badge, iconColor }: any) => (
+const MenuItem = ({ icon, label, onPress, isActive, isDarkMode, badge, iconColor, iconImage }: any) => (
     <TouchableOpacity 
         style={[styles.menuItem, isActive && styles.activeMenuItem, isDarkMode && styles.darkMenuItem]} 
         onPress={onPress}
     >
         <View style={styles.menuItemContent}>
-            <View style={[styles.iconWrapper, { backgroundColor: `${iconColor}15` }]}>
-                <Ionicons 
-                    name={icon} 
-                    size={20} 
-                    color={isActive ? "#FFFFFF" : iconColor} 
-                />
+            <View style={styles.iconWrapper}>
+                {iconImage ? (
+                    <Image source={iconImage} style={styles.menuItemIconImage} resizeMode="contain" />
+                ) : (
+                    <Ionicons 
+                        name={icon} 
+                        size={36} 
+                        color={isActive ? "#FFFFFF" : iconColor} 
+                    />
+                )}
             </View>
             <Text 
                 style={[
@@ -379,81 +415,111 @@ const MenuItem = ({ icon, label, onPress, isActive, isDarkMode, badge, iconColor
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#FAFBFC',
     },
     darkContainer: {
         backgroundColor: '#0F172A',
     },
     scrollContent: {
-        paddingTop: 0,
+        paddingTop: 14,
+        paddingBottom: 16,
         flexGrow: 1,
+        backgroundColor: '#FAFBFC',
     },
     
-    // Top Section
-    topSection: {
-        backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingTop: 24,
-        paddingHorizontal: 20,
-        paddingBottom: 24,
-        marginBottom: 12,
+    // Header - compact
+    headerWrapper: {
+        marginHorizontal: 8,
+        marginTop: 4,
+        marginBottom: 6,
+        borderRadius: 14,
+        overflow: 'hidden',
         ...ShadowUtils.noShadow(),
+    },
+    headerGradient: {
+        paddingVertical: 14,
+        paddingHorizontal: 14,
     },
     logoSection: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     logoContainer: {
-        marginRight: 16,
+        marginRight: 12,
     },
-    logoSquare: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+    avatarWrapper: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(255,255,255,0.3)',
         justifyContent: 'center',
         alignItems: 'center',
-        ...ShadowUtils.noShadow(),
+        overflow: 'hidden',
+    },
+    avatarImage: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+    },
+    avatarStudentIcon: {
+        width: 36,
+        height: 36,
+    },
+    avatarEmoji: {
+        fontSize: 32,
+        lineHeight: 40,
     },
     appNameContainer: {
         flex: 1,
     },
     appName: {
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: '800',
-        color: '#1E293B',
-        letterSpacing: 0.5,
-        fontFamily: 'System',
+        color: '#FFFFFF',
+        letterSpacing: 0.4,
+    },
+    tagline: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.9)',
+        marginTop: 2,
+        fontWeight: '600',
+        letterSpacing: 0.3,
+    },
+    userGreeting: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.85)',
+        marginTop: 4,
+        fontWeight: '600',
     },
     darkText: {
         color: '#F8FAFC',
     },
 
-    // Menu Section
+    // Menu Section - compact
     menuSection: {
         backgroundColor: '#FFFFFF',
-        marginHorizontal: 12,
-        marginBottom: 12,
-        borderRadius: 16,
-        paddingVertical: 20,
+        marginHorizontal: 8,
+        marginBottom: 6,
+        borderRadius: 12,
+        paddingVertical: 10,
         ...ShadowUtils.noShadow(),
     },
     sectionTitle: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 16,
-        paddingHorizontal: 20,
-        letterSpacing: 0.2,
-        fontFamily: 'System',
+        color: '#64748B',
+        marginBottom: 8,
+        paddingHorizontal: 12,
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
     },
     menuItems: {
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
     },
     menuItem: {
-        marginHorizontal: 8,
+        marginHorizontal: 4,
         marginVertical: 0,
-        borderRadius: 12,
+        borderRadius: 10,
         ...ShadowUtils.noShadow(),
     },
     darkMenuItem: {
@@ -467,9 +533,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'flex-start',
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        minHeight: 42,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        minHeight: 40,
     },
     menuItemText: {
         fontSize: Platform.select({
@@ -493,13 +559,13 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     iconWrapper: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
-        marginLeft: -16,
+        marginRight: 12,
+    },
+    menuItemIconImage: {
+        width: 42,
+        height: 42,
     },
     badge: {
         backgroundColor: '#EF4444',
@@ -518,66 +584,63 @@ const styles = StyleSheet.create({
     },
 
 
-    // Social Media Section
+    // Social - compact
     socialSection: {
-        backgroundColor: '#F8FAFC',
-        marginHorizontal: 12,
-        marginBottom: 12,
-        borderRadius: 16,
-        paddingVertical: 20,
-        paddingHorizontal: 20,
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 8,
+        marginBottom: 6,
+        borderRadius: 12,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
         ...ShadowUtils.noShadow(),
     },
     socialTitle: {
-        fontSize: 16,
+        fontSize: 11,
         fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 16,
+        color: '#64748B',
+        marginBottom: 8,
         textAlign: 'center',
-        letterSpacing: 0.3,
-        fontFamily: 'System',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
     },
     socialIcons: {
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 24,
+        gap: 16,
     },
     socialIcon: {
-        padding: 6,
+        padding: 4,
     },
     facebookIconContainer: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 10,
         backgroundColor: '#1877F2',
         justifyContent: 'center',
         alignItems: 'center',
-        ...ShadowUtils.noShadow(),
     },
     youtubeIconContainer: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 10,
         backgroundColor: '#FF0000',
         justifyContent: 'center',
         alignItems: 'center',
-        ...ShadowUtils.noShadow(),
     },
     instagramIconContainer: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 10,
         backgroundColor: '#E1306C',
         justifyContent: 'center',
         alignItems: 'center',
-        ...ShadowUtils.noShadow(),
     },
 
-    // Privacy Section
+    // Privacy - compact
     privacySection: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
+        paddingHorizontal: 12,
+        paddingBottom: 10,
     },
     privacyLinks: {
         flexDirection: 'column',
@@ -585,7 +648,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     termsContainer: {
-        marginTop: 8,
+        marginTop: 4,
     },
     privacyLinkText: {
         color: '#475569',
@@ -634,25 +697,19 @@ const styles = StyleSheet.create({
         color: '#CBD5E1',
     },
     logoutSection: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 12,
-        marginBottom: 12,
-        borderRadius: 8,
-        paddingVertical: 4,
-        paddingHorizontal: 12,
-        ...ShadowUtils.noShadow(),
+        marginHorizontal: 8,
+        marginBottom: 14,
+        marginTop: 0,
     },
     logoutButton: {
-        backgroundColor: '#FF4757',
-        borderRadius: 6,
-        ...ShadowUtils.noShadow(),
-    },
-    logoutButtonContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 10,
+        backgroundColor: '#FF0000',
     },
     logoutButtonText: {
         color: '#FFFFFF',

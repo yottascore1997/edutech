@@ -280,7 +280,11 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
             </TouchableOpacity>
           </LinearGradient>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.modalBody}
+            contentContainerStyle={styles.modalBodyContent}
+            showsVerticalScrollIndicator={false}
+          >
             {/* Document Type Selection */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Document Type *</Text>
@@ -419,14 +423,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     width: '92%',
-    maxHeight: '90%',
-    minHeight: '75%',
+    maxHeight: '88%',
+    height: '88%',
+    flexDirection: 'column',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
-    elevation: 0,
+    elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.8)',
   },
@@ -456,9 +461,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   modalBody: {
+    flex: 1,
+  },
+  modalBodyContent: {
     padding: 24,
     paddingTop: 20,
-    paddingBottom: 0,
+    paddingBottom: 32,
   },
   inputContainer: {
     marginBottom: 20,
@@ -585,26 +593,22 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   submitButton: {
-    backgroundColor: '#FB923C',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    backgroundColor: '#059669',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FB923C',
+    alignSelf: 'stretch',
+    shadowColor: '#059669',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 0,
-    marginTop: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
+    marginTop: 16,
     borderWidth: 1,
-    borderColor: 'rgba(251, 146, 60, 0.2)',
-    position: 'absolute',
-    bottom: -35,
-    left: '50%',
-    transform: [{ translateX: -100 }],
-    width: 200,
+    borderColor: 'rgba(5, 150, 105, 0.4)',
   },
   submitButtonDisabled: {
     backgroundColor: 'rgba(156, 163, 175, 0.9)',

@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +19,7 @@ interface Category {
   name: string;
   icon: string;
   color: string;
+  categoryLogoUrl?: string;
 }
 
 interface PracticeExam {
@@ -85,7 +86,14 @@ export default function PracticeCategoriesPreview() {
               name: exam.category,
               icon: getCategoryIcon(exam.category),
               color: getCategoryColor(exam.category),
+              categoryLogoUrl: exam.categoryLogoUrl || undefined
             });
+          } else {
+            // Update categoryLogoUrl if not set and exam has it
+            const existingCategory = categoryMap.get(exam.category);
+            if (existingCategory && !existingCategory.categoryLogoUrl && exam.categoryLogoUrl) {
+              existingCategory.categoryLogoUrl = exam.categoryLogoUrl;
+            }
           }
         });
         
@@ -139,8 +147,15 @@ export default function PracticeCategoriesPreview() {
   // Helper function to get full image URL
   const getImageUrl = (logoUrl: string | undefined) => {
     if (!logoUrl) return null;
-    if (logoUrl.startsWith('http')) return logoUrl;
-    return `http://192.168.1.5:3000${logoUrl}`;
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+      return logoUrl;
+    }
+    try {
+      return getImageUrlFromApi(logoUrl);
+    } catch (error) {
+      console.error('Error getting image URL:', error);
+      return null;
+    }
   };
 
   const handleCategorySelect = (categoryId: string) => {
@@ -303,17 +318,15 @@ export default function PracticeCategoriesPreview() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.headerIconContainer}>
-            <Ionicons name="school" size={24} color="#7C3AED" />
-          </View>
+          <Image source={require('@/assets/images/icons/exam2.png')} style={styles.practiceSectionIcon} resizeMode="contain" />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Practice Categories</Text>
+            <Text style={styles.headerTitle}>Practise</Text>
             <Text style={styles.headerSubtitle}>Improve your skills</Text>
           </View>
         </View>
         <TouchableOpacity style={styles.viewAllButton} onPress={handleViewAll}>
           <Text style={styles.viewAllText}>View All</Text>
-          <Ionicons name="arrow-forward" size={16} color="#7C3AED" />
+          <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
@@ -328,7 +341,7 @@ export default function PracticeCategoriesPreview() {
             style={styles.categoriesListScroll}
             showsVerticalScrollIndicator={false}
           >
-            {categories.slice(0, 4).map((category) => (
+            {categories.map((category) => (
               <TouchableOpacity
                 key={category.id}
                 style={[
@@ -342,11 +355,25 @@ export default function PracticeCategoriesPreview() {
                   styles.categoryListIconContainer,
                   { backgroundColor: category.color }
                 ]}>
-                  <Ionicons 
-                    name={category.icon as any} 
-                    size={20} 
-                    color="#FFFFFF" 
-                  />
+                  {category.categoryLogoUrl ? (
+                    <Image 
+                      source={{ uri: getImageUrl(category.categoryLogoUrl) || category.categoryLogoUrl }} 
+                      style={{ width: 32, height: 32, borderRadius: 6 }}
+                      resizeMode="cover"
+                      onError={(error) => {
+                        console.error('❌ Image load error for category:', category.name, 'URL:', category.categoryLogoUrl, 'Processed URL:', getImageUrl(category.categoryLogoUrl));
+                      }}
+                      onLoad={() => {
+                        console.log('✅ Image loaded successfully for category:', category.name, 'URL:', category.categoryLogoUrl);
+                      }}
+                    />
+                  ) : (
+                    <Ionicons 
+                      name={category.icon as any} 
+                      size={20} 
+                      color="#FFFFFF" 
+                    />
+                  )}
                 </View>
                 <View style={styles.categoryListInfo}>
                   <Text style={[
@@ -453,6 +480,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  practiceSectionIcon: {
+    width: 52,
+    height: 52,
+    marginRight: 12,
+  },
   headerIconContainer: {
     width: 48,
     height: 48,
@@ -479,15 +511,15 @@ const styles = StyleSheet.create({
   viewAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
   viewAllText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#7C3AED',
+    color: '#FFFFFF',
     marginRight: 4,
   },
   analysisSection: {
@@ -656,7 +688,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoriesListScroll: {
-    maxHeight: 300,
+    maxHeight: 400,
   },
   examsListScroll: {
     maxHeight: 300,

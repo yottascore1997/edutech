@@ -199,6 +199,7 @@ const WalletScreen = () => {
                         action="Add Cash" 
                         onAction={() => setDepositModalVisible(true)} 
                         iconColor="#4F46E5"
+                        iconImage={require('../../assets/images/icons/deposit.png')}
                     />
                     <View style={styles.divider} />
                     <MoneyDetailRow 
@@ -209,6 +210,7 @@ const WalletScreen = () => {
                         onAction={() => {}} 
                         isWithdraw 
                         iconColor="#10B981"
+                        iconImage={require('../../assets/images/icons/rupee.png')}
                     />
                 </View>
 
@@ -341,10 +343,14 @@ const WalletScreen = () => {
     );
 };
 
-const MoneyDetailRow = ({ icon, title, amount, action, onAction, isWithdraw = false, iconColor }: any) => (
+const MoneyDetailRow = ({ icon, title, amount, action, onAction, isWithdraw = false, iconColor, iconImage }: any) => (
     <View style={styles.moneyRow}>
-        <View style={[styles.moneyIconContainer, { backgroundColor: `${iconColor}15` }]}>
-            <Ionicons name={icon} size={24} color={iconColor} />
+        <View style={styles.moneyIconContainer}>
+            {iconImage ? (
+                <Image source={iconImage} style={styles.moneyDetailIconImage} resizeMode="contain" />
+            ) : (
+                <Ionicons name={icon} size={28} color={iconColor} />
+            )}
         </View>
         <View style={styles.moneyTextContainer}>
             <Text style={styles.moneyTitle}>{title}</Text>
@@ -566,19 +572,13 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
     },
     moneyIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 14,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 0,
-        borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.05)',
+    },
+    moneyDetailIconImage: {
+        width: 36,
+        height: 36,
     },
     moneyTextContainer: {
         flex: 1,

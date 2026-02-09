@@ -1,10 +1,11 @@
+import { apiFetchAuth } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Dimensions, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +42,30 @@ interface LiveExamResult {
   totalParticipants?: number;
   questionAnalysis?: QuestionAnalysis[];
   subjectWise?: { subject: string; correct: number; total: number; percentage: number }[];
+  certificateUrl?: string;
+  verificationUrl?: string;
+  verificationId?: string;
+}
+
+interface SuggestionItem {
+  area: string;
+  current: number;
+  target: number;
+  improvement: number;
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+}
+
+interface ImprovementSuggestion {
+  hasEnoughData?: boolean;
+  suggestions?: SuggestionItem[];
+  summary?: {
+    totalAreas: number;
+    avgImprovement: number;
+    estimatedRankImprovement?: string;
+  };
+  nextSteps?: string[];
+  message?: string;
 }
 
 export default function LiveExamResultScreen() {
@@ -50,6 +75,8 @@ export default function LiveExamResultScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LiveExamResult | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed' | 'analysis'>('overview');
+  const [improvementData, setImprovementData] = useState<ImprovementSuggestion | null>(null);
+  const [loadingImprovements, setLoadingImprovements] = useState(false);
   
   // Animation values
   const [fadeAnim] = useState(new Animated.Value(0));
@@ -132,6 +159,14 @@ export default function LiveExamResultScreen() {
           ])
         ).start();
 
+        // Fetch improvement suggestions after result is loaded
+        if (user?.token) {
+          // Delay to ensure component is fully rendered
+          setTimeout(() => {
+            fetchImprovementSuggestions();
+          }, 500);
+        }
+
       } catch (e) {
         console.error('Error parsing result data:', e);
       }
@@ -145,7 +180,44 @@ export default function LiveExamResultScreen() {
       });
       confettiRefs.current = [];
     };
-  }, [resultData]);
+  }, [resultData, user?.token]);
+
+  const fetchImprovementSuggestions = useCallback(async () => {
+    try {
+      if (!user?.token) {
+        console.log('⚠️ No token available for fetching improvement suggestions');
+        return;
+      }
+
+      setLoadingImprovements(true);
+      console.log('📡 Fetching improvement suggestions...');
+      const response = await apiFetchAuth('/student/performance/improvement-suggestions', user.token);
+      
+      console.log('📡 API Response:', {
+        ok: response.ok,
+        status: response.status,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : []
+      });
+      
+      if (response.ok && response.data) {
+        // Handle different response structures
+        const data = response.data.data || response.data;
+        console.log('✅ Improvement suggestions data:', data);
+        setImprovementData(data);
+      } else {
+        console.error('❌ Failed to fetch improvement suggestions:', response);
+        // Set empty state to show the card
+        setImprovementData({ hasEnoughData: false, message: 'Unable to fetch suggestions at this time' });
+      }
+    } catch (err) {
+      console.error('❌ Error fetching improvement suggestions:', err);
+      // Set empty state to show the card
+      setImprovementData({ hasEnoughData: false, message: 'Error loading suggestions. Please try again.' });
+    } finally {
+      setLoadingImprovements(false);
+    }
+  }, [user?.token]);
 
   const startConfetti = () => {
     setShowConfetti(true);
@@ -342,6 +414,18 @@ export default function LiveExamResultScreen() {
             </LinearGradient>
           </View>
 
+          {/* View Certificate Button */}
+          <View style={styles.certificateButtonWrap}>
+            <TouchableOpacity
+              style={styles.certificateButton}
+              onPress={() => router.push({ pathname: '/(tabs)/live-exam/certificate/[id]' as any, params: { id } })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="ribbon" size={22} color="#fff" />
+              <Text style={styles.certificateButtonText}>View Certificate</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Tabs Navigation */}
           <View style={styles.tabsContainer}>
             {['overview', 'detailed'].map((tab) => (
@@ -427,7 +511,7 @@ export default function LiveExamResultScreen() {
                       style={styles.statGradient}
                     >
                       <View style={styles.statIcon}>
-                        <Ionicons name="checkmark-circle" size={32} color="#059669" />
+                        <Ionicons name="checkmark-circle" size={18} color="#059669" />
                       </View>
                       <Text style={styles.statValue}>{result.correctAnswers}</Text>
                       <Text style={styles.statLabel}>Correct</Text>
@@ -443,7 +527,7 @@ export default function LiveExamResultScreen() {
                       style={styles.statGradient}
                     >
                       <View style={styles.statIcon}>
-                        <Ionicons name="close-circle" size={32} color="#DC2626" />
+                        <Ionicons name="close-circle" size={18} color="#DC2626" />
                       </View>
                       <Text style={styles.statValue}>{result.wrongAnswers}</Text>
                       <Text style={styles.statLabel}>Wrong</Text>
@@ -459,7 +543,7 @@ export default function LiveExamResultScreen() {
                       style={styles.statGradient}
                     >
                       <View style={styles.statIcon}>
-                        <Ionicons name="help-circle" size={32} color="#4F46E5" />
+                        <Ionicons name="help-circle" size={18} color="#4F46E5" />
                       </View>
                       <Text style={styles.statValue}>{result.totalQuestions}</Text>
                       <Text style={styles.statLabel}>Total</Text>
@@ -473,7 +557,7 @@ export default function LiveExamResultScreen() {
                       style={styles.statGradient}
                     >
                       <View style={styles.statIcon}>
-                        <Ionicons name="time" size={32} color="#D97706" />
+                        <Ionicons name="time" size={18} color="#D97706" />
                       </View>
                       <Text style={styles.statValue}>{result.timeTakenMinutes}</Text>
                       <Text style={styles.statLabel}>Minutes</Text>
@@ -609,6 +693,189 @@ export default function LiveExamResultScreen() {
                   )}
                 </View>
               </View>
+
+              {/* Improvement Suggestions Card - Displayed Directly */}
+              {loadingImprovements ? (
+                <View style={styles.improvementCard}>
+                  <LinearGradient
+                    colors={['#EEF2FF', '#E0E7FF']}
+                    style={styles.improvementGradient}
+                  >
+                    <View style={styles.improvementLoadingContainer}>
+                      <ActivityIndicator size="small" color="#4F46E5" />
+                      <Text style={styles.improvementLoadingText}>Loading suggestions...</Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+              ) : improvementData && improvementData.hasEnoughData && improvementData.suggestions && improvementData.suggestions.length > 0 ? (
+                <View style={styles.improvementCard}>
+                  <LinearGradient
+                    colors={['#EEF2FF', '#E0E7FF']}
+                    style={styles.improvementGradient}
+                  >
+                    <View style={styles.improvementHeader}>
+                      <Ionicons name="bulb" size={28} color="#4F46E5" />
+                      <Text style={styles.improvementTitle}>💡 Improvement Suggestions</Text>
+                    </View>
+                    <Text style={styles.improvementSubtext}>
+                      Personalized recommendations to boost your performance
+                    </Text>
+
+                    {/* Summary Section */}
+                    {improvementData.summary && (
+                      <View style={styles.improvementSummary}>
+                        <View style={styles.summaryRow}>
+                          <View style={styles.summaryItem}>
+                            <Text style={styles.summaryLabel}>Areas to Improve</Text>
+                            <Text style={styles.summaryValue}>{improvementData.summary.totalAreas}</Text>
+                          </View>
+                          <View style={styles.summaryDivider} />
+                          <View style={styles.summaryItem}>
+                            <Text style={styles.summaryLabel}>Avg Improvement</Text>
+                            <Text style={styles.summaryValue}>{improvementData.summary.avgImprovement.toFixed(1)}%</Text>
+                          </View>
+                          {improvementData.summary.estimatedRankImprovement && (
+                            <>
+                              <View style={styles.summaryDivider} />
+                              <View style={styles.summaryItem}>
+                                <Text style={styles.summaryLabel}>Rank Impact</Text>
+                                <Text style={[styles.summaryValue, styles.summaryValueSmall]}>
+                                  {improvementData.summary.estimatedRankImprovement}
+                                </Text>
+                              </View>
+                            </>
+                          )}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Suggestions List */}
+                    <View style={styles.improvementSuggestionsList}>
+                      {improvementData.suggestions.map((suggestion: SuggestionItem, index: number) => {
+                        const priorityColor = suggestion.priority === 'high' ? '#DC2626' : 
+                                              suggestion.priority === 'medium' ? '#6366F1' : '#059669';
+                        const priorityBgColor = suggestion.priority === 'high' ? '#FEE2E2' : 
+                                                suggestion.priority === 'medium' ? '#E0E7FF' : '#D1FAE5';
+                        
+                        return (
+                          <View key={index} style={styles.improvementSuggestionCard}>
+                            <View style={styles.improvementSuggestionCardHeader}>
+                              <View style={styles.improvementSuggestionAreaRow}>
+                                <Text style={styles.improvementSuggestionArea}>{suggestion.area}</Text>
+                                <View style={[styles.improvementPriorityBadge, { backgroundColor: priorityBgColor }]}>
+                                  <Text style={[styles.improvementPriorityText, { color: priorityColor }]}>
+                                    {suggestion.priority.toUpperCase()}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={styles.improvementBadge}>+{suggestion.improvement.toFixed(1)}%</Text>
+                            </View>
+
+                            {/* Current vs Target */}
+                            <View style={styles.improvementProgressSection}>
+                              <View style={styles.improvementProgressRow}>
+                                <Text style={styles.improvementProgressLabel}>Current</Text>
+                                <Text style={styles.improvementProgressValue}>{suggestion.current.toFixed(1)}%</Text>
+                              </View>
+                              <View style={styles.improvementProgressBarContainer}>
+                                <View style={styles.improvementProgressBarBg}>
+                                  {/* Current progress */}
+                                  <View style={[
+                                    styles.improvementProgressBarFill,
+                                    { 
+                                      width: `${Math.min(suggestion.current, 100)}%`,
+                                      backgroundColor: priorityColor
+                                    }
+                                  ]} />
+                                  {/* Target indicator line */}
+                                  <View style={[
+                                    styles.improvementTargetIndicator,
+                                    { left: `${Math.min(suggestion.target, 100)}%` }
+                                  ]} />
+                                </View>
+                              </View>
+                              <View style={styles.improvementProgressRow}>
+                                <Text style={styles.improvementProgressLabel}>Target</Text>
+                                <Text style={[styles.improvementProgressValue, styles.improvementTargetValue]}>
+                                  {suggestion.target.toFixed(1)}%
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Action Text */}
+                            <View style={styles.improvementActionSection}>
+                              <Ionicons name="arrow-forward-circle" size={18} color="#4F46E5" />
+                              <Text style={styles.improvementActionText}>{suggestion.action}</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* Next Steps Section */}
+                    {improvementData.nextSteps && improvementData.nextSteps.length > 0 && (
+                      <View style={styles.improvementNextStepsSection}>
+                        <Text style={styles.improvementNextStepsTitle}>📋 Next Steps</Text>
+                        {improvementData.nextSteps.map((step: string, index: number) => (
+                          <View key={index} style={styles.improvementNextStepItem}>
+                            <View style={styles.improvementNextStepNumber}>
+                              <Text style={styles.improvementNextStepNumberText}>{index + 1}</Text>
+                            </View>
+                            <Text style={styles.improvementNextStepText}>{step}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </LinearGradient>
+                </View>
+              ) : improvementData && improvementData.hasEnoughData === false ? (
+                <View style={styles.improvementCard}>
+                  <LinearGradient
+                    colors={['#EEF2FF', '#E0E7FF']}
+                    style={styles.improvementGradient}
+                  >
+                    <View style={styles.improvementHeader}>
+                      <Ionicons name="bulb" size={28} color="#4F46E5" />
+                      <Text style={styles.improvementTitle}>💡 Get Improvement Suggestions</Text>
+                    </View>
+                    <View style={styles.improvementNoDataContainer}>
+                      <Ionicons name="information-circle" size={24} color="#4F46E5" />
+                      <Text style={styles.improvementNoDataText}>
+                        {improvementData?.message || 'Complete more exams to get personalized improvement suggestions'}
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </View>
+              ) : (
+                <View style={styles.improvementCard}>
+                  <LinearGradient
+                    colors={['#EEF2FF', '#E0E7FF']}
+                    style={styles.improvementGradient}
+                  >
+                    <View style={styles.improvementHeader}>
+                      <Ionicons name="bulb" size={28} color="#4F46E5" />
+                      <Text style={styles.improvementTitle}>💡 Get Improvement Suggestions</Text>
+                    </View>
+                    <Text style={styles.improvementSubtext}>
+                      Get personalized recommendations to boost your performance based on your exam history
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.improvementButton}
+                      onPress={fetchImprovementSuggestions}
+                      activeOpacity={0.8}
+                      disabled={loadingImprovements}
+                    >
+                      <LinearGradient
+                        colors={['#4F46E5', '#4338CA']}
+                        style={styles.improvementButtonGradient}
+                      >
+                        <Ionicons name="refresh" size={20} color="#FFFFFF" />
+                        <Text style={styles.improvementButtonText}>Get Suggestions</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                </View>
+              )}
             </Animated.View>
           )}
 
@@ -778,117 +1045,117 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Ultra-Premium Header
+  // Ultra-Premium Header (compact)
   ultraHeaderSection: {
-    marginBottom: 24,
+    marginBottom: 12,
     marginHorizontal: 16,
-    borderRadius: 28,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.25,
-    shadowRadius: 32,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   ultraHeaderGradient: {
-    padding: 28,
-    paddingTop: 32,
-    paddingBottom: 32,
+    padding: 16,
+    paddingTop: 18,
+    paddingBottom: 18,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
   decorativeCircle1: {
     position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    top: -60,
-    right: -40,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
     width: 120,
     height: 120,
     borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    top: -40,
+    right: -30,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    bottom: -30,
-    left: -30,
+    bottom: -20,
+    left: -20,
   },
   decorativeCircle3: {
     position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    top: 50,
-    left: 30,
+    top: 30,
+    left: 20,
   },
   ultraHeaderTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 1,
+    marginBottom: 4,
+    letterSpacing: 0.8,
     textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
     textAlign: 'center',
   },
   ultraHeaderSubtitle: {
-    fontSize: 15,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.95)',
     fontWeight: '700',
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    paddingHorizontal: 16,
+    textShadowRadius: 2,
+    paddingHorizontal: 12,
   },
   massiveScoreContainer: {
-    marginVertical: 16,
+    marginVertical: 8,
     alignItems: 'center',
   },
   scoreRing: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 14,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   scoreInnerRing: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
     overflow: 'hidden',
     paddingTop: 0,
   },
   scoreLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.95)',
-    letterSpacing: 2,
-    marginBottom: 12,
+    letterSpacing: 1.5,
+    marginBottom: 6,
     textTransform: 'uppercase',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
@@ -900,14 +1167,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   massiveScore: {
-    fontSize: 52,
+    fontSize: 38,
     fontWeight: '900',
     color: '#1F2937',
-    lineHeight: 52,
-    letterSpacing: -1.5,
+    lineHeight: 38,
+    letterSpacing: -1,
   },
   scorePercentage: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '800',
     color: '#64748B',
     marginLeft: 2,
@@ -915,20 +1182,20 @@ const styles = StyleSheet.create({
   },
   performancePill: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginTop: 8,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
   },
   performancePillText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.5,
@@ -951,6 +1218,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   ultraShareText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  certificateButtonWrap: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+  },
+  certificateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#aa35ce',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    borderWidth: 0,
+  },
+  certificateButtonText: {
     fontSize: 16,
     fontWeight: '800',
     color: '#fff',
@@ -1120,53 +1407,55 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Stats Section
+  // Stats Section - Performance Metrics (compact)
   statsSection: {
-    marginHorizontal: 20,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 14,
     fontWeight: '900',
     color: '#1F2937',
-    marginBottom: 16,
+    marginBottom: 6,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 6,
   },
   statCard: {
-    width: (width - 64) / 2,
-    borderRadius: 16,
+    width: (width - 44) / 2,
+    borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+    } : {}),
+    elevation: 3,
   },
   statGradient: {
-    padding: 20,
+    padding: 8,
     alignItems: 'center',
   },
   statIcon: {
-    marginBottom: 12,
+    marginBottom: 4,
   },
   statValue: {
-    fontSize: 36,
+    fontSize: 18,
     fontWeight: '900',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 1,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 1,
   },
   statPercentage: {
-    fontSize: 12,
+    fontSize: 9,
     fontWeight: '700',
     color: '#9CA3AF',
   },
@@ -1441,6 +1730,486 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#6B7280',
+  },
+
+  // Improvement Suggestions Card (indigo theme)
+  improvementCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  improvementGradient: {
+    padding: 24,
+  },
+  improvementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  improvementTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#312E81',
+  },
+  improvementSubtext: {
+    fontSize: 14,
+    color: '#4338CA',
+    marginBottom: 20,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  improvementLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  improvementLoadingText: {
+    fontSize: 14,
+    color: '#3730A3',
+    fontWeight: '600',
+  },
+  improvementNoDataContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  improvementNoDataText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#3730A3',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  improvementButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  improvementButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+  },
+  improvementButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  improvementSummary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  improvementSuggestionsList: {
+    gap: 16,
+    marginBottom: 20,
+  },
+  improvementSuggestionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  improvementSuggestionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  improvementSuggestionAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  improvementSuggestionArea: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+    flex: 1,
+  },
+  improvementPriorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  improvementPriorityText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  improvementBadge: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#10B981',
+  },
+  improvementProgressSection: {
+    marginBottom: 12,
+  },
+  improvementProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  improvementProgressLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  improvementProgressValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  improvementTargetValue: {
+    color: '#10B981',
+  },
+  improvementProgressBarContainer: {
+    marginVertical: 8,
+  },
+  improvementProgressBarBg: {
+    height: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 5,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  improvementProgressBarFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  improvementTargetIndicator: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    height: '100%',
+    backgroundColor: '#10B981',
+    zIndex: 1,
+  },
+  improvementActionSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EEF2FF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  improvementActionText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3730A3',
+    lineHeight: 18,
+  },
+  improvementNextStepsSection: {
+    marginTop: 8,
+  },
+  improvementNextStepsTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#312E81',
+    marginBottom: 12,
+  },
+  improvementNextStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  improvementNextStepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  improvementNextStepNumberText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  improvementNextStepText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#3730A3',
+    lineHeight: 18,
+  },
+
+  // Modal Styles (kept for reference but not used)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: height * 0.9,
+    paddingBottom: 40,
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  modalHeaderTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#1F2937',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalSummary: {
+    margin: 20,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 16,
+    padding: 20,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#3730A3',
+    marginBottom: 8,
+  },
+  summaryValue: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#312E81',
+  },
+  summaryValueSmall: {
+    fontSize: 14,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#C7D2FE',
+  },
+  modalSuggestionsList: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  modalSuggestionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalSuggestionCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalSuggestionAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  modalSuggestionArea: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    flex: 1,
+  },
+  modalPriorityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  modalPriorityText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  modalImprovementBadge: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#10B981',
+  },
+  modalProgressSection: {
+    marginBottom: 16,
+  },
+  modalProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalProgressLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  modalProgressValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  modalTargetValue: {
+    color: '#10B981',
+  },
+  modalProgressBarContainer: {
+    marginVertical: 8,
+  },
+  modalProgressBarBg: {
+    height: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  modalProgressBarFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  modalTargetIndicator: {
+    position: 'absolute',
+    top: 0,
+    width: 2,
+    height: '100%',
+    backgroundColor: '#10B981',
+    zIndex: 1,
+  },
+  modalActionSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  modalActionText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    lineHeight: 20,
+  },
+  modalNextStepsSection: {
+    margin: 20,
+    marginTop: 0,
+  },
+  modalNextStepsTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  modalNextStepItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+    backgroundColor: '#F9FAFB',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalNextStepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#D97706',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalNextStepNumberText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  modalNextStepText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    lineHeight: 20,
+  },
+  modalMessageBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#F3F4F6',
+    padding: 16,
+    borderRadius: 12,
+    margin: 20,
+    marginTop: 0,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalMessageText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    fontWeight: '500',
   },
 
   // Analysis Card

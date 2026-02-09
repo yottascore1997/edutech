@@ -7,6 +7,7 @@ import {
     Easing,
     Image,
     Modal,
+    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -587,7 +588,7 @@ const QuestionOfTheDayPreview = () => {
             <View style={styles.previewLeft}>
               <View style={styles.previewTextContainer}>
                 <View style={styles.titleWithButtonRow}>
-                  <Text style={styles.previewTitle}>Question of the Day</Text>
+                  <Text style={styles.previewTitle} numberOfLines={1}>Question of the Day</Text>
                   <TouchableOpacity style={styles.rightViewButton} onPress={openModal}>
                     <LinearGradient
                       colors={['#DB2777', '#BE185D']}
@@ -614,30 +615,35 @@ const QuestionOfTheDayPreview = () => {
       >
         <View style={styles.centeredOverlay}>
           <View style={styles.centeredCard}>
-                            <LinearGradient
-                              colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={styles.cardGradient}
-                            >
-              {/* Enhanced Header with Close Button and Timer */}
+            <LinearGradient
+              colors={['#6366F1', '#7C3AED', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cardGradient}
+            >
+              {/* Modal Header - compact */}
               <View style={styles.modalHeader}>
                 <View style={styles.headerContent}>
                   {timerElement}
                   <View style={styles.headerText}>
-                    <Text style={styles.modalTitle}>Question</Text>
-                    <Text style={styles.modalSubtitle}>Test your knowledge!</Text>
+                    <Text style={styles.modalTitle} numberOfLines={1}>Question of the Day</Text>
+                    <Text style={styles.modalSubtitle} numberOfLines={1}>Test your knowledge daily</Text>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-                  <Ionicons name="close" size={24} color="#FF4444" />
+                <TouchableOpacity style={styles.closeButton} onPress={closeModal} activeOpacity={0.8}>
+                  <Ionicons name="close" size={20} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
-              {/* Content Container */}
-              <View style={styles.contentContainer}>
+              {/* Content Container - scrollable so result is never cut */}
+              <ScrollView
+                style={styles.contentScroll}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
                 <QuestionOfTheDay onTimerRender={setTimerElement} />
-              </View>
+              </ScrollView>
             </LinearGradient>
           </View>
         </View>
@@ -666,6 +672,7 @@ const styles = StyleSheet.create({
   previewGradient: {
     borderRadius: 18,
     padding: 18,
+    paddingRight: 20,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -781,6 +788,7 @@ const styles = StyleSheet.create({
   },
   previewTextContainer: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'flex-start',
     paddingTop: 10,
     marginLeft: 70,
@@ -790,6 +798,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 2,
+    gap: 10,
   },
   rightViewButton: {
     marginLeft: 8,
@@ -850,6 +859,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   previewTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -906,35 +916,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.25)',
-    backdropFilter: 'blur(10px)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
   },
   closeButton: {
-    backgroundColor: '#FFFFFF', // White background
-    borderRadius: 20,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 68, 68, 0.3)', // Light red border
-    shadowColor: '#FF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 17,
+    fontWeight: '800',
     color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 3,
-    letterSpacing: 0.5,
-    fontFamily: 'System',
-    lineHeight: 28,
+    letterSpacing: 0.2,
+    lineHeight: 22,
   },
   placeholder: {
     width: 40,
@@ -951,69 +952,58 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-    centeredCard: {
-        width: '90%',
-        minHeight: 550,
-        maxHeight: 750,
-        paddingVertical: 12,
-        paddingHorizontal: 0,
-        backgroundColor: 'transparent',
-        borderRadius: 24,
-        overflow: 'hidden',
-        shadowColor: '#EA580C',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.45,
-        shadowRadius: 20,
-        elevation: 16,
-        borderWidth: 2,
-        borderColor: 'rgba(234, 88, 12, 0.15)',
-    },
+  centeredCard: {
+    width: '92%',
+    minHeight: 520,
+    maxHeight: 780,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
   cardGradient: {
     flex: 1,
     borderRadius: 20,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    minHeight: 550,
-    maxHeight: 750,
+    minHeight: 520,
+    maxHeight: 780,
     justifyContent: 'flex-start',
     alignItems: 'stretch',
+    overflow: 'hidden',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   headerIcon: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 18,
+    borderRadius: 12,
     padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   headerText: {
-    marginLeft: 18,
+    marginLeft: 10,
+    flex: 1,
   },
   modalSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.92)',
     fontWeight: '600',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    letterSpacing: 0.3,
-    fontFamily: 'System',
-    lineHeight: 20,
+    letterSpacing: 0.2,
+    marginTop: 0,
+    lineHeight: 16,
+  },
+  contentScroll: {
+    flex: 1,
   },
   contentContainer: {
     flexGrow: 1,
-    paddingTop: 10,
-    paddingBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
     paddingHorizontal: 20,
   },
   // Enhanced Animation Elements

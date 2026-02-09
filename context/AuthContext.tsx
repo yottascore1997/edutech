@@ -1,8 +1,10 @@
 import { auth } from '@/config/firebase';
 import { apiFetch } from '@/constants/api';
 import authService from '@/services/authServiceFirebaseJS';
-import { clearAuthData, getToken, getUser, storeAuthData } from '@/utils/storage';
+import { setApiAuthHandler } from '@/utils/apiAuthHandler';
+import { clearAuthData, getRefreshToken, getToken, getUser, storeAuthData } from '@/utils/storage';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { useRouter } from 'expo-router';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 interface User {
@@ -12,6 +14,7 @@ interface User {
     token: string;
     profilePicture?: string;
     profilePhoto?: string;
+    gender?: 'male' | 'female';
     handle?: string;
     followers?: number;
     following?: number;
@@ -49,7 +52,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-    const [userStateVersion, setUserStateVersion] = useState(0); // Force re-renders
+    const [userStateVersion, setUserStateVersion] = useState(0);
+    const router = useRouter();
 
     useEffect(() => {
         const loadUser = async () => {
@@ -57,29 +61,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
                 const token = await getToken();
                 const userData = await getUser();
-                console.log('🔄 AuthContext - Loading user from storage:', {
-                    hasToken: !!token,
-                    tokenLength: token?.length,
-                    hasUserData: !!userData,
-                    userId: userData?.id,
-                    userName: userData?.name
-                });
+                if (__DEV__) {
+                    console.log('🔄 AuthContext - Loading from storage:', { hasToken: !!token, hasUserData: !!userData });
+                }
 
                 if (token && userData) {
                     const userWithToken = { ...userData, token };
-                    console.log('✅ AuthContext - User loaded with token:', {
-                        id: userWithToken.id,
-                        name: userWithToken.name,
-                        hasToken: !!userWithToken.token,
-                        tokenLength: userWithToken.token?.length
-                    });
                     setUser(userWithToken);
-                    setUserStateVersion(prev => prev + 1); // Force re-render
-                    console.log('🔄 User state updated from storage');
-                } else {
-                    console.log('❌ AuthContext - Missing token or user data');
-                    if (token) console.log('❌ Has token but no user data');
-                    if (userData) console.log('❌ Has user data but no token');
+                    setUserStateVersion(prev => prev + 1);
                 }
             } catch (e) {
                 console.error("❌ Failed to load user from storage:", e);
@@ -89,6 +78,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
         loadUser();
     }, []);
+
+    // 401 handler: refresh token and retry, or redirect to login
+    useEffect(() => {
+        const refreshAndGetToken = async (): Promise<string | null> => {
+            try {
+                const refreshToken = await getRefreshToken();
+                if (!refreshToken) return null;
+                const res = await apiFetch('/auth/refresh', {
+                    method: 'POST',
+                    body: { refreshToken },
+                });
+                if (!res.ok || !res.data) return null;
+                const { token: newToken, refreshToken: newRefreshToken, user: userData } = res.data;
+                if (!newToken) return null;
+                const userWithToken = { ...userData, token: newToken } as User;
+                setUser(userWithToken);
+                await storeAuthData(newToken, userData, newRefreshToken ?? null);
+                return newToken;
+            } catch {
+                return null;
+            }
+        };
+        const on401 = () => {
+            clearAuthData();
+            setUser(null);
+            setFirebaseUser(null);
+            try {
+                auth.signOut();
+            } catch {}
+            router.replace('/login');
+        };
+        setApiAuthHandler({ refreshAndGetToken, on401 });
+        return () => setApiAuthHandler(null);
+    }, [router]);
 
     // Firebase Auth State Listener
     useEffect(() => {
@@ -127,20 +150,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
                 if (response.ok) {
-                    const { token, user: userData } = response.data;
+                    const { token, refreshToken, user: userData } = response.data;
                     const userWithToken = { ...userData, token } as any;
 
-                    console.log('🔑 Login successful - Token details:', {
-                        tokenLength: token?.length,
-                        userId: userData?.id,
-                        userName: userData?.name,
-                        isFirebaseToken: token?.includes('eyJhbGciOiJSUzI1NiI') // Check if it's JWT
-                    });
-
+                    if (__DEV__) console.log('✅ Login - User state set and data stored');
                     setUser(userWithToken);
-                    await storeAuthData(token, userData);
-
-                    console.log('✅ Login - User state set and data stored');
+                    await storeAuthData(token, userData, refreshToken ?? null);
                     return userWithToken;
                 } else {
                     lastError = response.data || response;
@@ -165,38 +180,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
             if (response.ok) {
-                const { token, user: registeredUser } = response.data;
+                const { token, refreshToken, user: registeredUser } = response.data;
                 const userWithToken = { ...registeredUser, token };
                 setUser(userWithToken);
-                await storeAuthData(token, registeredUser);
+                await storeAuthData(token, registeredUser, refreshToken ?? null);
                 return userWithToken;
             } else {
-                // Handle different types of errors
-                if (response.data && response.data.message) {
-                    throw new Error(response.data.message);
-                } else if (response.data && response.data.error) {
-                    throw new Error(response.data.error);
-                } else {
-                    throw new Error('Registration failed. Please try again.');
-                }
+                if (response.data?.message) throw new Error(response.data.message);
+                if (response.data?.error) throw new Error(response.data.error);
+                throw new Error('Registration failed. Please try again.');
             }
-        } catch (error) {
-            console.error('Registration failed with error:', error);
-            // Re-throw the error so it can be caught by the registration screen
-            throw error;
+        } catch (error: any) {
+            // 429 rate limit
+            if (error?.status === 429 || error?.data?.statusCode === 429) {
+                throw new Error('Too many attempts. Please try again later.');
+            }
+            if (error?.data?.message) throw new Error(error.data.message);
+            if (error?.message) throw error;
+            throw new Error('Registration failed. Please try again.');
         }
     };
 
     const logout = async () => {
+        try {
+            const refreshToken = await getRefreshToken();
+            if (refreshToken) {
+                await apiFetch('/auth/logout', {
+                    method: 'POST',
+                    body: { refreshToken },
+                });
+            }
+        } catch (e) {
+            if (__DEV__) console.warn('Logout API call failed:', e);
+        }
         setUser(null);
         setFirebaseUser(null);
         await clearAuthData();
-        // Also sign out from Firebase
         try {
             await auth.signOut();
         } catch (error) {
             console.error('Firebase sign out error:', error);
         }
+        router.replace('/login');
     };
 
     const updateUser = (userData: Partial<User>) => {
@@ -206,7 +231,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Firebase OTP Methods
     const loginWithOTP = async (phoneNumber: string) => {
         try {
-            console.log('🔥 Starting OTP login for:', phoneNumber);
+            if (__DEV__) console.log('🔥 Starting OTP login for:', phoneNumber);
             const result = await authService.sendOTP(phoneNumber);
             return result;
         } catch (error) {
@@ -217,19 +242,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const verifyOTP = async (otp: string) => {
         try {
-            console.log('🔥 Verifying OTP in AuthContext:', otp);
+            if (__DEV__) console.log('🔥 Verifying OTP in AuthContext');
             const result = await authService.verifyOTP(otp);
-            console.log('🔥 AuthContext - Firebase verifyOTP result:', result);
 
             if (result.success && result.user) {
-                console.log('✅ OTP verified successfully, Firebase user:', result.user);
-
-                // 🔥 Step 1: Get Firebase ID token
                 const firebaseToken = await result.user.getIdToken();
-                console.log('🔑 Firebase token received, length:', firebaseToken.length);
-
-                // 🔥 Step 2: Exchange Firebase token for backend JWT token
-                console.log('🔄 Calling backend /auth/firebase to get backend token');
                 
                 try {
                     const backendResponse = await apiFetch('/auth/firebase', {
@@ -241,21 +258,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     });
 
                     if (backendResponse.ok) {
-                        // ✅ Backend returned token just like email/password login
-                        const { token, user: userData } = backendResponse.data;
+                        const { token, refreshToken, user: userData } = backendResponse.data;
                         const userWithToken = { ...userData, token };
 
-                        console.log('✅ Backend JWT token received:', {
-                            tokenLength: token?.length,
-                            userId: userData?.id,
-                            userName: userData?.name,
-                            isBackendToken: !token?.includes('eyJhbGciOiJSUzI1NiIs')
-                        });
-
+                        if (__DEV__) console.log('✅ OTP login complete - Backend token stored');
                         setUser(userWithToken);
                         setUserStateVersion(prev => prev + 1);
-                        await storeAuthData(token, userWithToken);
-                        console.log('✅ OTP login complete - Backend token stored');
+                        await storeAuthData(token, userWithToken, refreshToken ?? null);
                         return { success: true, user: userWithToken };
                     } else {
                         console.error('❌ Backend /auth/firebase failed:', backendResponse.data);

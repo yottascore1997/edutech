@@ -12,6 +12,8 @@ import CustomDrawerContent from '../components/CustomDrawerContent';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { NotificationBadge } from '../components/NotificationBadge';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { CategoryProvider } from '../context/CategoryContext';
+import { LiveExamProvider } from '../context/LiveExamContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { RefreshProvider } from '../context/RefreshContext';
 import { ToastProvider } from '../context/ToastContext';
@@ -142,7 +144,7 @@ function RootNavigator() {
                     }}
                 />
                 <Drawer.Screen
-                    name="exam-notifications"
+                    name="(tabs)/exam-notifications"
                     options={{
                       title: '', // Remove the title for exam-notifications
                     }}
@@ -270,17 +272,21 @@ function RootLayout() {
 
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <WebSocketProvider>
-          <RefreshProvider>
-            <ToastProvider>
-              <ErrorBoundary>
-                <RootNavigator />
-              </ErrorBoundary>
-            </ToastProvider>
-          </RefreshProvider>
-        </WebSocketProvider>
-      </NotificationProvider>
+      <CategoryProvider>
+        <NotificationProvider>
+          <WebSocketProvider>
+            <RefreshProvider>
+              <ToastProvider>
+                <LiveExamProvider>
+                  <ErrorBoundary>
+                    <RootNavigator />
+                  </ErrorBoundary>
+                </LiveExamProvider>
+              </ToastProvider>
+            </RefreshProvider>
+          </WebSocketProvider>
+        </NotificationProvider>
+      </CategoryProvider>
     </AuthProvider>
   );
 }

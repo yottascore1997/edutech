@@ -1,5 +1,5 @@
 import BookListingForm from '@/components/BookListingForm';
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { ShadowUtils } from '@/utils/shadowUtils';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Book {
   id: string;
@@ -44,19 +45,20 @@ interface Book {
 
 
 const CATEGORIES = [
-  { name: 'ALL', emoji: '📚', label: 'All Books' },
-  { name: 'Academic', emoji: '📖', label: 'Academic' },
-  { name: 'Exam Preparation', emoji: '🎯', label: 'Exam Prep' },
-  { name: 'Literature', emoji: '📕', label: 'Literature' },
-  { name: 'Language Learning', emoji: '🗣️', label: 'Language' },
-  { name: 'Technical', emoji: '💻', label: 'Technical' },
-  { name: 'Business', emoji: '💼', label: 'Business' },
-  { name: 'Arts & Design', emoji: '🎨', label: 'Arts' },
+  { name: 'ALL', emoji: '📚', label: 'All Books', icon: 'library' as const },
+  { name: 'Academic', emoji: '📚', label: 'Academic', icon: 'school' as const },
+  { name: 'Exam Preparation', emoji: '📚', label: 'Exam Prep', icon: 'document-text' as const },
+  { name: 'Literature', emoji: '📚', label: 'Literature', icon: 'book' as const },
+  { name: 'Language Learning', emoji: '📚', label: 'Language', icon: 'language' as const },
+  { name: 'Technical', emoji: '📚', label: 'Technical', icon: 'code-slash' as const },
+  { name: 'Business', emoji: '📚', label: 'Business', icon: 'briefcase' as const },
+  { name: 'Arts & Design', emoji: '📚', label: 'Arts', icon: 'color-palette' as const },
 ];
 
 const BookStoreScreen = () => {
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,14 +154,19 @@ const BookStoreScreen = () => {
   };
 
   const fetchCartCount = async () => {
+    if (!user?.token) {
+      return;
+    }
     try {
-      const response = await apiFetchAuth('/cart', user?.token || '');
+      const response = await apiFetchAuth('/books/cart', user.token);
       if (response.ok && response.data.success) {
-        const cartItems = response.data.data || [];
-        setCartCount(cartItems.length);
+        const cartItems = response.data.data?.items || [];
+        setCartCount(cartItems.length || 0);
       }
     } catch (error) {
       console.error('Error fetching cart count:', error);
+      // Silently fail - don't show error to user
+      setCartCount(0);
     }
   };
 
@@ -253,86 +260,70 @@ const BookStoreScreen = () => {
     }
   };
 
+  // Helper: all image URLs go through getImageUrlFromApi (uses score.yottascore.com, replaces old domain)
+  const getImageUrl = (imageUrl: string | undefined | null): string | null => {
+    if (!imageUrl || imageUrl.trim() === '') return null;
+    try {
+      const finalUrl = getImageUrlFromApi(imageUrl);
+      if (!finalUrl || !(finalUrl.startsWith('http://') || finalUrl.startsWith('https://'))) return null;
+      new URL(finalUrl);
+      return finalUrl;
+    } catch {
+      return null;
+    }
+  };
+
   const BookCard = ({ book }: { book: Book }) => (
     <TouchableOpacity 
       style={styles.bookCard}
-      onPress={() => {
-
-        router.push(`/(tabs)/book-details?bookId=${book.id}`);
-      }}
+      onPress={() => router.push(`/(tabs)/book-details?bookId=${book.id}`)}
+      activeOpacity={0.9}
     >
       <View style={styles.bookImageContainer}>
-        <Image 
-          source={{ uri: book.coverImage.startsWith('http') ? book.coverImage : `http://192.168.1.5:3000${book.coverImage}` }} 
-          style={styles.bookImage}
-          resizeMode="cover"
-        />
+        {book.coverImage && getImageUrl(book.coverImage) ? (
+          <Image 
+            source={{ uri: getImageUrl(book.coverImage)! }} 
+            style={styles.bookImage}
+            resizeMode="cover"
+            onError={() => {}}
+          />
+        ) : (
+          <View style={[styles.bookImage, styles.bookImagePlaceholder]}>
+            <Ionicons name="book" size={36} color="#94A3B8" />
+          </View>
+        )}
         <View style={[styles.listingTypeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
           <Text style={styles.listingTypeText}>{book.listingType}</Text>
         </View>
       </View>
-      
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-        <Text style={styles.bookAuthor}>by {book.author}</Text>
-        <Text style={styles.bookCategory}>{book.category}</Text>
-        
-        <View style={styles.bookDetails}>
-          <View style={styles.conditionContainer}>
-            <Text style={styles.conditionLabel}>Condition:</Text>
-            <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '20' }]}>
-              <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>
-                {book.condition}
-              </Text>
-            </View>
+        <View style={styles.bookMetaRow}>
+          <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '18' }]}>
+            <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>{book.condition}</Text>
           </View>
-          
-          <View style={styles.priceContainer}>
-            <View style={styles.priceInfo}>
-              {book.listingType === 'DONATE' ? (
-                <Text style={styles.priceLabel}>Free</Text>
-              ) : (
-                <>
-                  <Text style={styles.priceLabel}>₹{book.price}</Text>
-                  {book.rentPrice && (
-                    <Text style={styles.rentPriceLabel}>Rent: ₹{book.rentPrice}/month</Text>
-                  )}
-                </>
-              )}
-            </View>
-            <View style={styles.distanceLocationContainer}>
-              {book.distance !== undefined && locationEnabled && (
-                <Text style={styles.distanceText}>{formatDistance(book.distance)} away</Text>
-              )}
-              <Text style={styles.locationText}>📍 {book.location}</Text>
-            </View>
-          </View>
+          {book.listingType === 'DONATE' ? (
+            <Text style={styles.bookPrice}>Free</Text>
+          ) : (
+            <Text style={styles.bookPrice}>₹{book.price}{book.rentPrice ? ` · Rent ₹${book.rentPrice}` : ''}</Text>
+          )}
         </View>
-        
-        <View style={styles.sellerInfo}>
-          <Image 
-            source={{ uri: book.seller.image?.startsWith('http') ? book.seller.image : `http://192.168.1.5:3000${book.seller.image}` || 'https://via.placeholder.com/24' }} 
-            style={styles.sellerAvatar}
-          />
-          <View style={styles.sellerDetails}>
-            <Text style={styles.sellerName}>{book.seller.name}</Text>
-            <Text style={styles.sellerLocation}>{book.seller.bookProfile.city}</Text>
+        {locationEnabled && book.distance !== undefined && (
+          <View style={styles.bookDistanceRow}>
+            <Ionicons name="location" size={12} color="#6366F1" />
+            <Text style={styles.bookDistanceText}>{formatDistance(book.distance)} away</Text>
           </View>
-        </View>
-        
+        )}
         <TouchableOpacity 
           style={styles.listingAddToCartButton}
-          onPress={(e) => {
-            e.stopPropagation(); // Prevent navigation to book details
-            handleAddToCart(book);
-          }}
+          onPress={(e) => { e.stopPropagation(); handleAddToCart(book); }}
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
+            colors={['#6366F1', '#8B5CF6']}
             style={styles.listingAddToCartGradient}
           >
-            <Ionicons name="cart" size={14} color="#FFFFFF" />
+            <Ionicons name="cart-outline" size={16} color="#FFFFFF" />
             <Text style={styles.listingAddToCartText}>
               {book.listingType === 'DONATE' ? 'Get Free' : 'Add to Cart'}
             </Text>
@@ -433,16 +424,19 @@ const BookStoreScreen = () => {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#4F46E5', '#7C3AED']}
+        colors={['#F5F3FF', '#EDE9FE']}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
+        end={{ x: 0, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top }]}
       >
-        {/* Header Top Row with Title and Cart */}
+        {/* Header: icon + title block + cart */}
         <View style={styles.headerTopRow}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Book Store</Text>
-            <Text style={styles.headerSubtitle}>Find and share books with students</Text>
+          <View style={styles.headerLeftBlock}>
+            <Image source={require('@/assets/images/icons/book.png')} style={styles.headerBookIcon} resizeMode="contain" />
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Book Store</Text>
+              <Text style={styles.headerSubtitle}>Buy, rent & share study materials</Text>
+            </View>
           </View>
           <TouchableOpacity 
             style={styles.cartIconButton}
@@ -450,7 +444,7 @@ const BookStoreScreen = () => {
             activeOpacity={0.7}
           >
             <View style={styles.cartIconContainer}>
-              <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
+              <Image source={require('@/assets/images/icons/trolley.png')} style={styles.cartTrolleyIcon} resizeMode="contain" />
               {cartCount > 0 && (
                 <View style={styles.cartBadge}>
                   <Text style={styles.cartBadgeText}>{cartCount}</Text>
@@ -463,7 +457,7 @@ const BookStoreScreen = () => {
         {/* Search Bar with Filter Icon */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputContainer}>
-            <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+            <Image source={require('@/assets/images/icons/search.png')} style={[styles.searchIcon, styles.searchBarIcon]} resizeMode="contain" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search books..."
@@ -478,7 +472,7 @@ const BookStoreScreen = () => {
             activeOpacity={0.7}
           >
             <View style={styles.filterIconGradient}>
-              <Ionicons name="options" size={20} color="#FFFFFF" />
+              <Ionicons name="options" size={20} color="#6366F1" />
             </View>
           </TouchableOpacity>
         </View>
@@ -531,22 +525,22 @@ const BookStoreScreen = () => {
           </View>
         </View>
 
-        {/* Explore Categories */}
+        {/* Explore Categories - Enhanced educative / exam feel */}
         <View style={styles.categoriesContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Explore Categories</Text>
-            <View style={styles.trendingBadge}>
-              <Text style={styles.trendingText}>🔥 Trending</Text>
+            <View style={styles.sectionTitleRow}>
+              <Image source={require('@/assets/images/icons/adventurer.png')} style={styles.exploreCategoriesIcon} resizeMode="contain" />
+              <Text style={styles.sectionTitle}>Explore Categories</Text>
             </View>
           </View>
           <View style={styles.categoriesGrid}>
             {CATEGORIES.slice(0, 4).map((category, index) => {
               const isActive = selectedCategory === category.name;
               const gradients: [string, string][] = [
-                ['#FF6B6B', '#FF8E53'],
-                ['#4ECDC4', '#44A08D'],
-                ['#FFD93D', '#6BCF7F'],
-                ['#FF9A9E', '#FECFEF']
+                ['#818CF8', '#A78BFA'],
+                ['#38BDF8', '#818CF8'],
+                ['#34D399', '#6EE7B7'],
+                ['#E879F9', '#C084FC']
               ];
               return (
                 <TouchableOpacity 
@@ -569,10 +563,10 @@ const BookStoreScreen = () => {
                   }}
                 >
                   <LinearGradient
-                    colors={isActive ? ['#4F46E5', '#7C3AED'] : (gradients[index] || ['#FF6B6B', '#FF8E53'])}
+                    colors={isActive ? ['#6366F1', '#8B5CF6'] : (gradients[index] || ['#818CF8', '#A78BFA'])}
                     style={styles.categoryIconContainer}
                   >
-                    <Text style={styles.categoryEmoji}>{category.emoji}</Text>
+                    <Ionicons name={category.icon} size={28} color="#FFFFFF" />
                   </LinearGradient>
                   <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{category.label}</Text>
                 </TouchableOpacity>
@@ -585,11 +579,11 @@ const BookStoreScreen = () => {
             {CATEGORIES.slice(4).map((category, index) => {
               const isActive = selectedCategory === category.name;
               const gradients: [string, string][] = [
-                ['#96CEB4', '#FFEAA7'],
-                ['#74B9FF', '#0984E3'],
-                ['#FD79A8', '#E84393'],
-                ['#A29BFE', '#6C5CE7'],
-                ['#667EEA', '#764BA2']
+                ['#38BDF8', '#22D3EE'],
+                ['#A78BFA', '#C4B5FD'],
+                ['#F472B6', '#FB7185'],
+                ['#FBBF24', '#FCD34D'],
+                ['#2DD4BF', '#5EEAD4']
               ];
               return (
                 <TouchableOpacity 
@@ -608,10 +602,10 @@ const BookStoreScreen = () => {
                   }}
                 >
                   <LinearGradient
-                    colors={isActive ? ['#4F46E5', '#7C3AED'] : (gradients[index] || ['#96CEB4', '#FFEAA7'])}
+                    colors={isActive ? ['#6366F1', '#8B5CF6'] : (gradients[index] || ['#38BDF8', '#22D3EE'])}
                     style={styles.additionalCategoryIconContainer}
                   >
-                    <Text style={styles.additionalCategoryEmoji}>{category.emoji}</Text>
+                    <Ionicons name={category.icon} size={24} color="#FFFFFF" />
                   </LinearGradient>
                   <Text style={[styles.additionalCategoryText, isActive && styles.additionalCategoryTextActive]}>{category.label}</Text>
                 </TouchableOpacity>
@@ -620,100 +614,59 @@ const BookStoreScreen = () => {
           </View>
         </View>
 
-        {/* Top Books */}
-        <View style={styles.categoriesContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top Books</Text>
-            <View style={styles.trendingBadge}>
-              <Text style={styles.trendingText}>⭐ Top Rated</Text>
-            </View>
-          </View>
-          <View style={styles.categoriesGrid}>
-            {[
-              { name: 'Exam Prep Book', emoji: '🎯', label: 'Exam Prep' },
-              { name: 'Academic', emoji: '📖', label: 'Academic' },
-              { name: 'Business', emoji: '💼', label: 'Business' },
-              { name: 'Fiction', emoji: '📚', label: 'Fiction' }
-            ].map((category, index) => {
-              const isActive = selectedCategory === category.name;
-              const gradients: [string, string][] = [
-                ['#FF6B6B', '#FF8E53'],
-                ['#4ECDC4', '#44A08D'],
-                ['#FFD93D', '#6BCF7F'],
-                ['#FF9A9E', '#FECFEF']
-              ];
-              return (
-                <TouchableOpacity 
-                  key={category.name}
-                  style={[styles.categoryCard, isActive && styles.categoryCardActive]} 
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    router.push({
-                      pathname: '/(tabs)/category-books',
-                      params: {
-                        category: category.name,
-                        categoryLabel: category.label,
-                        categoryEmoji: category.emoji
-                      }
-                    });
-                  }}
-                >
-                  <LinearGradient
-                    colors={isActive ? ['#4F46E5', '#7C3AED'] : (gradients[index] || ['#FF6B6B', '#FF8E53'])}
-                    style={styles.categoryIconContainer}
-                  >
-                    <Text style={styles.categoryEmoji}>{category.emoji}</Text>
-                  </LinearGradient>
-                  <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{category.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Creative Advertisement Banner */}
+        {/* Creative Advertisement Banner - light & attractive */}
         <View style={styles.adBannerContainer}>
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.adBanner}
-          >
-            <View style={styles.adBannerContent}>
-              <View style={styles.adBannerText}>
-                <View style={styles.titleContainer}>
-                  <Text style={styles.adBannerTitle}>📚 Unlock Your Next Adventure!</Text>
-                  <View style={styles.sparkleContainer}>
-                    <Text style={styles.sparkle}>✨</Text>
+          <View style={styles.adBanner}>
+            <View style={styles.adBannerBgDecor}>
+              <View style={[styles.adBannerCircle, styles.adBannerCircle1]} />
+              <View style={[styles.adBannerCircle, styles.adBannerCircle2]} />
+              <View style={[styles.adBannerCircle, styles.adBannerCircle3]} />
+            </View>
+            <LinearGradient
+              colors={['#FFFBEB', '#FEF3C7', '#FDE68A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adBannerGradient}
+            >
+              <View style={styles.adBannerContent}>
+                <View style={styles.adBannerText}>
+                  <View style={styles.titleContainer}>
+                    <View style={styles.adBannerTitleIconWrap}>
+                      <Ionicons name="book" size={22} color="#B45309" />
+                    </View>
+                    <Text style={styles.adBannerTitle}>Unlock Your Next Adventure!</Text>
+                  </View>
+                  <View style={styles.offerBadge}>
+                    <Ionicons name="flash" size={14} color="#059669" />
+                    <Text style={styles.offerText}>Limited time offer</Text>
+                  </View>
+                  <TouchableOpacity style={styles.shopNowButton} activeOpacity={0.8}>
+                    <LinearGradient
+                      colors={['#D97706', '#B45309']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.shopNowGradient}
+                    >
+                      <Text style={styles.shopNowText}>Shop Now</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.adBannerBooks}>
+                  <View style={[styles.bookStack, styles.bookStack1, { backgroundColor: '#818CF8' }]} />
+                  <View style={[styles.bookStack, styles.bookStack2, { backgroundColor: '#34D399' }]} />
+                  <View style={[styles.bookStack, styles.bookStack3, { backgroundColor: '#38BDF8' }]} />
+                  <View style={[styles.bookStack, styles.bookStack4, { backgroundColor: '#A78BFA' }]} />
+                  <View style={[styles.bookStack, styles.bookStack5, { backgroundColor: '#FBBF24' }]} />
+                  <View style={styles.floatingIcons}>
+                    <View style={styles.floatingIconWrap}><Ionicons name="book-outline" size={18} color="#6366F1" /></View>
+                    <View style={[styles.floatingIconWrap, { top: -8, left: 22 }]}><Ionicons name="star" size={14} color="#F59E0B" /></View>
+                    <View style={[styles.floatingIconWrap, { top: 8, right: -2 }]}><Ionicons name="sparkles" size={14} color="#8B5CF6" /></View>
                   </View>
                 </View>
-                <View style={styles.offerBadge}>
-                  <Text style={styles.offerText}>🔥 LIMITED TIME OFFER</Text>
-                </View>
-                <TouchableOpacity style={styles.shopNowButton} activeOpacity={0.8}>
-                  <LinearGradient
-                    colors={['#FF6B6B', '#FF8E53']}
-                    style={styles.shopNowGradient}
-                  >
-                    <Text style={styles.shopNowText}>🚀 Shop Now</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                  </LinearGradient>
-                </TouchableOpacity>
               </View>
-              <View style={styles.adBannerBooks}>
-                <View style={[styles.bookStack, styles.bookStack1, { backgroundColor: '#FF6B6B' }]} />
-                <View style={[styles.bookStack, styles.bookStack2, { backgroundColor: '#4ECDC4' }]} />
-                <View style={[styles.bookStack, styles.bookStack3, { backgroundColor: '#45B7D1' }]} />
-                <View style={[styles.bookStack, styles.bookStack4, { backgroundColor: '#96CEB4' }]} />
-                <View style={[styles.bookStack, styles.bookStack5, { backgroundColor: '#FFEAA7' }]} />
-                <View style={styles.floatingIcons}>
-                  <Text style={styles.floatingIcon}>📖</Text>
-                  <Text style={[styles.floatingIcon, { top: -10, left: 20 }]}>⭐</Text>
-                  <Text style={[styles.floatingIcon, { top: 5, right: -5 }]}>💎</Text>
-                </View>
-              </View>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          </View>
         </View>
 
         {/* Filter Buttons */}
@@ -979,56 +932,77 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   header: {
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingBottom: 10,
     paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(99, 102, 241, 0.15)',
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  headerLeftBlock: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerBookIcon: {
+    width: 48,
+    height: 48,
+  },
+  headerIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6 } : {}),
+    elevation: 2,
   },
   headerTitleContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 2,
+    color: '#1F2937',
+    marginBottom: 0,
+    letterSpacing: 0.2,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+    fontSize: 13,
+    color: '#6366F1',
+    fontWeight: '600',
   },
   cartIconButton: {
-    marginLeft: 12,
+    marginLeft: 8,
   },
   cartIconContainer: {
     position: 'relative',
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 8,
+  },
+  cartTrolleyIcon: {
+    width: 40,
+    height: 40,
   },
   cartBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#FF4757',
+    backgroundColor: '#DC2626',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#4F46E5',
+    borderColor: '#FFFFFF',
   },
   cartBadgeText: {
     color: '#FFFFFF',
@@ -1043,8 +1017,8 @@ const styles = StyleSheet.create({
   // Banner Carousel Styles
   bannerCarouselContainer: {
     height: 180,
-    marginBottom: 16,
-    marginTop: 16,
+    marginBottom: 14,
+    marginTop: 12,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#F3F4F6',
@@ -1113,17 +1087,23 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 44,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.18)',
   },
   searchIcon: {
-    marginRight: 12,
+    marginRight: 10,
+  },
+  searchBarIcon: {
+    width: 20,
+    height: 20,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: '#1F2937',
   },
   locationContainer: {
@@ -1225,15 +1205,36 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  // Creative Advertisement Banner Styles
+  // Creative Advertisement Banner Styles - light & attractive
   adBannerContainer: {
     marginTop: 20,
     marginBottom: 24,
   },
   adBanner: {
     borderRadius: 20,
-    padding: 24,
-    ...ShadowUtils.large(),
+    overflow: 'hidden',
+    position: 'relative',
+    ...(Platform.OS === 'ios' ? { shadowColor: '#D97706', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 16 } : {}),
+    elevation: 4,
+  },
+  adBannerBgDecor: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  adBannerCircle: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+  },
+  adBannerCircle1: { width: 140, height: 140, top: -40, right: -30 },
+  adBannerCircle2: { width: 80, height: 80, bottom: -20, left: -20 },
+  adBannerCircle3: { width: 60, height: 60, top: '40%', right: 20 },
+  adBannerGradient: {
+    padding: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
   },
   adBannerContent: {
     flexDirection: 'row',
@@ -1247,51 +1248,62 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    gap: 10,
+  },
+  adBannerTitleIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(180, 83, 9, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   adBannerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  sparkleContainer: {
-    marginLeft: 8,
-  },
-  sparkle: {
+    flex: 1,
     fontSize: 20,
+    fontWeight: '800',
+    color: '#1F2937',
+    letterSpacing: 0.2,
+    lineHeight: 26,
   },
   adBannerSubtitle: {
     fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.95)',
+    color: '#475569',
     lineHeight: 22,
     marginBottom: 12,
   },
   offerBadge: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 12,
     alignSelf: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(5, 150, 105, 0.2)',
   },
   offerText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#059669',
   },
   shopNowButton: {
-    borderRadius: 25,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   shopNowGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 12,
     gap: 8,
   },
   shopNowText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1302,15 +1314,12 @@ const styles = StyleSheet.create({
   },
   bookStack: {
     position: 'absolute',
-    width: 45,
-    height: 65,
-    borderRadius: 6,
-    left: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    width: 42,
+    height: 60,
+    borderRadius: 8,
+    left: 10,
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6 } : {}),
+    elevation: 3,
   },
   bookStack1: { top: 0, transform: [{ rotate: '-5deg' }] },
   bookStack2: { top: 8, transform: [{ rotate: '-2deg' }] },
@@ -1322,11 +1331,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  floatingIcon: {
+  floatingIconWrap: {
     position: 'absolute',
-    fontSize: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
     top: 10,
-    left: 10,
+    left: 8,
+    ...(Platform.OS === 'ios' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 } : {}),
+    elevation: 2,
   },
 
   // Creative Categories Styles
@@ -1337,50 +1353,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  exploreCategoriesIcon: {
+    width: 48,
+    height: 48,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#1F2937',
+    letterSpacing: 0.2,
   },
   trendingBadge: {
-    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(5, 150, 105, 0.2)',
   },
   trendingText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FF6B6B',
+    color: '#059669',
   },
   categoriesGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 18,
+    gap: 12,
   },
   categoryCard: {
     alignItems: 'center',
-    width: '23%',
+    width: '22%',
+    minWidth: 72,
   },
   categoryCardActive: {
     transform: [{ scale: 1.05 }],
   },
   categoryIconContainer: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
-    ...ShadowUtils.medium(),
-  },
-  categoryEmoji: {
-    fontSize: 24,
+    marginBottom: 10,
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 } : {}),
+    elevation: 4,
   },
   categoryText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
@@ -1398,31 +1430,32 @@ const styles = StyleSheet.create({
   },
   additionalCategories: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   additionalCategoryCard: {
     alignItems: 'center',
-    width: '23%',
+    width: '22%',
+    minWidth: 72,
   },
   additionalCategoryCardActive: {
     transform: [{ scale: 1.05 }],
   },
   additionalCategoryIconContainer: {
-    width: 56,
-    height: 56,
+    width: 58,
+    height: 58,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-    ...ShadowUtils.medium(),
-  },
-  additionalCategoryEmoji: {
-    fontSize: 22,
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.18, shadowRadius: 6 } : {}),
+    elevation: 3,
   },
   additionalCategoryText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#374151',
     textAlign: 'center',
   },
   additionalCategoryTextActive: {
@@ -1598,154 +1631,101 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 12,
   },
   bookCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginBottom: 16,
     overflow: 'hidden',
-    width: '48%', // Take up 48% width for 2 columns with spacing
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    width: '47%',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.08)',
+    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 } : {}),
     elevation: 3,
   },
   bookImageContainer: {
     position: 'relative',
-    height: 140, // Smaller height for grid layout
+    height: 120,
   },
   bookImage: {
     width: '100%',
     height: '100%',
   },
+  bookImagePlaceholder: {
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listingTypeBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  listingTypeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  bookInfo: {
-    padding: 12,
-  },
-  bookTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  bookAuthor: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 4,
-    fontStyle: 'italic',
-  },
-  bookCategory: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  bookDetails: {
-    marginBottom: 12,
-  },
-  conditionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  conditionLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginRight: 8,
-  },
-  conditionBadge: {
+    top: 8,
+    right: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  conditionText: {
-    fontSize: 12,
-    fontWeight: '600',
+  listingTypeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
-  bookPriceContainer: {
+  bookInfo: {
+    padding: 10,
+  },
+  bookTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 2,
+    lineHeight: 19,
+  },
+  bookMetaRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
     flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
   },
-  priceLabel: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
+  conditionBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  priceInfo: {
-    flex: 1,
+  conditionText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
-  rentPriceLabel: {
+  bookPrice: {
     fontSize: 14,
-    color: '#3B82F6',
-    fontWeight: '600',
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#6366F1',
   },
-  distanceLocationContainer: {
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  distanceText: {
-    fontSize: 12,
-    color: '#4F46E5',
-    fontWeight: '600',
-  },
-  locationText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  sellerInfo: {
+  bookDistanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    gap: 4,
+    marginBottom: 8,
   },
-  sellerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 12,
-  },
-  sellerDetails: {
-    flex: 1,
-  },
-  sellerName: {
-    fontSize: 14,
-    color: '#1F2937',
+  bookDistanceText: {
+    fontSize: 11,
     fontWeight: '600',
-  },
-  sellerLocation: {
-    fontSize: 12,
-    color: '#6B7280',
+    color: '#6366F1',
   },
   listingAddToCartButton: {
-    marginTop: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   listingAddToCartGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
     gap: 6,
   },
   listingAddToCartText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1793,12 +1773,14 @@ const styles = StyleSheet.create({
   filterIconButton: {
   },
   filterIconGradient: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
   },
   filterOverlay: {
     flex: 1,

@@ -1,14 +1,15 @@
 import { apiFetchAuth } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { formatTimeUntilStart, formatDateTime, hasExamStarted } from '@/utils/timeUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ExamCard from '../../../components/ExamCard';
 
 const ExamDetailScreen = () => {
-    const { id, from, status } = useLocalSearchParams();
+    const { id, from, status, joined, resultData: resultDataParam } = useLocalSearchParams<{ id?: string; from?: string; status?: string; joined?: string; resultData?: string }>();
     const router = useRouter();
     const { user } = useAuth();
     
@@ -16,15 +17,39 @@ const ExamDetailScreen = () => {
     const [exam, setExam] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string|null>(null);
-    const [activeTab, setActiveTab] = useState('Info');
+    const normalizedStatus = String(status || '').toUpperCase();
+    const initialTab = from === 'my-exams' && (normalizedStatus === 'COMPLETED' || normalizedStatus === 'FINISHED') ? 'Result' : 'Info';
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     const [winnings, setWinnings] = useState<any[]>([]);
     const [winningsLoading, setWinningsLoading] = useState(false);
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-    const [isParticipant, setIsParticipant] = useState(false);
+    const [attempts, setAttempts] = useState<any>(null);
+    const [attemptsLoading, setAttemptsLoading] = useState(false);
+    const [resultData, setResultData] = useState<any>(null);
+    const [resultLoading, setResultLoading] = useState(false);
+    const [resultError, setResultError] = useState<string | null>(null);
+    const [resultFetched, setResultFetched] = useState(false);
+    const [isParticipant, setIsParticipant] = useState(joined === '1' || joined === 'true');
     const [participantLoading, setParticipantLoading] = useState(false);
+    const [examHasStarted, setExamHasStarted] = useState(false);
+    const [examHasEnded, setExamHasEnded] = useState(false);
+    const [timeUntilStart, setTimeUntilStart] = useState<string>('');
+    const isCompleted = normalizedStatus === 'COMPLETED' || normalizedStatus === 'FINISHED';
+
+    useEffect(() => {
+        if (!resultDataParam) return;
+        try {
+            const parsed = JSON.parse(String(resultDataParam));
+            setResultData(parsed);
+            setResultError(null);
+            setResultFetched(true);
+        } catch (e) {
+            console.error('Failed to parse resultData param:', e);
+        }
+    }, [resultDataParam]);
 
     // Check if user is a participant in this exam
     const checkParticipantStatus = async () => {
@@ -36,11 +61,18 @@ const ExamDetailScreen = () => {
             if (response.ok) {
                 setIsParticipant(true);
             } else {
-                setIsParticipant(false);
+                // Don't overwrite to false if user just came from join flow (joined param)
+                const justJoined = joined === '1' || joined === 'true';
+                if (!justJoined) {
+                    setIsParticipant(false);
+                }
             }
         } catch (error) {
             console.error('Error checking participant status:', error);
-            setIsParticipant(false);
+            const justJoined = joined === '1' || joined === 'true';
+            if (!justJoined) {
+                setIsParticipant(false);
+            }
         } finally {
             setParticipantLoading(false);
         }
@@ -50,11 +82,46 @@ const ExamDetailScreen = () => {
     const handleStartExam = async () => {
         if (!user?.token || !id || !exam) return;
         
+        const now = new Date();
+        
+        // Check if exam has ended
+        if (exam.endTime) {
+            const endTime = new Date(exam.endTime);
+            if (now.getTime() > endTime.getTime()) {
+                Alert.alert(
+                    'Exam Ended',
+                    'The exam time has ended. You cannot start the exam now.',
+                    [{ text: 'OK' }]
+                );
+                setExamHasEnded(true);
+                return;
+            }
+        }
+        
+        // Strict check: verify exam has actually started
+        const startTime = exam.startTime ? new Date(exam.startTime) : null;
+        const hasStarted = startTime ? now.getTime() >= startTime.getTime() : false;
+        
+        if (!hasStarted) {
+            Alert.alert('Wait', 'Exam has not started yet. Please wait for the start time.');
+            return;
+        }
+        
         try {
             // Fetch questions
             const questionsRes = await apiFetchAuth(`/student/live-exams/${id}/questions`, user.token);
             if (!questionsRes.ok) {
-                throw new Error('Failed to fetch questions');
+                if (questionsRes.data?.message?.includes('not started') || questionsRes.data?.message?.includes('start time')) {
+                    Alert.alert('Wait', 'Exam has not started yet. Please wait for the start time.');
+                    setExamHasStarted(false);
+                    return;
+                }
+                if (questionsRes.data?.message?.includes('ended') || questionsRes.data?.message?.includes('end time')) {
+                    Alert.alert('Exam Ended', 'The exam time has ended. You cannot start the exam now.');
+                    setExamHasEnded(true);
+                    return;
+                }
+                throw new Error(questionsRes.data?.message || 'Failed to fetch questions');
             }
             
             // Navigate to questions page
@@ -67,13 +134,88 @@ const ExamDetailScreen = () => {
                 } 
             });
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to start exam.');
+            if (error.message?.includes('not started') || error.message?.includes('start time')) {
+                Alert.alert('Wait', 'Exam has not started yet. Please wait for the start time.');
+                setExamHasStarted(false);
+            } else if (error.message?.includes('ended') || error.message?.includes('end time')) {
+                Alert.alert('Exam Ended', 'The exam time has ended. You cannot start the exam now.');
+                setExamHasEnded(true);
+            } else {
+                Alert.alert('Error', error.message || 'Failed to start exam.');
+            }
         }
+    };
+
+    const getResultAccuracy = (data: any) => {
+        if (!data) return 0;
+        if (typeof data.accuracy === 'number') return Math.round(data.accuracy);
+        if (data.totalQuestions) {
+            return Math.round((Number(data.correctAnswers || 0) / Number(data.totalQuestions)) * 100);
+        }
+        return 0;
+    };
+
+    const formatResultDuration = (data: any) => {
+        if (!data) return 'N/A';
+        if (data.timeTakenFormatted) return String(data.timeTakenFormatted);
+        if (data.timeTakenMinutes != null) return `${data.timeTakenMinutes} min`;
+        if (data.timeTakenSeconds != null) return `${Math.max(1, Math.round(data.timeTakenSeconds / 60))} min`;
+        return 'N/A';
+    };
+
+    const openFullResult = () => {
+        if (!resultData) return;
+        router.push({
+            pathname: '/(tabs)/live-exam/result/[id]' as any,
+            params: { id: String(id), resultData: JSON.stringify(resultData) }
+        });
     };
 
     useEffect(() => {
         checkParticipantStatus();
     }, [user?.token, id]);
+
+    // Check exam start time and update countdown
+    useEffect(() => {
+        if (!exam?.startTime) return;
+
+        const checkStartTime = () => {
+            const now = new Date();
+            let startTime: Date;
+            
+            try {
+                startTime = new Date(exam.startTime);
+                if (isNaN(startTime.getTime())) {
+                    console.error('Invalid start time:', exam.startTime);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error parsing start time:', error);
+                return;
+            }
+            
+            // Strict check: exam has started only if current time is >= start time
+            const timeDiff = startTime.getTime() - now.getTime();
+            const started = timeDiff <= 0;
+            
+            setExamHasStarted(started);
+            
+            if (!started) {
+                const timeUntil = formatTimeUntilStart(exam.startTime);
+                setTimeUntilStart(timeUntil);
+            } else {
+                setTimeUntilStart('');
+            }
+        };
+
+        // Initial check
+        checkStartTime();
+        
+        // Update every second
+        const interval = setInterval(checkStartTime, 1000);
+        
+        return () => clearInterval(interval);
+    }, [exam?.startTime]);
 
     useEffect(() => {
         const fetchLeaderboardData = async () => {
@@ -158,66 +300,162 @@ const ExamDetailScreen = () => {
     }, [activeTab, id, user]);
 
     useEffect(() => {
-        const fetchExamDetails = async () => {
-            setExam(null);
-            setWinnings([]);
-            setLeaderboard([]);
-            setActiveTab('Info');
-            setError(null);
-            setIsParticipant(false);
-
+        const fetchAttemptsData = async () => {
             if (!user?.token || !id) return;
-
-            const idStr = String(id);
-            setLoading(true);
             try {
-                // Try generic exams list first
-                const response = await apiFetchAuth('/student/exams', user.token);
-                let examData: any | null = null;
-                if (response.ok && Array.isArray(response.data)) {
-                    examData = response.data.find((e: any) => String(e?.id) === idStr);
-                }
-
-                // Fallback to live exam details if not found
-                if (!examData) {
-                    // Prefer a direct exam endpoint; if it fails, try list fallback
-                    let liveRes = await apiFetchAuth(`/student/live-exams/${idStr}`, user.token);
-                    if (liveRes.ok && liveRes.data) {
-                        examData = liveRes.data;
-                    } else {
-                        liveRes = await apiFetchAuth('/student/live-exams', user.token);
-                        if (liveRes.ok && Array.isArray(liveRes.data)) {
-                            examData = liveRes.data.find((e: any) => String(e?.id) === idStr || String(e?.examId) === idStr);
-                        }
-                    }
-                }
-
-                if (examData) {
-                    // Normalize minimal fields used by this screen
-                    const normalized = {
-                        ...examData,
-                        id: examData.id ?? examData.examId ?? idStr,
-                        duration: examData.duration ?? examData.timeLimit ?? 0,
-                        questions: examData.questions ?? [],
-                        entryFee: examData.entryFee ?? examData.fee ?? 0,
-                        createdBy: examData.createdBy ?? examData.author ?? { name: 'Admin' },
-                        startTime: examData.startTime ?? examData.start_date ?? new Date().toISOString(),
-                        spots: examData.spots ?? examData.totalSpots ?? 0,
-                        spotsLeft: examData.spotsLeft ?? examData.remainingSpots ?? 0,
-                    };
-                    setExam(normalized);
-                    checkParticipantStatus();
+                setAttemptsLoading(true);
+                const response = await apiFetchAuth(`/student/live-exams/${id}/attempts`, user.token);
+                if (response.ok) {
+                    setAttempts(response.data || null);
                 } else {
-                    setError('Exam not found.');
+                    console.error("Failed to load attempts: ", response.data);
+                    setAttempts(null);
                 }
             } catch (e: any) {
-                setError(e?.data?.message || 'An error occurred.');
+                console.error("An error occurred while fetching attempts", e);
+                setAttempts(null);
             } finally {
-                setLoading(false);
+                setAttemptsLoading(false);
             }
         };
-        fetchExamDetails();
+
+        if (activeTab === 'Result') {
+            fetchAttemptsData();
+        }
+    }, [activeTab, id, user]);
+
+    const fetchResultData = async () => {
+        if (!user?.token || !id || !isCompleted) return;
+        if (resultLoading) return;
+        try {
+            setResultLoading(true);
+            setResultError(null);
+            const response = await apiFetchAuth(`/student/live-exams/${id}/result`, user.token);
+            if (response.ok) {
+                setResultData(response.data || null);
+            } else {
+                setResultData(null);
+                setResultError(response.data?.message || 'Result not available');
+            }
+        } catch (e: any) {
+            setResultData(null);
+            setResultError(e?.message || 'Result not available');
+        } finally {
+            setResultLoading(false);
+            setResultFetched(true);
+        }
+    };
+
+    useEffect(() => {
+        const fetchIfNeeded = async () => {
+            if (!user?.token || !id || !isCompleted) return;
+            if (resultFetched || resultData) return;
+            try {
+                await fetchResultData();
+            } catch {
+                // handled in fetchResultData
+            }
+        };
+
+        if (activeTab === 'Result') {
+            fetchIfNeeded();
+        }
+    }, [activeTab, id, user?.token, isCompleted, resultData, resultFetched]);
+
+    // Fetch exam details function
+    const fetchExamDetails = async () => {
+        if (!user?.token || !id) return;
+
+        const idStr = String(id);
+        try {
+            // Try generic exams list first
+            const response = await apiFetchAuth('/student/exams', user.token);
+            let examData: any | null = null;
+            if (response.ok && Array.isArray(response.data)) {
+                examData = response.data.find((e: any) => String(e?.id) === idStr);
+            }
+
+            // Fallback to live exam details if not found
+            if (!examData) {
+                // Prefer a direct exam endpoint; if it fails, try list fallback
+                let liveRes = await apiFetchAuth(`/student/live-exams/${idStr}`, user.token);
+                if (liveRes.ok && liveRes.data) {
+                    examData = liveRes.data;
+                } else {
+                    liveRes = await apiFetchAuth('/student/live-exams', user.token);
+                    if (liveRes.ok && Array.isArray(liveRes.data)) {
+                        examData = liveRes.data.find((e: any) => String(e?.id) === idStr || String(e?.examId) === idStr);
+                    }
+                }
+            }
+
+            if (examData) {
+                // Normalize minimal fields used by this screen
+                const normalized = {
+                    ...examData,
+                    id: examData.id ?? examData.examId ?? idStr,
+                    duration: examData.duration ?? examData.timeLimit ?? 0,
+                    questions: examData.questions ?? [],
+                    entryFee: examData.entryFee ?? examData.fee ?? 0,
+                    createdBy: examData.createdBy ?? examData.author ?? { name: 'Admin' },
+                    startTime: examData.startTime ?? examData.start_date ?? new Date().toISOString(),
+                    spots: examData.spots ?? examData.totalSpots ?? 0,
+                    spotsLeft: examData.spotsLeft ?? examData.remainingSpots ?? 0,
+                };
+                setExam(normalized);
+                checkParticipantStatus();
+            } else {
+                setError('Exam not found.');
+            }
+        } catch (e: any) {
+            setError(e?.data?.message || 'An error occurred.');
+        }
+    };
+
+    // Initial fetch
+    useEffect(() => {
+        setExam(null);
+        setWinnings([]);
+        setLeaderboard([]);
+        if (!resultDataParam) {
+            setResultData(null);
+            setResultError(null);
+            setResultLoading(false);
+            setResultFetched(false);
+        }
+        setActiveTab(initialTab);
+        setError(null);
+        setIsParticipant(false);
+        setLoading(true);
+        
+        fetchExamDetails().finally(() => {
+            setLoading(false);
+        });
     }, [id, user]);
+
+    // Refresh spots periodically (every 30 seconds) if exam hasn't started
+    useEffect(() => {
+        if (!exam || examHasStarted || !user?.token) return;
+
+        const refreshSpots = async () => {
+            try {
+                const idStr = String(id);
+                const liveRes = await apiFetchAuth(`/student/live-exams/${idStr}`, user.token);
+                if (liveRes.ok && liveRes.data) {
+                    setExam((prev: any) => ({
+                        ...prev,
+                        spots: liveRes.data.spots ?? liveRes.data.totalSpots ?? prev.spots,
+                        spotsLeft: liveRes.data.spotsLeft ?? liveRes.data.remainingSpots ?? prev.spotsLeft,
+                    }));
+                }
+            } catch (error) {
+                console.error('Error refreshing spots:', error);
+            }
+        };
+
+        const interval = setInterval(refreshSpots, 30000); // Refresh every 30 seconds
+        return () => clearInterval(interval);
+    }, [exam, examHasStarted, id, user?.token]);
 
     if (loading) {
         return <ActivityIndicator size="large" color={AppColors.primary} style={styles.centered} />;
@@ -240,17 +478,38 @@ const ExamDetailScreen = () => {
                 renderItem={() => (
                     <>
                         <View style={styles.examCardWrapper}>
-                            <ExamCard exam={exam} hideAttemptButton={String(from) === 'my-exams'} isDetailsPage={true} />
+                            <ExamCard exam={exam} hideAttemptButton={String(from) === 'my-exams'} isDetailsPage={true} onJoinSuccess={() => setIsParticipant(true)} attemptStatus={from === 'my-exams' ? status : undefined} hideSpotsSection={from === 'my-exams'} />
+                            {isParticipant && status !== 'COMPLETED' && !examHasStarted && exam?.startTime && (
+                                <View style={styles.joinedCompactCard}>
+                                    <View style={styles.joinedCompactIconWrap}>
+                                        <Ionicons name="checkmark" size={16} color="#059669" />
+                                    </View>
+                                    <View style={styles.joinedCompactContent}>
+                                        <Text style={styles.joinedCompactLabel}>You're in</Text>
+                                        <Text style={styles.joinedCompactTime}>
+                                            Starts in {timeUntilStart || formatTimeUntilStart(exam.startTime)}
+                                        </Text>
+                                        <Text style={styles.joinedCompactSubtext}>
+                                            Your spot is confirmed. Be ready when the exam starts.
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
                         <View style={styles.tabContainer}>
-                            {['Info', 'Leaderboard', 'Winnings'].map(tabName => (
+                            {[
+                                { key: 'Info', label: 'Info' },
+                                { key: 'Result', label: 'Result' },
+                                { key: 'Leaderboard', label: 'Ranking' },
+                                { key: 'Winnings', label: 'Winnings' },
+                            ].map(({ key, label }) => (
                                 <TouchableOpacity 
-                                    key={tabName} 
-                                    style={[styles.tab, activeTab === tabName && styles.activeTab]}
-                                    onPress={() => setActiveTab(tabName)}
+                                    key={key} 
+                                    style={[styles.tab, activeTab === key && styles.activeTab]}
+                                    onPress={() => setActiveTab(key)}
                                 >
-                                    <Text style={[styles.tabText, activeTab === tabName && styles.activeTabText]}>{tabName}</Text>
+                                    <Text style={[styles.tabText, activeTab === key && styles.activeTabText]}>{label}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
@@ -272,16 +531,82 @@ const ExamDetailScreen = () => {
                                     {/* Start Exam Button for Participants - Only show if not completed */}
                                     {isParticipant && status !== 'COMPLETED' && (
                                         <View style={styles.startExamContainer}>
-                                            <TouchableOpacity 
-                                                style={styles.startExamButton}
-                                                onPress={handleStartExam}
-                                                disabled={participantLoading}
-                                            >
-                                                <Ionicons name="play" size={20} color={AppColors.white} />
-                                                <Text style={styles.startExamButtonText}>
-                                                    {participantLoading ? 'Loading...' : 'Start Exam'}
-                                                </Text>
-                                            </TouchableOpacity>
+                                            {(() => {
+                                                if (!exam?.startTime) {
+                                                    return null;
+                                                }
+                                                
+                                                // Double check: Use state variable AND direct calculation for accuracy
+                                                const now = new Date();
+                                                let startTime: Date;
+                                                let endTime: Date | null = null;
+                                                
+                                                try {
+                                                    startTime = new Date(exam.startTime);
+                                                    if (isNaN(startTime.getTime())) {
+                                                        return null;
+                                                    }
+                                                    
+                                                    // Check end time if available
+                                                    if (exam.endTime) {
+                                                        endTime = new Date(exam.endTime);
+                                                        if (isNaN(endTime.getTime())) {
+                                                            endTime = null;
+                                                        }
+                                                    }
+                                                } catch (error) {
+                                                    return null;
+                                                }
+                                                
+                                                // Check if exam has ended
+                                                if (endTime) {
+                                                    const endTimeDiff = endTime.getTime() - now.getTime();
+                                                    const hasEnded = endTimeDiff <= 0;
+                                                    
+                                                    if (hasEnded) {
+                                                        // Exam has ended - show ended message
+                                                        return (
+                                                            <View style={styles.countdownContainer}>
+                                                                <View style={[styles.joinedBadge, { backgroundColor: '#FEE2E2', borderColor: '#EF4444' }]}>
+                                                                    <Ionicons name="close-circle" size={24} color="#EF4444" />
+                                                                    <Text style={[styles.joinedText, { color: '#EF4444' }]}>Exam Ended</Text>
+                                                                </View>
+                                                                <Text style={[styles.countdownLabel, { color: '#DC2626' }]}>Exam time has ended</Text>
+                                                                <Text style={styles.startTimeText}>
+                                                                    End Time: {formatDateTime(exam.endTime)}
+                                                                </Text>
+                                                                <Text style={styles.examEndedMessage}>
+                                                                    You joined this exam but did not attempt it. The exam time has now ended.
+                                                                </Text>
+                                                                <TouchableOpacity 
+                                                                    style={[styles.startExamButton, styles.disabledButton]}
+                                                                    disabled={true}
+                                                                >
+                                                                    <Ionicons name="lock-closed" size={20} color={AppColors.white} />
+                                                                    <Text style={styles.startExamButtonText}>
+                                                                        Exam Ended
+                                                                    </Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        );
+                                                    }
+                                                }
+                                                
+                                                // Calculate time difference in milliseconds
+                                                const timeDiff = startTime.getTime() - now.getTime();
+                                                // Exam has started only if time difference is <= 0
+                                                const hasStarted = timeDiff <= 0;
+                                                
+                                                // Use the more accurate check (direct calculation)
+                                                // This ensures we don't rely on stale state
+                                                if (!hasStarted) {
+                                                    // Countdown/Joined message is shown above (in card area) - nothing extra here
+                                                    return null;
+                                                } else {
+                                                    // Exam has started - Start Attempt button is on the card (upper), no duplicate here
+                                                    return null;
+                                                }
+                                            })()}
                                         </View>
                                     )}
                                 </>
@@ -334,7 +659,7 @@ const ExamDetailScreen = () => {
                                         {/* Leaderboard List */}
                                         <View style={styles.leaderboardCard}>
                                             <View style={styles.leaderboardHeader}>
-                                                <Text style={styles.leaderboardTitle}>Leaderboard</Text>
+                                                <Text style={styles.leaderboardTitle}>Ranking</Text>
                                             </View>
                                             
                                             {leaderboard.length > 0 ? (
@@ -345,17 +670,17 @@ const ExamDetailScreen = () => {
                                                     scrollEnabled={true}
                                                 >
                                                     <View style={styles.leaderboardList}>
-                                                        {leaderboard.map((item, index) => (
+                                                        {leaderboard.slice(0, 50).map((item, index) => (
                                                             <View key={item.userId || `user-${index}`} style={styles.leaderboardRow}>
                                                                 <View style={styles.leaderboardRankContainer}>
-                                                                    <Text style={styles.leaderboardRankText}>RANK: {item.rank}</Text>
+                                                                    <Text style={styles.leaderboardRankText}>{item.rank}</Text>
                                                                 </View>
                                                                 <View style={styles.leaderboardProfileContainer}>
-                                                                    <Ionicons name="person-circle-outline" size={40} color="#9CA3AF" />
+                                                                    <Ionicons name="person-circle-outline" size={28} color="#9CA3AF" />
                                                                 </View>
                                                                 <View style={styles.leaderboardInfoContainer}>
-                                                                    <Text style={styles.leaderboardNameText}>{item.name} • {item.timeTaken || 0} min</Text>
-                                                                    <Text style={styles.leaderboardScoreText}>{item.score} Marks</Text>
+                                                                    <Text style={styles.leaderboardNameText} numberOfLines={1}>{item.name}</Text>
+                                                                    <Text style={styles.leaderboardScoreText}>{item.score} Marks • {item.timeTaken ?? 0} min</Text>
                                                                 </View>
                                                             </View>
                                                         ))}
@@ -438,6 +763,109 @@ const ExamDetailScreen = () => {
                                                 </View>
                                             )}
                                         />
+                                    </View>
+                                )
+                            )}
+                            {activeTab === 'Result' && (
+                                resultLoading || attemptsLoading ? (
+                                    <ActivityIndicator color={AppColors.primary} style={{ marginVertical: 20 }}/>
+                                ) : (
+                                    <View style={styles.resultContainer}>
+                                        {!isCompleted ? (
+                                            <View style={styles.emptyState}>
+                                                <Ionicons name="information-circle-outline" size={48} color="#9CA3AF" />
+                                                <Text style={styles.emptyText}>Result will be available after completion.</Text>
+                                                <Text style={styles.emptySubtext}>
+                                                    Complete the exam to see full performance details.
+                                                </Text>
+                                            </View>
+                                        ) : resultData ? (
+                                            <>
+                                                <View style={styles.resultSummaryCard}>
+                                                    <View style={styles.resultHeaderRow}>
+                                                        <Text style={styles.resultTitle}>Your Result</Text>
+                                                        {resultData.currentRank != null && (
+                                                            <View style={styles.resultBadge}>
+                                                                <Ionicons name="podium" size={14} color="#7C3AED" />
+                                                                <Text style={styles.resultBadgeText}>Rank #{resultData.currentRank}</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                    <View style={styles.resultGrid}>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Score</Text>
+                                                                <Text style={styles.resultValue}>
+                                                                    {resultData.score ?? 0} / {resultData.totalQuestions ?? (exam.questions?.length || 0)}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Accuracy</Text>
+                                                                <Text style={styles.resultValue}>{getResultAccuracy(resultData)}%</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Correct</Text>
+                                                                <Text style={styles.resultValue}>{resultData.correctAnswers ?? 0}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Wrong</Text>
+                                                                <Text style={styles.resultValue}>{resultData.wrongAnswers ?? 0}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Unattempted</Text>
+                                                                <Text style={styles.resultValue}>{resultData.unattempted ?? 0}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <View style={styles.resultItem}>
+                                                            <View style={styles.resultItemRow}>
+                                                                <Text style={styles.resultLabel}>Time Taken</Text>
+                                                                <Text style={styles.resultValue}>{formatResultDuration(resultData)}</Text>
+                                                            </View>
+                                                        </View>
+                                                        {resultData.completedAt && (
+                                                            <View style={styles.resultItemFull}>
+                                                                <View style={styles.resultItemRow}>
+                                                                    <Text style={styles.resultLabel}>Completed</Text>
+                                                                    <Text style={styles.resultValue}>
+                                                                        {new Date(resultData.completedAt).toLocaleString()}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                        )}
+                                                        {resultData.prizeAmount != null && (
+                                                            <View style={styles.resultItemFull}>
+                                                                <View style={styles.resultItemRow}>
+                                                                    <Text style={styles.resultLabel}>Prize</Text>
+                                                                    <Text style={styles.resultValue}>₹ {resultData.prizeAmount}</Text>
+                                                                </View>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                                <TouchableOpacity style={styles.resultActionButton} onPress={openFullResult} activeOpacity={0.85}>
+                                                    <Ionicons name="analytics" size={18} color="#FFF" />
+                                                    <Text style={styles.resultActionText}>View Full Result</Text>
+                                                </TouchableOpacity>
+                                            </>
+                                        ) : (
+                                            <View style={styles.emptyState}>
+                                                <Ionicons name="alert-circle-outline" size={48} color="#9CA3AF" />
+                                                <Text style={styles.emptyText}>{resultError || 'Result not available yet.'}</Text>
+                                                <Text style={styles.emptySubtext}>Please try again in a moment.</Text>
+                                                <TouchableOpacity style={styles.retryResultButton} onPress={fetchResultData}>
+                                                    <Ionicons name="refresh" size={18} color="#7C3AED" />
+                                                    <Text style={styles.retryResultText}>Retry</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
                                 )
                             )}
@@ -641,22 +1069,22 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         backgroundColor: AppColors.white,
         marginHorizontal: 16,
-        marginTop: 12,
-        marginBottom: 12,
-        borderRadius: 16,
-        padding: 6,
+        marginTop: 4,
+        marginBottom: 4,
+        borderRadius: 10,
+        padding: 3,
         shadowColor: '#6366F1',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 4,
         borderWidth: 1,
         borderColor: 'rgba(99, 102, 241, 0.1)',
     },
     tab: {
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        paddingVertical: 5,
+        paddingHorizontal: 6,
+        borderRadius: 8,
         flex: 1,
         alignItems: 'center',
         marginHorizontal: 2,
@@ -664,22 +1092,22 @@ const styles = StyleSheet.create({
     activeTab: {
         backgroundColor: AppColors.primary,
         shadowColor: AppColors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
+        elevation: 4,
     },
     tabText: {
         color: AppColors.grey,
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 11,
         letterSpacing: 0.2,
     },
     activeTabText: {
         color: AppColors.white,
-        fontWeight: '800',
-        fontSize: 14,
-        letterSpacing: 0.3,
+        fontWeight: '700',
+        fontSize: 11,
+        letterSpacing: 0.2,
     },
     tabContent: {
         backgroundColor: AppColors.white,
@@ -867,6 +1295,128 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 10,
+    },
+    countdownContainer: {
+        alignItems: 'center',
+        padding: 20,
+        backgroundColor: '#F0FDF4',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#10B981',
+    },
+    countdownContainerInCard: {
+        marginHorizontal: 12,
+        marginBottom: 12,
+    },
+    joinedCompactCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 12,
+        backgroundColor: '#FFFFFF',
+        paddingVertical: 14,
+        paddingHorizontal: 14,
+        marginHorizontal: 12,
+        marginBottom: 12,
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#10B981',
+        ...(Platform.OS === 'android' ? {} : {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06,
+            shadowRadius: 4,
+        }),
+        elevation: Platform.OS === 'android' ? 0 : 2,
+    },
+    joinedCompactIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#D1FAE5',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    joinedCompactContent: {
+        flex: 1,
+    },
+    joinedCompactLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#6B7280',
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    joinedCompactTime: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#047857',
+        marginBottom: 4,
+    },
+    joinedCompactSubtext: {
+        fontSize: 12,
+        color: '#6B7280',
+        lineHeight: 18,
+    },
+    joinedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#D1FAE5',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#10B981',
+    },
+    joinedText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#10B981',
+        marginLeft: 8,
+    },
+    spotsInfoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        marginTop: 12,
+        marginBottom: 16,
+    },
+    spotsInfoText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#374151',
+        marginLeft: 6,
+    },
+    countdownLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#059669',
+        marginBottom: 8,
+    },
+    countdownTime: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#10B981',
+        marginBottom: 12,
+        letterSpacing: 2,
+    },
+    startTimeText: {
+        fontSize: 12,
+        color: '#059669',
+        marginBottom: 8,
+        fontWeight: '500',
+    },
+    disabledButton: {
+        backgroundColor: '#9CA3AF',
+        opacity: 0.7,
+    },
+    joinedButton: {
+        backgroundColor: '#10B981',
+        opacity: 0.9,
     },
     leaderboardContainer: {
         backgroundColor: '#FFFFFF',
@@ -1276,6 +1826,120 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
     },
+    emptySubtext: {
+        color: '#6B7280',
+        fontSize: 13,
+        marginTop: 6,
+        textAlign: 'center',
+    },
+    resultContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    resultSummaryCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#EEF2F7',
+        shadowColor: '#111827',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.07,
+        shadowRadius: 14,
+        elevation: 4,
+    },
+    resultHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    resultTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#111827',
+    },
+    resultBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EDE9FE',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+    },
+    resultBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#7C3AED',
+        marginLeft: 6,
+    },
+    resultGrid: {
+        flexDirection: 'column',
+    },
+    resultItem: {
+        width: '100%',
+    },
+    resultItemFull: {
+        width: '100%',
+    },
+    resultItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    resultLabel: {
+        fontSize: 12,
+        color: '#6B7280',
+        flex: 1,
+    },
+    resultValue: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#111827',
+        flex: 1,
+        textAlign: 'right',
+    },
+    resultActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#22C55E',
+        borderRadius: 12,
+        paddingVertical: 10,
+        marginTop: 10,
+        shadowColor: '#16A34A',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 3,
+    },
+    resultActionText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    retryResultButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#C4B5FD',
+        backgroundColor: '#F5F3FF',
+        marginTop: 12,
+    },
+    retryResultText: {
+        marginLeft: 6,
+        color: '#7C3AED',
+        fontSize: 13,
+        fontWeight: '600',
+    },
     crownIcon: {
         position: 'absolute',
         bottom: -5,
@@ -1382,11 +2046,12 @@ const styles = StyleSheet.create({
         padding: 0,
         backgroundColor: '#FFFFFF',
         marginBottom: 16,
-        marginTop: 0,
+        marginTop: 12,
     },
     topPerformersGradient: {
         padding: 0,
         backgroundColor: '#FFFFFF',
+        alignItems: 'center',
     },
     topPerformersTitle: {
         fontSize: 16,
@@ -1394,6 +2059,7 @@ const styles = StyleSheet.create({
         color: '#1F2937',
         marginBottom: 12,
         paddingHorizontal: 4,
+        textAlign: 'center',
     },
     topPerformersRow: {
         flexDirection: 'row',
@@ -1513,52 +2179,52 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
     leaderboardList: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         flexGrow: 1,
     },
     leaderboardRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        marginBottom: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 6,
+        marginBottom: 4,
         backgroundColor: '#FAFAFA',
-        borderRadius: 10,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#F3F4F6',
     },
     leaderboardRankContainer: {
         backgroundColor: '#F97316',
         borderRadius: 6,
-        paddingVertical: 4,
-        paddingHorizontal: 8,
-        marginRight: 10,
-        minWidth: 50,
+        paddingVertical: 2,
+        paddingHorizontal: 6,
+        marginRight: 8,
+        minWidth: 28,
         alignItems: 'center',
     },
     leaderboardRankText: {
         fontSize: 11,
         fontWeight: '700',
         color: '#FFFFFF',
-        letterSpacing: 0.5,
     },
     leaderboardProfileContainer: {
-        marginRight: 10,
+        marginRight: 8,
     },
     leaderboardInfoContainer: {
         flex: 1,
+        minWidth: 0,
     },
     leaderboardNameText: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: '#1F2937',
-        marginBottom: 3,
     },
     leaderboardScoreText: {
-        fontSize: 13,
+        fontSize: 11,
         color: '#6B7280',
         fontWeight: '500',
+        marginTop: 1,
     },
     noWinnersSection: {
         alignItems: 'center',
@@ -1581,8 +2247,47 @@ const styles = StyleSheet.create({
     },
     // Leaderboard Scroll
     leaderboardScrollView: {
-        maxHeight: 300,
+        maxHeight: 420,
         flexGrow: 0,
+    },
+    examEndedMessage: {
+        fontSize: 13,
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 12,
+        marginBottom: 16,
+        lineHeight: 18,
+        paddingHorizontal: 8,
+    },
+    // Attempts Tab Styles
+    attemptsContainer: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+    },
+    attemptInfoCard: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    attemptInfoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    attemptStatusText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginLeft: 12,
+    },
+    attemptDetailText: {
+        fontSize: 14,
+        color: '#374151',
+        marginLeft: 12,
+        fontWeight: '500',
     },
 });
 

@@ -3,17 +3,67 @@
  */
 
 /**
- * Filters out expired exams based on endTime or startTime
+ * Filters live exams based on API requirements:
+ * - isLive: true
+ * - endTime: null OR endTime > now (upcoming + ongoing)
+ * - spotsLeft > 0
+ * - User hasn't joined (optional - can be checked separately)
  * @param exams - Array of exam objects
- * @returns Array of active (non-expired) exams
+ * @param userId - Optional user ID to check if user has joined
+ * @returns Array of active live exams
  */
-export function filterActiveExams(exams: any[]): any[] {
+export function filterActiveExams(
+  exams: any[],
+  userId?: string,
+  joinedExamIds?: string[]
+): any[] {
   const now = new Date().getTime();
   
   return exams.filter(exam => {
-    // Use endTime if available, otherwise fall back to startTime
-    const endTime = new Date(exam.endTime || exam.startTime).getTime();
-    return endTime > now;
+    // 1. Check isLive: true
+    if (exam.isLive !== true && exam.isLive !== undefined) {
+      return false;
+    }
+    
+    // 2. Check endTime: null OR endTime > now
+    if (exam.endTime) {
+      const endTime = new Date(exam.endTime).getTime();
+      if (endTime <= now) {
+        return false; // Exam has ended
+      }
+    }
+    // If endTime is null, that's fine (ongoing exam)
+
+    // 2b. Hide started exams for users who haven't joined
+    if (exam.startTime) {
+      const startTime = new Date(exam.startTime).getTime();
+      if (startTime <= now) {
+        if (joinedExamIds && joinedExamIds.includes(exam.id)) {
+          return true; // Joined exam should remain visible
+        }
+        if (userId && exam.participants) {
+          const hasJoined = exam.participants.some((p: any) => 
+            p.userId === userId || p.user?.id === userId || p.userId === userId
+          );
+          if (!hasJoined) {
+            return false; // Exam started and user did not join
+          }
+        } else {
+          return false; // No user info; hide started exam
+        }
+      }
+    }
+    
+    // 3. Check spotsLeft > 0
+    if (exam.spotsLeft !== undefined && exam.spotsLeft !== null) {
+      if (exam.spotsLeft <= 0) {
+        return false; // No spots left
+      }
+    }
+    
+    // 4. Do not hide joined exams; joined users should always see their exam
+    
+    return true;
   });
 }
 
@@ -63,13 +113,15 @@ export function applyExamFilters(
     category?: string;
     searchQuery?: string;
     includeExpired?: boolean;
+    userId?: string;
+    joinedExamIds?: string[];
   }
 ): any[] {
   let filtered = exams;
   
   // Filter out expired exams unless explicitly included
   if (!filters.includeExpired) {
-    filtered = filterActiveExams(filtered);
+    filtered = filterActiveExams(filtered, filters.userId, filters.joinedExamIds);
   }
   
   // Apply category filter

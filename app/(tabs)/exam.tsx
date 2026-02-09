@@ -1,6 +1,7 @@
 import { apiFetchAuth } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { useCategory } from '@/context/CategoryContext';
 import { applyExamFilters } from '@/utils/examFilter';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +11,7 @@ import {
     ActivityIndicator,
     Animated,
     FlatList,
+    Image,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -24,7 +26,9 @@ import ExamCard from '../../components/ExamCard';
 export default function ExamScreen() {
     const { user } = useAuth();
     const router = useRouter();
+    const { selectedCategory: globalCategory } = useCategory();
     const [exams, setExams] = useState<any[]>([]);
+    const [joinedLiveExamIds, setJoinedLiveExamIds] = useState<string[]>([]);
     const [filteredExams, setFilteredExams] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -37,6 +41,25 @@ export default function ExamScreen() {
     // Animation refs
     const floatAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    const fetchJoinedLiveExams = async () => {
+        if (!user?.token) return;
+        try {
+            const res = await apiFetchAuth('/student/my-exams', user.token);
+            if (res.ok && Array.isArray(res.data)) {
+                const ids = res.data
+                    .filter((e: any) => e.examType === 'LIVE' && e.status !== 'COMPLETED')
+                    .map((e: any) => e.examId || e.id)
+                    .filter(Boolean);
+                setJoinedLiveExamIds(ids);
+            } else {
+                setJoinedLiveExamIds([]);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching joined live exams:', error);
+            setJoinedLiveExamIds([]);
+        }
+    };
 
     const fetchExams = async () => {
         if (!user?.token) {
@@ -67,6 +90,7 @@ export default function ExamScreen() {
             } else {
                 setError(response.data?.message || 'Failed to fetch exams');
             }
+            await fetchJoinedLiveExams();
         } catch (err: any) {
             setError(err.data?.message || 'An unknown error occurred');
         } finally {
@@ -174,16 +198,21 @@ export default function ExamScreen() {
         return () => clearInterval(timer);
     }, [filteredExams]);
 
-    // Filter exams based on selected category and search query
+    // Filter exams based on global category, local category, and search query
     useEffect(() => {
+        // Use global category if available, otherwise use local selectedCategory
+        const categoryToFilter = globalCategory || (selectedCategory !== 'all' ? selectedCategory : undefined);
+        
         const filtered = applyExamFilters(exams, {
-            category: selectedCategory,
+            category: categoryToFilter,
             searchQuery: searchQuery,
-            includeExpired: false // Filter out expired exams
+            includeExpired: false, // Filter out expired exams
+            userId: user?.id, // Pass userId to filter out exams user has joined
+            joinedExamIds: joinedLiveExamIds
         });
         
         setFilteredExams(filtered);
-    }, [selectedCategory, exams, searchQuery]);
+    }, [globalCategory, selectedCategory, exams, searchQuery, joinedLiveExamIds]);
 
     const handleCategorySelect = (category: string) => {
         setSelectedCategory(category);
@@ -257,7 +286,7 @@ export default function ExamScreen() {
                 >
                     <View style={styles.searchInputContainer}>
                         <View style={styles.searchIconContainer}>
-                            <Ionicons name="search" size={22} color="#8B5CF6" />
+                            <Image source={require('@/assets/images/icons/search.png')} style={styles.searchBarIcon} resizeMode="contain" />
                         </View>
                         <TextInput
                             style={styles.searchInput}
@@ -273,7 +302,7 @@ export default function ExamScreen() {
                                 style={styles.clearButton}
                                 onPress={() => setSearchQuery('')}
                             >
-                                <Ionicons name="close-circle" size={24} color="#8B5CF6" />
+                                <Ionicons name="close-circle" size={20} color="#8B5CF6" />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -423,12 +452,12 @@ const styles = StyleSheet.create({
     searchContainer: {
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingVertical: 6,
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
     },
     searchGradient: {
-        borderRadius: 10,
+        borderRadius: 8,
         backgroundColor: '#F9FAFB',
         borderWidth: 1,
         borderColor: '#E5E7EB',
@@ -437,20 +466,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        minHeight: 34,
         borderWidth: 1,
         borderColor: '#D1D5DB',
     },
     searchIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#F3F4F6',
-        marginRight: 8,
+        marginRight: 6,
+    },
+    searchBarIcon: {
+        width: 18,
+        height: 18,
     },
     searchInput: {
         flex: 1,

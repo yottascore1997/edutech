@@ -1,12 +1,18 @@
 import { apiFetchAuth } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
+import { useLiveExam } from '@/context/LiveExamContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
+
+const LIVE_EXAM_STATE_KEY = (examId: string) => `live_exam_state_${examId}`;
+const SAVED_STATE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // interface Question {
 //   id: string;
@@ -30,11 +36,22 @@ interface QuestionStatus {
   eliminated: number[]; // Track eliminated options
 }
 
+interface SavedLiveExamState {
+  examId: string;
+  questions: Question[];
+  statuses: QuestionStatus[];
+  currentIndex: number;
+  remainingSeconds: number;
+  savedAt: number;
+}
+
 const LiveExamQuestionsScreen = () => {
   const { id, duration } = useLocalSearchParams<{ id: string, duration?: string }>();
  
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const { setLiveExamInProgress } = useLiveExam();
 
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -47,6 +64,24 @@ const LiveExamQuestionsScreen = () => {
   const [currentSelection, setCurrentSelection] = useState<number | undefined>(undefined);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Resume flow: show dialog if we have saved state for this exam
+  const [resumePayload, setResumePayload] = useState<SavedLiveExamState | null>(null);
+  const allowLeaveRef = useRef(false);
+  const lastSaveRef = useRef(0);
+  const saveThrottleMs = 15000;
+
+  // Refs to read latest state when saving (e.g. on leave or background)
+  const questionsRef = useRef<Question[]>([]);
+  const statusesRef = useRef<QuestionStatus[]>([]);
+  const currentRef = useRef(0);
+  const timerStateRef = useRef(0);
+  const currentSelectionRef = useRef<number | undefined>(undefined);
+  questionsRef.current = questions;
+  statusesRef.current = statuses;
+  currentRef.current = current;
+  timerStateRef.current = timer;
+  currentSelectionRef.current = currentSelection;
   
   // NEW FEATURES STATE
   const [liveRank, setLiveRank] = useState<number | null>(null);
@@ -61,11 +96,102 @@ const LiveExamQuestionsScreen = () => {
   // const rotateAnim = useRef(new Animated.Value(0)).current;
   // const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // Fetch questions directly since join is already handled in the previous screen
+  const saveExamState = useCallback(async () => {
+    if (!id || questionsRef.current.length === 0) return;
+    try {
+      const payload: SavedLiveExamState = {
+        examId: id,
+        questions: questionsRef.current,
+        statuses: statusesRef.current,
+        currentIndex: currentRef.current,
+        remainingSeconds: timerStateRef.current,
+        savedAt: Date.now(),
+      };
+      await AsyncStorage.setItem(LIVE_EXAM_STATE_KEY(id), JSON.stringify(payload));
+      lastSaveRef.current = Date.now();
+    } catch (e) {
+      console.warn('Failed to save exam state', e);
+    }
+  }, [id]);
+
+  const clearExamState = useCallback(async () => {
+    if (!id) return;
+    try {
+      await AsyncStorage.removeItem(LIVE_EXAM_STATE_KEY(id));
+    } catch (e) {
+      console.warn('Failed to clear exam state', e);
+    }
+  }, [id]);
+
+  // Verify exam has started before showing questions
+  const verifyStartTime = async () => {
+    if (!id || !user?.token) return false;
+    
+    try {
+      // Fetch exam details to check start time
+      const examRes = await apiFetchAuth(`/student/live-exams/${id}`, user.token);
+      if (examRes.ok && examRes.data) {
+        const exam = examRes.data;
+        const now = new Date();
+        const startTime = new Date(exam.startTime);
+        
+        if (now < startTime) {
+          Alert.alert(
+            'Exam Not Started',
+            'Please wait for the exam start time.',
+            [
+              {
+                text: 'Go Back',
+                onPress: () => router.back()
+              }
+            ]
+          );
+          return false;
+        }
+        return true;
+      }
+      return true; // If exam fetch fails, allow to proceed (backend will handle)
+    } catch (error) {
+      console.error('Error verifying start time:', error);
+      return true; // Allow to proceed if verification fails
+    }
+  };
+
+  // Initialize: check for saved state (resume) or fetch fresh
   useEffect(() => {
     if (!id || !user?.token) return;
     
-    fetchQuestions();
+    const initializeExam = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(LIVE_EXAM_STATE_KEY(id));
+        if (raw) {
+          const parsed: SavedLiveExamState = JSON.parse(raw);
+          if (parsed.examId !== id || !parsed.questions?.length) {
+            await AsyncStorage.removeItem(LIVE_EXAM_STATE_KEY(id));
+          } else {
+            const age = Date.now() - parsed.savedAt;
+            if (age <= SAVED_STATE_MAX_AGE_MS) {
+              const elapsedSec = Math.floor(age / 1000);
+              const remaining = Math.max(0, parsed.remainingSeconds - elapsedSec);
+              if (remaining > 0) {
+                setResumePayload(parsed);
+                setLoading(false);
+                return;
+              }
+            }
+            await AsyncStorage.removeItem(LIVE_EXAM_STATE_KEY(id));
+          }
+        }
+      } catch (_) {
+        try { await AsyncStorage.removeItem(LIVE_EXAM_STATE_KEY(id)); } catch (_2) {}
+      }
+      const canProceed = await verifyStartTime();
+      if (canProceed) {
+        fetchQuestions();
+      }
+    };
+    
+    initializeExam();
     
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -122,6 +248,21 @@ const LiveExamQuestionsScreen = () => {
     try {
       const res = await apiFetchAuth(`/student/live-exams/${id}/questions`, user.token);
       if (res.ok) {
+        // Check if response indicates exam hasn't started
+        if (res.data?.message?.includes('not started') || res.data?.message?.includes('start time')) {
+          Alert.alert(
+            'Exam Not Started',
+            'Please wait for the exam start time.',
+            [
+              {
+                text: 'Go Back',
+                onPress: () => router.back()
+              }
+            ]
+          );
+          setLoading(false);
+          return;
+        }
 
         setQuestions(res.data);
         setStatuses(res.data.map(() => ({ 
@@ -134,12 +275,40 @@ const LiveExamQuestionsScreen = () => {
         setLoading(false);
         startTimer();
       } else {
-        Alert.alert('Error', 'Could not fetch questions.');
+        // Check if error is about start time
+        if (res.data?.message?.includes('not started') || res.data?.message?.includes('start time')) {
+          Alert.alert(
+            'Exam Not Started',
+            'Please wait for the exam start time.',
+            [
+              {
+                text: 'Go Back',
+                onPress: () => router.back()
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Error', res.data?.message || 'Could not fetch questions.');
+        }
         setLoading(false);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error fetching questions:', e);
-      Alert.alert('Error', 'Could not fetch questions.');
+      // Check if error is about start time
+      if (e?.data?.message?.includes('not started') || e?.data?.message?.includes('start time')) {
+        Alert.alert(
+          'Exam Not Started',
+          'Please wait for the exam start time.',
+          [
+            {
+              text: 'Go Back',
+              onPress: () => router.back()
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', 'Could not fetch questions.');
+      }
       setLoading(false);
     }
   };
@@ -157,6 +326,96 @@ const LiveExamQuestionsScreen = () => {
       });
     }, 1000);
   };
+
+  const handleResumeAttempt = () => {
+    if (!resumePayload) return;
+    const elapsedSec = Math.floor((Date.now() - resumePayload.savedAt) / 1000);
+    const remaining = Math.max(0, resumePayload.remainingSeconds - elapsedSec);
+    setQuestions(resumePayload.questions);
+    setStatuses(resumePayload.statuses);
+    setCurrent(resumePayload.currentIndex);
+    setTimer(remaining);
+    setCurrentSelection(resumePayload.statuses[resumePayload.currentIndex]?.selectedOption);
+    setResumePayload(null);
+    if (remaining <= 0) {
+      setTimeout(() => autoSubmitExam(), 150);
+      return;
+    }
+    startTimer();
+  };
+
+  const handleStartFresh = async () => {
+    await clearExamState();
+    setResumePayload(null);
+    setLoading(true);
+    const canProceed = await verifyStartTime();
+    if (canProceed) {
+      fetchQuestions();
+    } else {
+      setLoading(false);
+    }
+  };
+
+  // Periodic save and save on app background
+  useEffect(() => {
+    if (questions.length === 0 || submitting) return;
+    const interval = setInterval(() => {
+      if (Date.now() - lastSaveRef.current >= saveThrottleMs) {
+        saveExamState();
+      }
+    }, saveThrottleMs);
+    return () => clearInterval(interval);
+  }, [questions.length, submitting, saveExamState]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'background' && questionsRef.current.length > 0) {
+        saveExamState();
+      }
+    });
+    return () => sub.remove();
+  }, [saveExamState]);
+
+  // Leave warning (back button): on Leave = save progress and go back
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (allowLeaveRef.current || questions.length === 0) return;
+      e.preventDefault();
+      Alert.alert(
+        'Leave exam?',
+        'Leaving will save your progress. You can resume when you return. Time will keep counting down.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'Leave',
+            style: 'destructive',
+            onPress: () => {
+              saveExamState();
+              setLiveExamInProgress(false);
+              allowLeaveRef.current = true;
+              router.back();
+            },
+          },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation, questions.length, saveExamState, setLiveExamInProgress]);
+
+  // On focus: mark in progress so tab bar shows alert every time. On blur: save + clear.
+  useFocusEffect(
+    useCallback(() => {
+      if (questionsRef.current.length > 0) {
+        setLiveExamInProgress(true);
+      }
+      return () => {
+        if (questionsRef.current.length > 0) {
+          saveExamState();
+        }
+        setLiveExamInProgress(false);
+      };
+    }, [saveExamState, setLiveExamInProgress])
+  );
 
   const formatTime = (sec: number) => {
     const h = Math.floor(sec / 3600).toString().padStart(2, '0');
@@ -352,11 +611,8 @@ const LiveExamQuestionsScreen = () => {
 
       if (response.ok) {
         console.log('Live exam auto-submitted successfully');
-        
-        // Store the result data
+        await clearExamState();
         const resultData = response.data;
-        
-        // Navigate directly to result page with the exam ID and result data
         router.push({
           pathname: '/(tabs)/live-exam/result/[id]' as any,
           params: { 
@@ -371,7 +627,7 @@ const LiveExamQuestionsScreen = () => {
       console.error('❌ Error auto-submitting live exam:', error);
       setSubmitting(false);
       Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
-      // Even if error occurs, try to navigate to result page
+      await clearExamState();
       router.push({
         pathname: '/(tabs)/live-exam/result/[id]' as any,
         params: { id: id }
@@ -408,13 +664,8 @@ const LiveExamQuestionsScreen = () => {
       });
 
       if (response.ok) {
-
-
-        
-        // Store the result data
+        await clearExamState();
         const resultData = response.data;
-        
-        // Navigate directly to result page with the exam ID and result data
         router.push({
           pathname: '/(tabs)/live-exam/result/[id]' as any,
           params: { 
@@ -461,35 +712,62 @@ const LiveExamQuestionsScreen = () => {
     );
   }
 
+  // Resume dialog when we have saved state
+  if (resumePayload) {
+    const elapsedSec = Math.floor((Date.now() - resumePayload.savedAt) / 1000);
+    const remaining = Math.max(0, resumePayload.remainingSeconds - elapsedSec);
+    const minLeft = Math.floor(remaining / 60);
+    const secLeft = remaining % 60;
+    const timeStr = minLeft > 0 ? `${minLeft} min ${secLeft} sec` : `${secLeft} sec`;
+
+    return (
+      <View style={styles.loadingContainer}>
+        <LinearGradient
+          colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
+          style={styles.loadingGradient}
+        >
+          <View style={styles.resumeDialogBox}>
+            <Ionicons name="time" size={40} color="#fff" style={{ marginBottom: 12 }} />
+            <Text style={styles.resumeDialogTitle}>Resume your attempt?</Text>
+            <Text style={styles.resumeDialogSubtext}>
+              You have a saved attempt with {timeStr} remaining.
+            </Text>
+            <View style={styles.resumeDialogButtons}>
+              <TouchableOpacity style={styles.resumeDialogButtonPrimary} onPress={handleResumeAttempt} activeOpacity={0.8}>
+                <Text style={styles.resumeDialogButtonPrimaryText}>Resume</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.resumeDialogButtonSecondary} onPress={handleStartFresh} activeOpacity={0.8}>
+                <Text style={styles.resumeDialogButtonSecondaryText}>Start fresh</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header with Timer */}
+      {/* Header with Timer - improved */}
       <LinearGradient
-        colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
+        colors={['#4F46E5', '#5B21B6', '#6D28D9']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
         style={styles.headerGradient}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.sidePanelToggle} 
+          <Pressable
+            style={({ pressed }) => [styles.sidePanelToggle, pressed && styles.sidePanelTogglePressed]}
             onPress={() => setShowSidePanel(!showSidePanel)}
+            hitSlop={{ top: 28, bottom: 28, left: 28, right: 28 }}
           >
-            <Ionicons name={showSidePanel ? "close" : "menu"} size={24} color="#fff" />
-          </TouchableOpacity>
+            <Ionicons name={showSidePanel ? "close" : "menu"} size={26} color="#fff" />
+            <Text style={styles.sidePanelToggleLabel}>{showSidePanel ? "Close" : "Menu"}</Text>
+          </Pressable>
           
           <View style={styles.headerCenter}>
-            {/* Live Rank Indicator */}
-            {showLiveRank && liveRank && (
-              <View style={styles.liveRankBadge}>
-                <Ionicons name="trophy" size={14} color="#FFA500" />
-                <Text style={styles.liveRankText}>
-                  Rank #{liveRank}/{totalParticipants}
-                </Text>
-              </View>
-            )}
-            
+            <Text style={styles.headerLiveLabel}>Live Exam</Text>
             <Text style={styles.questionProgress}>Question {current + 1} of {questions.length}</Text>
-            
-            {/* Progress Bar */}
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBarBackground}>
                 <View 
@@ -501,10 +779,16 @@ const LiveExamQuestionsScreen = () => {
               </View>
               <Text style={styles.progressText}>{Math.round(((current + 1) / questions.length) * 100)}%</Text>
             </View>
+            {showLiveRank && liveRank ? (
+              <View style={styles.liveRankBadge}>
+                <Ionicons name="trophy" size={12} color="#FBBF24" />
+                <Text style={styles.liveRankText}>#{liveRank}</Text>
+              </View>
+            ) : null}
           </View>
           
-          <View style={styles.timerContainer}>
-            <Ionicons name="time" size={18} color="#fff" style={styles.timerIcon} />
+          <View style={[styles.timerContainer, timer <= 300 && styles.timerContainerWarning]}>
+            <Ionicons name="time-outline" size={20} color="#fff" style={styles.timerIcon} />
             <Text style={[styles.timerText, timer <= 300 && styles.timerTextWarning]}>
               {formatTime(timer)}
             </Text>
@@ -527,33 +811,30 @@ const LiveExamQuestionsScreen = () => {
             }
           ]}
         >
-          {/* Question Header */}
+          {/* Question Header - improved */}
           <View style={styles.questionHeader}>
-            <View style={styles.headerLeft}>
+            <View style={styles.questionHeaderTop}>
               <View style={styles.questionNumberBadge}>
-                <Text style={styles.questionNumber}>Q{current + 1}.</Text>
+                <Text style={styles.questionNumber}>Q{current + 1}</Text>
               </View>
-              <ScrollView 
-                style={styles.questionScrollContainer}
-                showsVerticalScrollIndicator={true}
-              >
-                <Text style={styles.questionTitleInline}>
-                  {questions[current]?.text}
-                </Text>
-              </ScrollView>
-              <View style={styles.rightBadges}>
+              <View style={styles.questionMetaRow}>
                 <View style={styles.timeSpentBadge}>
-                  <Ionicons name="time-outline" size={12} color="#667eea" />
-                  <Text style={styles.timeSpentText}>
-                    {formatQuestionTime(statuses[current]?.timeSpent || 0)}
-                  </Text>
+                  <Ionicons name="time-outline" size={12} color="#6366F1" />
+                  <Text style={styles.timeSpentText}>{formatQuestionTime(statuses[current]?.timeSpent || 0)}</Text>
                 </View>
                 <View style={styles.questionMarks}>
-                  <Ionicons name="star" size={12} color="#B45309" />
-                  <Text style={styles.marksText}>{questions[current]?.marks || 1}m</Text>
+                  <Text style={styles.marksText}>{questions[current]?.marks || 1} mark{questions[current]?.marks !== 1 ? 's' : ''}</Text>
                 </View>
               </View>
             </View>
+            <ScrollView 
+              style={styles.questionScrollContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.questionTitleInline}>
+                {questions[current]?.text}
+              </Text>
+            </ScrollView>
           </View>
 
 
@@ -725,18 +1006,25 @@ const LiveExamQuestionsScreen = () => {
 
       {/* Side Panel */}
       {showSidePanel && (
-        <View style={[styles.sidePanel, { width: Math.min(width * 0.9, 320) }]}>
+        <View style={[styles.sidePanel, { width: Math.min(width * 0.82, 280) }]}>
           <ScrollView style={styles.sidePanelScroll} showsVerticalScrollIndicator={false}>
-            
-
-            {/* Progress Summary */}
+            {/* Progress Summary - Total Time + Close in one row */}
             <View style={styles.sidePanelSection}>
-              {/* Total Time Spent Card */}
               <View style={styles.totalTimeCard}>
-                <Ionicons name="time" size={16} color="#667eea" />
-                <Text style={styles.totalTimeText}>
-                  Total Time: {formatQuestionTime(statuses.reduce((acc, s) => acc + (s.timeSpent || 0), 0))}
-                </Text>
+                <View style={styles.totalTimeRow}>
+                  <Ionicons name="time" size={16} color="#667eea" />
+                  <Text style={styles.totalTimeText}>
+                    Total Time: {formatQuestionTime(statuses.reduce((acc, s) => acc + (s.timeSpent || 0), 0))}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.sidePanelCloseButton}
+                  onPress={() => setShowSidePanel(false)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="close" size={22} color="#374151" />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.progressGrid}>
@@ -815,6 +1103,8 @@ const LiveExamQuestionsScreen = () => {
                         current === idx && styles.currentQuestionNav
                       ]}
                       onPress={() => handleNav(idx)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      activeOpacity={0.7}
                     >
                       <Text style={[styles.questionNavText, { color: textColor }]}>
                         {idx + 1}
@@ -833,7 +1123,7 @@ const LiveExamQuestionsScreen = () => {
         </View>
       )}
 
-      {/* Enhanced Submit Confirmation Modal */}
+      {/* Final Submit Modal - App theme (indigo/purple) */}
       <Modal
         visible={showSubmitModal}
         transparent={true}
@@ -851,46 +1141,50 @@ const LiveExamQuestionsScreen = () => {
             onPress={(e) => e.stopPropagation()}
           >
             <LinearGradient
-              colors={['#FB923C', '#F97316', '#FB923C']}
+              colors={['#4F46E5', '#7C3AED', '#6D28D9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.modalHeader}
             >
+              <View style={styles.modalHeaderGlass} />
               <View style={styles.modalIconContainer}>
-                <Ionicons name="checkmark-circle" size={32} color="#fff" />
+                <Ionicons name="checkmark-circle" size={28} color="#fff" />
               </View>
               <View style={styles.modalTitleContainer}>
                 <Text style={styles.modalTitle}>Final Submit</Text>
-                <Text style={styles.modalSubtitle}>Review your answers before final submission</Text>
+                <Text style={styles.modalSubtitle}>Review answers before submission</Text>
               </View>
               <TouchableOpacity 
                 style={styles.modalCloseButton}
                 onPress={() => setShowSubmitModal(false)}
                 activeOpacity={0.8}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close-circle" size={24} color="#fff" />
+                <Ionicons name="close-circle" size={22} color="rgba(255,255,255,0.9)" />
               </TouchableOpacity>
             </LinearGradient>
 
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
               <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <View style={[styles.statIconContainer, { backgroundColor: '#10B981' }]}>
-                    <Ionicons name="checkmark-done" size={24} color="#fff" />
+                <View style={[styles.statCard, styles.statCardAnswered]}>
+                  <View style={[styles.statIconContainer, { backgroundColor: '#D1FAE5' }]}>
+                    <Ionicons name="checkmark-done" size={14} color="#059669" />
                   </View>
                   <Text style={styles.statNumber}>{answered}</Text>
                   <Text style={styles.statLabel}>Answered</Text>
                 </View>
 
-                <View style={styles.statCard}>
-                  <View style={[styles.statIconContainer, { backgroundColor: '#F59E0B' }]}>
-                    <Ionicons name="bookmark" size={24} color="#fff" />
+                <View style={[styles.statCard, styles.statCardMarked]}>
+                  <View style={[styles.statIconContainer, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="bookmark" size={14} color="#B45309" />
                   </View>
                   <Text style={styles.statNumber}>{marked}</Text>
                   <Text style={styles.statLabel}>Marked</Text>
                 </View>
 
-                <View style={styles.statCard}>
-                  <View style={[styles.statIconContainer, { backgroundColor: '#EF4444' }]}>
-                    <Ionicons name="close-circle" size={24} color="#fff" />
+                <View style={[styles.statCard, styles.statCardNotVisited]}>
+                  <View style={[styles.statIconContainer, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="close-circle" size={14} color="#DC2626" />
                   </View>
                   <Text style={styles.statNumber}>{notVisited}</Text>
                   <Text style={styles.statLabel}>Not Visited</Text>
@@ -898,13 +1192,13 @@ const LiveExamQuestionsScreen = () => {
               </View>
 
               <View style={styles.warningBox}>
-                <Ionicons name="warning" size={24} color="#DC2626" />
+                <View style={styles.warningIconWrap}>
+                  <Ionicons name="information-circle" size={20} color="#7C3AED" />
+                </View>
                 <View style={styles.warningTextContainer}>
-                  <Text style={styles.warningTitle}>Important Notice</Text>
+                  <Text style={styles.warningTitle}>Important</Text>
                   <Text style={styles.warningText}>
-                    • This action cannot be undone{'\n'}
-                    • All marked answers will be submitted{'\n'}
-                    • Your result will be shown immediately
+                    • Cannot be undone • Answers submitted • Result shown immediately
                   </Text>
                 </View>
               </View>
@@ -917,7 +1211,7 @@ const LiveExamQuestionsScreen = () => {
                 activeOpacity={0.8}
               >
                 <View style={styles.cancelButtonContent}>
-                  <Ionicons name="arrow-back" size={18} color="#6B7280" />
+                  <Ionicons name="arrow-back" size={16} color="#5B21B6" />
                   <Text style={styles.cancelButtonText}>Review Again</Text>
                 </View>
               </TouchableOpacity>
@@ -928,7 +1222,9 @@ const LiveExamQuestionsScreen = () => {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={submitting ? ['#9CA3AF', '#6B7280'] : ['#FB923C', '#F97316']}
+                  colors={submitting ? ['#9CA3AF', '#6B7280'] : ['#4F46E5', '#7C3AED']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={styles.submitButtonGradient}
                 >
                   {submitting ? (
@@ -938,7 +1234,7 @@ const LiveExamQuestionsScreen = () => {
                     </View>
                   ) : (
                     <View style={styles.submitButtonContent}>
-                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
                       <Text style={styles.submitConfirmButtonText}>Submit Exam</Text>
                     </View>
                   )}
@@ -988,31 +1284,119 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)'
   },
+  resumeDialogBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  resumeDialogTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  resumeDialogSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.95)',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  resumeDialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resumeDialogButtonPrimary: {
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  resumeDialogButtonPrimaryText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
+  resumeDialogButtonSecondary: {
+    backgroundColor: 'transparent',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    minWidth: 120,
+    alignItems: 'center',
+  },
+  resumeDialogButtonSecondaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
+  },
   headerGradient: {
-    paddingTop: Platform.OS === 'ios' ? 8 : 4,
-    paddingBottom: 6,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8
+    paddingTop: Platform.OS === 'ios' ? 12 : 10,
+    paddingBottom: 12,
+    paddingHorizontal: 14,
+    ...(Platform.OS === 'android' ? {} : {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+    }),
+    elevation: Platform.OS === 'android' ? 0 : 4,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    gap: 8,
   },
   sidePanelToggle: {
-    padding: 8,
+    minWidth: 56,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)'
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    ...(Platform.OS === 'android' ? { elevation: 0 } : {
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+    }),
+  },
+  sidePanelTogglePressed: {
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  sidePanelToggleLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   headerCenter: {
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerLiveLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 2,
   },
   examTitle: {
     fontSize: 16,
@@ -1038,78 +1422,80 @@ const styles = StyleSheet.create({
   liveRankBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginBottom: 6,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginTop: 6,
+    gap: 4,
   },
   liveRankText: {
     fontSize: 11,
     color: '#fff',
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '700',
   },
   questionProgress: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    color: '#fff',
     fontWeight: '700',
-    letterSpacing: 0.3,
-    marginTop: 2
+    letterSpacing: 0.2,
   },
   progressBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: 180,
-    gap: 8
+    width: 160,
+    gap: 8,
+    marginTop: 6,
   },
   progressBarBackground: {
     flex: 1,
     height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     borderRadius: 3,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: '#fff',
-    borderRadius: 3
+    borderRadius: 3,
   },
   progressText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '600'
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '700',
+    minWidth: 28,
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#DC2626'
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  timerContainerWarning: {
+    backgroundColor: 'rgba(220, 38, 38, 1)',
   },
   timerIcon: {
-    marginRight: 4
+    marginRight: 6,
   },
-  timerText: { 
-    fontSize: 14, 
-    fontWeight: 'bold', 
-    color: '#fff'
+  timerText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
   timerTextWarning: {
-    color: '#fff'
+    color: '#fff',
   },
   mainContent: {
     flex: 1,
     paddingHorizontal: 16
   },
   mainContentContent: {
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   contentCenter: {
     maxWidth: 720,
@@ -1120,9 +1506,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', 
     borderRadius: 24, 
     marginTop: 0,
-    marginBottom: 20,
-    padding: 24, 
-    paddingBottom: 30,
+    marginBottom: 8,
+    padding: 20, 
+    paddingBottom: 14,
     shadowColor: '#4F46E5', 
     shadowOffset: { width: 0, height: 8 }, 
     shadowOpacity: 0.15, 
@@ -1131,56 +1517,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(79, 70, 229, 0.1)',
     transform: [{ scale: 1.02 }],
-    minHeight: 400
+    minHeight: 280
   },
   questionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-    paddingBottom: 16,
+    marginBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    gap: 12,
-    minHeight: 100,
-    maxHeight: 160,
+    borderBottomColor: '#E5E7EB',
   },
-  headerLeft: {
+  questionHeaderTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
     gap: 10,
   },
-  questionTextSection: {
-    flex: 1,
+  questionMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   questionNumberBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
     backgroundColor: '#4F46E5',
     borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
+    borderColor: 'rgba(79, 70, 229, 0.25)',
     elevation: 0,
-    alignSelf: 'flex-start',
   },
   questionNumber: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
     letterSpacing: 0.2,
   },
-  rightBadges: {
-    flexDirection: 'column',
-    gap: 6,
-    alignItems: 'flex-end',
+  questionScrollContainer: {
+    maxHeight: 140,
+  },
+  questionTitleInline: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#1F2937',
+    fontWeight: '500',
   },
   timeSpentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
     gap: 4,
     borderWidth: 1,
@@ -1189,17 +1575,15 @@ const styles = StyleSheet.create({
   timeSpentText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#667eea',
+    color: '#6366F1',
   },
   questionMarks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(217, 119, 6, 0.08)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.2)',
   },
   marksText: {
     marginLeft: 4,
@@ -1222,13 +1606,13 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   optionsContainer: { 
-    marginBottom: 16
+    marginBottom: 4
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 5,
   },
   eliminateBtn: {
     padding: 8,
@@ -1256,8 +1640,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC', 
-    borderRadius: 14, 
-    paddingVertical: 12,
+    borderRadius: 12, 
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: 'rgba(226, 232, 240, 0.8)',
@@ -1338,8 +1722,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginTop: 12,
-    paddingTop: 14,
+    marginTop: 4,
+    paddingTop: 6,
     borderTopWidth: 2,
     borderTopColor: '#E0E7FF'
   },
@@ -1351,9 +1735,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     backgroundColor: '#F3F4F6', 
-    borderRadius: 14, 
-    paddingVertical: 10, 
-    paddingHorizontal: 14,
+    borderRadius: 12, 
+    paddingVertical: 8, 
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#4F46E5',
@@ -1402,9 +1786,9 @@ const styles = StyleSheet.create({
   saveNextButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 12
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    gap: 10
   },
   saveNextButtonText: {
     color: '#fff',
@@ -1423,14 +1807,14 @@ const styles = StyleSheet.create({
   nextButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    gap: 8
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 6
   },
   submitContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    marginTop: 20
+    paddingBottom: 20,
+    marginTop: 0
   },
   submitButton: {
     borderRadius: 16,
@@ -1449,8 +1833,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     gap: 8
   },
   submitButtonText: {
@@ -1488,7 +1872,7 @@ mcqText: {
 // ✅ True/False Specific Styles
 trueFalseContainer: {
   flexDirection: 'row',
-  gap: 20,
+  gap: 12,
 },
 trueFalseButton: {
   flex: 1,
@@ -1496,8 +1880,8 @@ trueFalseButton: {
   alignItems: 'center',
   justifyContent: 'space-between',
   backgroundColor: '#F8FAFC',
-  borderRadius: 24,
-  padding: 22,
+  borderRadius: 14,
+  padding: 14,
   borderWidth: 2,
   borderColor: 'transparent',
   shadowColor: '#4F46E5',
@@ -1548,6 +1932,28 @@ trueFalseTextSelected: {
     shadowRadius: 16,
     elevation: 0,
     zIndex: 1000
+  },
+  sidePanelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === 'ios' ? 16 : 12,
+    minHeight: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#F8FAFC',
+    zIndex: 10,
+    elevation: 2,
+  },
+  sidePanelCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sidePanelScroll: {
     flex: 1,
@@ -1615,6 +2021,7 @@ trueFalseTextSelected: {
   totalTimeCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#EEF2FF',
     padding: 12,
     borderRadius: 12,
@@ -1622,6 +2029,12 @@ trueFalseTextSelected: {
     gap: 8,
     borderWidth: 1,
     borderColor: '#C7D2FE',
+  },
+  totalTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
   },
   totalTimeText: {
     fontSize: 13,
@@ -1767,138 +2180,182 @@ trueFalseTextSelected: {
     alignItems: 'center',
     justifyContent: 'center'
   },
-  // Submit Modal Styles
+  // Submit Modal Styles - App theme (indigo/purple)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '72%',
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#4F46E5',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+    } : {}),
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+    position: 'relative',
+  },
+  modalHeaderGlass: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
   },
   modalIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
   },
   modalTitleContainer: {
     flex: 1,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 2,
+    letterSpacing: 0.2,
   },
   modalSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.92)',
     fontWeight: '500',
   },
   modalCloseButton: {
     padding: 4,
   },
   modalContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    maxHeight: 400,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
+    maxHeight: 240,
+    backgroundColor: '#FAFBFC',
   },
   statsGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 8,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    padding: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: 1.5,
+  },
+  statCardAnswered: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  statCardMarked: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  statCardNotVisited: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
   },
   statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
     marginBottom: 4,
   },
+  statNumber: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 0,
+  },
   statLabel: {
-    fontSize: 12,
+    fontSize: 9,
     color: '#6B7280',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   warningBox: {
     flexDirection: 'row',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#F5F3FF',
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
+    padding: 12,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: '#DDD6FE',
+  },
+  warningIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   warningTextContainer: {
     flex: 1,
   },
   warningTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#DC2626',
-    marginBottom: 8,
+    color: '#5B21B6',
+    marginBottom: 4,
   },
   warningText: {
-    fontSize: 13,
-    color: '#991B1B',
-    lineHeight: 20,
+    fontSize: 12,
+    color: '#4C1D95',
+    lineHeight: 18,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#E0E7FF',
+    backgroundColor: '#FFFFFF',
   },
   cancelButton: {
     flex: 0.8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#EEF2FF',
     borderRadius: 12,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
   },
   cancelButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#5B21B6',
   },
   submitConfirmButton: {
     flex: 1.2,
@@ -1906,20 +2363,20 @@ trueFalseTextSelected: {
     overflow: 'hidden',
   },
   submitButtonGradient: {
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   submitConfirmButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });
 

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -48,6 +49,8 @@ interface WeeklyLeaderboardData {
 
 interface TopPerformersSectionProps {
     onPress?: () => void;
+    /** Increment to trigger refetch (e.g. when parent pull-to-refresh). */
+    refreshTrigger?: number;
 }
 
 // Enhanced Avatar Component with proper image loading
@@ -115,7 +118,7 @@ const WinnerAvatar = ({ userPhoto, userName }: { userPhoto?: string | null; user
     );
 };
 
-const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) => {
+const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress, refreshTrigger }) => {
     const { user } = useAuth();
     const [leaderboardData, setLeaderboardData] = useState<WeeklyLeaderboardData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -235,7 +238,14 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
 
     useEffect(() => {
         fetchLeaderboardData();
-    }, [user?.token]);
+    }, [user?.token, refreshTrigger]);
+
+    // Refetch when screen gains focus (e.g. back from another tab / week change)
+    useFocusEffect(
+        useCallback(() => {
+            if (user?.token) fetchLeaderboardData();
+        }, [user?.token])
+    );
 
     useEffect(() => {
         // All animations removed for better performance
@@ -322,9 +332,11 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
                         {/* Background pattern removed for better performance */}
                     <View style={styles.headerLeft}>
                         <View style={styles.headerIconContainer}>
-                            <View style={[styles.iconGradient, { backgroundColor: '#FB923C' }]}>
-                                <Ionicons name="school" size={16} color="#FFFFFF" />
-                            </View>
+                            <Image
+                                source={require('../assets/images/icons/leadership.png')}
+                                style={styles.headerLeadershipIcon}
+                                resizeMode="contain"
+                            />
                         </View>
                                                     {/* <Animated.View 
                                 style={[
@@ -357,7 +369,6 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#4F46E5" />
                         <Text style={styles.loadingText}>Loading weekly toppers...</Text>
-                        <Text style={styles.loadingText}>Fetching from /api/student/weekly-leaderboard</Text>
                     </View>
                 ) : leaderboardData?.leaderboard && leaderboardData.leaderboard.length > 0 ? (
                     <ScrollView 
@@ -401,14 +412,6 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
                                     {/* Top 5 Winners with Winning Amounts */}
                                     <View style={styles.winnersContainer}>
                                         <Text style={styles.winnersSectionTitle}>Top 5 Winners</Text>
-                                        {(() => {
-                                            console.log(`\n=== Rendering Exam ${examIndex} ===`);
-                                            console.log('Exam winners:', exam.winners);
-                                            console.log('Winners length:', exam.winners?.length);
-                                            console.log('Winners type:', typeof exam.winners);
-                                            console.log('Condition check:', exam.winners && exam.winners.length > 0);
-                                            return null;
-                                        })()}
                                         {exam.winners && exam.winners.length > 0 ? (
                                             exam.winners.slice(0, 5).map((winner, winnerIndex) => (
                                                     <View key={winner.userId || winnerIndex} style={styles.winnerItem}>
@@ -454,8 +457,8 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress }) 
                 ) : (
                     <View style={styles.noDataContainer}>
                         <Ionicons name="trophy-outline" size={48} color="#9CA3AF" />
-                        <Text style={styles.noDataText}>No exam toppers this week</Text>
-                        <Text style={styles.noDataSubtext}>Check back after exams are completed</Text>
+                        <Text style={styles.noDataText}>No toppers this week yet</Text>
+                        <Text style={styles.noDataSubtext}>Be the first! Give an exam and top the leaderboard.</Text>
                     </View>
                 )}
             </LinearGradient>
@@ -527,19 +530,13 @@ const styles = StyleSheet.create({
         zIndex: 3,
     },
     headerIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 40,
+        height: 40,
         marginRight: 10,
-        overflow: 'hidden',
-        shadowColor: '#FB923C',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        zIndex: 4,
-        borderWidth: 2,
-        borderColor: 'rgba(251, 146, 60, 0.3)',
+    },
+    headerLeadershipIcon: {
+        width: 40,
+        height: 40,
     },
     iconGradient: {
         width: '100%',

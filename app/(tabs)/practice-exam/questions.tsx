@@ -1,11 +1,14 @@
 import { AppColors } from '@/constants/Colors';
 import { apiFetchAuth } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
+import { useLiveExam } from '@/context/LiveExamContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, AppStateStatus, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Question {
   id: string;
@@ -21,11 +24,24 @@ interface QuestionStatus {
   selectedOption?: number;
 }
 
+interface SavedPracticeExamState {
+  examId: string;
+  questions: Question[];
+  statuses: QuestionStatus[];
+  currentIndex: number;
+  remainingSeconds: number;
+  savedAt: number;
+}
+
+const PRACTICE_EXAM_STATE_KEY = (examId: string) => `practice_exam_state_${examId}`;
+const SAVED_STATE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 const PracticeExamQuestionsScreen = () => {
   const { id, duration } = useLocalSearchParams<{ id: string, duration?: string }>();
- 
   const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
+  const { setLiveExamInProgress } = useLiveExam();
 
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -36,11 +52,74 @@ const PracticeExamQuestionsScreen = () => {
   const [showSidePanel, setShowSidePanel] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resumePayload, setResumePayload] = useState<SavedPracticeExamState | null>(null);
 
-  // Fetch questions directly since join is already handled in the previous screen
+  const allowLeaveRef = useRef(false);
+  const questionsRef = useRef<Question[]>([]);
+  const statusesRef = useRef<QuestionStatus[]>([]);
+  const currentRef = useRef(0);
+  const timerStateRef = useRef(0);
+  questionsRef.current = questions;
+  statusesRef.current = statuses;
+  currentRef.current = current;
+  timerStateRef.current = timer;
+
+  const saveExamState = useCallback(async () => {
+    if (!id || questionsRef.current.length === 0) return;
+    try {
+      const payload: SavedPracticeExamState = {
+        examId: id,
+        questions: questionsRef.current,
+        statuses: statusesRef.current,
+        currentIndex: currentRef.current,
+        remainingSeconds: timerStateRef.current,
+        savedAt: Date.now(),
+      };
+      await AsyncStorage.setItem(PRACTICE_EXAM_STATE_KEY(id), JSON.stringify(payload));
+    } catch (e) {
+      console.warn('Failed to save practice exam state', e);
+    }
+  }, [id]);
+
+  const clearExamState = useCallback(async () => {
+    if (!id) return;
+    try {
+      await AsyncStorage.removeItem(PRACTICE_EXAM_STATE_KEY(id));
+    } catch (e) {
+      console.warn('Failed to clear practice exam state', e);
+    }
+  }, [id]);
+
+  // Initialize: check for saved state (resume) or fetch fresh
   useEffect(() => {
     if (!id || !user?.token) return;
-    fetchQuestions();
+    const initializeExam = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PRACTICE_EXAM_STATE_KEY(id));
+        if (raw) {
+          const parsed: SavedPracticeExamState = JSON.parse(raw);
+          if (parsed.examId !== id || !parsed.questions?.length) {
+            await AsyncStorage.removeItem(PRACTICE_EXAM_STATE_KEY(id));
+          } else {
+            const age = Date.now() - parsed.savedAt;
+            if (age <= SAVED_STATE_MAX_AGE_MS) {
+              const elapsedSec = Math.floor(age / 1000);
+              const remaining = Math.max(0, parsed.remainingSeconds - elapsedSec);
+              if (remaining > 0) {
+                setResumePayload(parsed);
+                setLoading(false);
+                return;
+              }
+            }
+            await AsyncStorage.removeItem(PRACTICE_EXAM_STATE_KEY(id));
+          }
+        }
+      } catch (_) {
+        try { await AsyncStorage.removeItem(PRACTICE_EXAM_STATE_KEY(id)); } catch (_2) {}
+      }
+      fetchQuestions();
+    };
+    initializeExam();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -51,6 +130,15 @@ const PracticeExamQuestionsScreen = () => {
       setTimer(parseInt(duration) * 60);
     }
   }, [duration]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'background' && questionsRef.current.length > 0) {
+        saveExamState();
+      }
+    });
+    return () => sub.remove();
+  }, [saveExamState]);
 
   const fetchQuestions = async () => {
     if (!user?.token) return;
@@ -87,6 +175,29 @@ const PracticeExamQuestionsScreen = () => {
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const handleResumeAttempt = () => {
+    if (!resumePayload) return;
+    const elapsedSec = Math.floor((Date.now() - resumePayload.savedAt) / 1000);
+    const remaining = Math.max(0, resumePayload.remainingSeconds - elapsedSec);
+    setQuestions(resumePayload.questions);
+    setStatuses(resumePayload.statuses);
+    setCurrent(resumePayload.currentIndex);
+    setTimer(remaining);
+    setResumePayload(null);
+    if (remaining <= 0) {
+      setTimeout(() => autoSubmitExam(), 150);
+      return;
+    }
+    startTimer();
+  };
+
+  const handleStartFresh = async () => {
+    await clearExamState();
+    setResumePayload(null);
+    setLoading(true);
+    fetchQuestions();
   };
 
   const formatTime = (sec: number) => {
@@ -183,17 +294,34 @@ const PracticeExamQuestionsScreen = () => {
         console.log('Exam auto-submitted successfully');
         console.log('Submit response:', response.data);
         setSubmitting(false);
+        await clearExamState();
         
-        // Extract result from nested response structure
-        const resultData = response.data?.result || response.data;
-        console.log('Result data to pass:', resultData);
+        // Pass full response data (includes result and rankPreview)
+        const resultData = response.data;
+        console.log('📦 Full response.data structure (auto-submit):', {
+          hasSuccess: !!resultData.success,
+          hasRedirectTo: !!resultData.redirectTo,
+          hasResult: !!resultData.result,
+          hasRankPreview: !!resultData.rankPreview,
+          rankPreviewData: resultData.rankPreview
+        });
+        
+        // Ensure we're passing the full response structure
+        const dataToPass = {
+          success: resultData.success,
+          redirectTo: resultData.redirectTo,
+          result: resultData.result,
+          rankPreview: resultData.rankPreview
+        };
+        
+        console.log('📦 Data to pass (full structure - auto-submit):', JSON.stringify(dataToPass, null, 2));
         
         // Store result data and redirect to result page
         router.push({
           pathname: '/(tabs)/practice-exam/result/[id]' as any,
           params: { 
             id: id,
-            resultData: JSON.stringify(resultData) 
+            resultData: JSON.stringify(dataToPass) 
           }
         });
       } else {
@@ -242,17 +370,34 @@ const PracticeExamQuestionsScreen = () => {
         console.log('Submit response:', response.data);
         setShowSubmitModal(false);
         setSubmitting(false);
+        await clearExamState();
         
-        // Extract result from nested response structure
-        const resultData = response.data?.result || response.data;
-        console.log('Result data to pass:', resultData);
+        // Pass full response data (includes result and rankPreview)
+        const resultData = response.data;
+        console.log('📦 Full response.data structure:', {
+          hasSuccess: !!resultData.success,
+          hasRedirectTo: !!resultData.redirectTo,
+          hasResult: !!resultData.result,
+          hasRankPreview: !!resultData.rankPreview,
+          rankPreviewData: resultData.rankPreview
+        });
+        
+        // Ensure we're passing the full response structure
+        const dataToPass = {
+          success: resultData.success,
+          redirectTo: resultData.redirectTo,
+          result: resultData.result,
+          rankPreview: resultData.rankPreview
+        };
+        
+        console.log('📦 Data to pass (full structure):', JSON.stringify(dataToPass, null, 2));
         
         // Store result data and redirect to result page
         router.push({
           pathname: '/(tabs)/practice-exam/result/[id]' as any,
           params: { 
             id: id,
-            resultData: JSON.stringify(resultData) 
+            resultData: JSON.stringify(dataToPass) 
           }
         });
       } else {
@@ -267,6 +412,47 @@ const PracticeExamQuestionsScreen = () => {
     }
   };
 
+  // Leave warning (back button): on Leave = save progress and go back
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (allowLeaveRef.current || questions.length === 0) return;
+      e.preventDefault();
+      Alert.alert(
+        'Leave exam?',
+        'Leaving will save your progress. You can resume when you return. Time will keep counting down.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'Leave',
+            style: 'destructive',
+            onPress: () => {
+              saveExamState();
+              setLiveExamInProgress(false);
+              allowLeaveRef.current = true;
+              router.back();
+            },
+          },
+        ]
+      );
+    });
+    return unsubscribe;
+  }, [navigation, questions.length, saveExamState, setLiveExamInProgress]);
+
+  // On focus: mark in progress so tab bar shows alert. On blur: save + clear.
+  useFocusEffect(
+    useCallback(() => {
+      if (questionsRef.current.length > 0) {
+        setLiveExamInProgress(true);
+      }
+      return () => {
+        if (questionsRef.current.length > 0) {
+          saveExamState();
+        }
+        setLiveExamInProgress(false);
+      };
+    }, [saveExamState, setLiveExamInProgress])
+  );
+
   // Summary counts
   const answered = statuses.filter(s => s.answered).length;
   const marked = statuses.filter(s => s.marked).length;
@@ -279,6 +465,33 @@ const PracticeExamQuestionsScreen = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={AppColors.primary} />
         <Text style={styles.loadingText}>Loading Exam...</Text>
+      </View>
+    );
+  }
+
+  if (resumePayload) {
+    const elapsedSec = Math.floor((Date.now() - resumePayload.savedAt) / 1000);
+    const remaining = Math.max(0, resumePayload.remainingSeconds - elapsedSec);
+    const minLeft = Math.floor(remaining / 60);
+    const secLeft = remaining % 60;
+    const timeStr = minLeft > 0 ? `${minLeft} min ${secLeft} sec` : `${secLeft} sec`;
+    return (
+      <View style={styles.loadingContainer}>
+        <View style={styles.resumeDialogBox}>
+          <Ionicons name="time" size={40} color={AppColors.primary} style={{ marginBottom: 10 }} />
+          <Text style={styles.resumeDialogTitle}>Resume your attempt?</Text>
+          <Text style={styles.resumeDialogSubtext}>
+            You have a saved attempt with {timeStr} remaining.
+          </Text>
+          <View style={styles.resumeDialogButtons}>
+            <TouchableOpacity style={styles.resumeDialogButtonPrimary} onPress={handleResumeAttempt} activeOpacity={0.85}>
+              <Text style={styles.resumeDialogButtonPrimaryText}>Resume</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.resumeDialogButtonSecondary} onPress={handleStartFresh} activeOpacity={0.85}>
+              <Text style={styles.resumeDialogButtonSecondaryText}>Start fresh</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
@@ -423,11 +636,11 @@ const PracticeExamQuestionsScreen = () => {
         </View>
       )}
 
-      {/* Enhanced Submit Confirmation Modal */}
+      {/* Compact Submit Confirmation Modal */}
       <Modal
         visible={showSubmitModal}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowSubmitModal(false)}
       >
         <TouchableOpacity 
@@ -436,91 +649,49 @@ const PracticeExamQuestionsScreen = () => {
           onPress={() => setShowSubmitModal(false)}
         >
           <TouchableOpacity 
-            style={styles.modalContainer}
+            style={styles.modalContainerCompact}
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            <LinearGradient
-              colors={['#8B5CF6', '#7C3AED', '#6D28D9']}
-              style={styles.modalHeader}
-            >
-              <View style={styles.modalIconContainer}>
-                <Ionicons name="checkmark-circle" size={32} color="#fff" />
+            <View style={styles.submitModalHeaderCompact}>
+              <View style={styles.submitModalIconSmall}>
+                <Ionicons name="checkmark-done-circle" size={20} color="#0D9488" />
               </View>
-              <View style={styles.modalTitleContainer}>
-                <Text style={styles.modalTitle}>Submit Exam</Text>
-                <Text style={styles.modalSubtitle}>Review your answers before final submission</Text>
-              </View>
+              <Text style={styles.submitModalTitleCompact}>Submit exam?</Text>
               <TouchableOpacity 
-                style={styles.modalCloseButton}
+                style={styles.submitModalCloseBtnSmall}
                 onPress={() => setShowSubmitModal(false)}
                 activeOpacity={0.8}
               >
-                <Ionicons name="close-circle" size={24} color="#fff" />
+                <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
 
-            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.summarySection}>
-                <View style={styles.summaryHeader}>
-                  <Ionicons name="analytics" size={24} color="#8B5CF6" />
-                  <Text style={styles.summaryTitle}>Exam Summary</Text>
+            <View style={styles.submitModalBodyCompact}>
+              <View style={styles.submitModalGrid}>
+                <View style={styles.submitModalGridItem}>
+                  <Text style={styles.submitModalGridValueGreen}>{answered}</Text>
+                  <Text style={styles.submitModalGridLabel}>Answered</Text>
                 </View>
-                <View style={styles.summaryGrid}>
-                  <View style={styles.summaryItem}>
-                    <View style={styles.summaryIconContainer}>
-                      <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                    </View>
-                    <View style={styles.summaryTextContainer}>
-                      <Text style={styles.summaryLabel}>Answered</Text>
-                      <Text style={styles.summaryValue}>{answered}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={styles.summaryIconContainer}>
-                      <Ionicons name="close-circle" size={20} color="#EF4444" />
-                    </View>
-                    <View style={styles.summaryTextContainer}>
-                      <Text style={styles.summaryLabel}>Unanswered</Text>
-                      <Text style={styles.summaryValue}>{questions.length - answered}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.summaryItem}>
-                    <View style={styles.summaryIconContainer}>
-                      <Ionicons name="bookmark" size={20} color="#F59E0B" />
-                    </View>
-                    <View style={styles.summaryTextContainer}>
-                      <Text style={styles.summaryLabel}>Marked</Text>
-                      <Text style={styles.summaryValue}>{marked}</Text>
-                    </View>
-                  </View>
+                <View style={styles.submitModalGridItem}>
+                  <Text style={styles.submitModalGridValueRed}>{questions.length - answered}</Text>
+                  <Text style={styles.submitModalGridLabel}>Unanswered</Text>
                 </View>
               </View>
-
-              <View style={styles.warningSection}>
-                <View style={styles.warningIconContainer}>
-                  <Ionicons name="warning" size={24} color="#F59E0B" />
-                </View>
-                <View style={styles.warningTextContainer}>
-                  <Text style={styles.warningTitle}>Important Notice</Text>
-                  <Text style={styles.warningText}>
-                    Once submitted, you cannot change your answers. Please review all questions before proceeding.
-                  </Text>
-                </View>
+              <View style={styles.submitModalWarning}>
+                <Ionicons name="warning" size={18} color="#DC2626" />
+                <Text style={styles.submitModalWarningText}>Answers cannot be changed after submission.</Text>
               </View>
-            </ScrollView>
+            </View>
 
-            <View style={styles.modalActions}>
+            <View style={styles.modalActionsCompact}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={styles.cancelButtonCompact}
                 onPress={() => setShowSubmitModal(false)}
                 disabled={submitting}
                 activeOpacity={0.8}
               >
-                <View style={styles.cancelButtonContent}>
-                  <Ionicons name="arrow-back" size={18} color="#6B7280" />
-                  <Text style={styles.cancelButtonText}>Review More</Text>
-                </View>
+                <Text style={styles.cancelButtonTextCompact}>Review</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.submitConfirmButton}
@@ -529,18 +700,18 @@ const PracticeExamQuestionsScreen = () => {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={submitting ? ['#9CA3AF', '#6B7280'] : ['#8B5CF6', '#7C3AED']}
-                  style={styles.submitButtonGradient}
+                  colors={submitting ? ['#94A3B8', '#64748B'] : ['#0D9488', '#059669']}
+                  style={styles.submitButtonGradientCompact}
                 >
                   {submitting ? (
                     <View style={styles.submitButtonContent}>
                       <ActivityIndicator size="small" color="#fff" />
-                      <Text style={styles.submitConfirmButtonText}>Submitting...</Text>
+                      <Text style={styles.submitConfirmButtonText}>Submitting…</Text>
                     </View>
                   ) : (
                     <View style={styles.submitButtonContent}>
-                      <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                      <Text style={styles.submitConfirmButtonText}>Submit Exam</Text>
+                      <Ionicons name="send" size={16} color="#fff" />
+                      <Text style={styles.submitConfirmButtonText}>Submit</Text>
                     </View>
                   )}
                 </LinearGradient>
@@ -568,6 +739,60 @@ const styles = StyleSheet.create({
     marginTop: 10, 
     fontSize: 16, 
     color: AppColors.primary 
+  },
+  resumeDialogBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 22,
+    marginHorizontal: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  resumeDialogTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  resumeDialogSubtext: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginBottom: 18,
+    textAlign: 'center',
+  },
+  resumeDialogButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resumeDialogButtonPrimary: {
+    backgroundColor: AppColors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 10,
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  resumeDialogButtonPrimaryText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  resumeDialogButtonSecondary: {
+    backgroundColor: 'transparent',
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    minWidth: 110,
+    alignItems: 'center',
+  },
+  resumeDialogButtonSecondaryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
   },
   timerRow: { 
     flexDirection: 'row', 
@@ -931,107 +1156,143 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20
   },
-  // Modal Styles
+  // Modal Styles - Enhanced Submit Popup
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)'
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    padding: 20,
   },
   modalContainer: {
-    width: '90%',
-    maxHeight: '70%',
-    backgroundColor: '#fff',
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.3,
-    shadowRadius: 25,
-    elevation: 15,
   },
-  modalHeader: {
-    padding: 20,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  modalCloseButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  modalContainerCompact: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+    } : {}),
+    elevation: 8,
   },
-  modalIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 5
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 20
-  },
-  modalContent: {
-    padding: 20,
-    paddingBottom: 10,
-    maxHeight: 300,
-  },
-  summaryHeader: {
+  submitModalHeaderCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 10,
   },
-  summaryIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  submitModalIconSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F0FDF4',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
-  summaryTextContainer: {
+  submitModalTitleCompact: {
     flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  warningIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  submitModalCloseBtnSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
   },
-  warningTextContainer: {
+  submitModalBodyCompact: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  submitModalGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  submitModalGridItem: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  warningTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
+  submitModalGridValueGreen: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#059669',
   },
-  cancelButtonContent: {
+  submitModalGridValueRed: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  submitModalGridLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 4,
+  },
+  submitModalWarning: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  submitModalWarningText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  modalActionsCompact: {
+    flexDirection: 'row',
+    padding: 14,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  cancelButtonCompact: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  submitButtonGradient: {
+  cancelButtonTextCompact: {
+    color: '#64748B',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  submitButtonGradientCompact: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1044,103 +1305,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  summarySection: {
-    marginBottom: 20
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: AppColors.primary,
-    marginBottom: 10
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap'
-  },
-  summaryItem: {
-    alignItems: 'center',
-    marginHorizontal: 10,
-    marginBottom: 10
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: AppColors.darkGrey,
-    marginTop: 5
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: AppColors.primary,
-    marginTop: 5
-  },
-  warningSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 10
-  },
-  warningText: {
-    fontSize: 14,
-    color: '#856404',
-    marginLeft: 10,
-    flexShrink: 1
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    gap: 16,
-  },
-  cancelButton: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    flex: 1,
-    marginRight: 8,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  cancelButtonText: {
-    color: '#6B7280',
-    fontWeight: '600',
-    fontSize: 14,
-    marginLeft: 6,
+    gap: 6,
   },
   submitConfirmButton: {
     backgroundColor: 'transparent',
     borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 2,
-    marginLeft: 8,
+    flex: 1,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#0D9488',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+    } : {}),
     elevation: 4,
   },
   submitConfirmButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontWeight: '700',
     fontSize: 14,
-    marginLeft: 6,
-  }
+  },
 });
 
 export default PracticeExamQuestionsScreen; 

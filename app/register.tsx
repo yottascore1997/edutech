@@ -29,9 +29,15 @@ const Register = () => {
             return;
         }
         
-        // Basic validation
-        if (password.length < 6) {
-            showError('Password must be at least 6 characters long.');
+        // Strong password: at least 8 characters, one letter, one number
+        if (password.length < 8) {
+            showError('Password must be at least 8 characters and contain one letter and one number.');
+            return;
+        }
+        const hasLetter = /[a-zA-Z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        if (!hasLetter || !hasNumber) {
+            showError('Password must be at least 8 characters and contain one letter and one number.');
             return;
         }
         
@@ -54,22 +60,30 @@ const Register = () => {
         } catch (error: any) {
             console.error('Registration failed:', error);
             let errorMessage = 'Registration failed. Please try again.';
-            
             if (error?.response?.data?.message) {
                 errorMessage = error.response.data.message;
+            } else if (error?.data?.message) {
+                errorMessage = error.data.message;
             } else if (error?.message) {
                 errorMessage = error.message;
             }
-            
 
-            
-            // Show specific error messages
+            // 429 rate limit
+            if (error?.status === 429 || error?.data?.statusCode === 429) {
+                showError('Too many attempts. Please try again later.');
+                return;
+            }
+            // Backend strong password / validation messages – show as-is
+            if (errorMessage.toLowerCase().includes('password') && (errorMessage.includes('8') || errorMessage.includes('letter') || errorMessage.includes('number'))) {
+                showError(errorMessage);
+                return;
+            }
             if (errorMessage.toLowerCase().includes('email already exists')) {
                 showError('This email is already registered. Please use a different email or try logging in.');
             } else if (errorMessage.toLowerCase().includes('phone')) {
                 showError('Please enter a valid phone number.');
             } else if (errorMessage.toLowerCase().includes('password')) {
-                showError('Password is too weak. Please use a stronger password.');
+                showError(errorMessage);
             } else {
                 showError(errorMessage);
             }

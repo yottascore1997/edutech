@@ -1,5 +1,5 @@
 import { AppColors } from '@/constants/Colors';
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import {
     Animated,
     Dimensions,
     FlatList,
+    Image,
     Modal,
     RefreshControl,
     SafeAreaView,
@@ -35,6 +36,7 @@ interface PracticeExamDetails {
     spots: number;
     spotsLeft: number;
     attempted: boolean;
+    logoUrl?: string;
 }
 
 interface LeaderboardEntry {
@@ -482,41 +484,29 @@ const PracticeExamDetailsScreen = () => {
                 </TouchableOpacity>
             </Modal>
 
-            {/* Enhanced Header Section - Like Live Exam */}
-            <LinearGradient
-                colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.enhancedMainHeader}
-            >
-                {/* Background Pattern */}
-                <View style={styles.headerPattern}>
-                    <View style={styles.patternCircle1} />
-                    <View style={styles.patternCircle2} />
-                    <View style={styles.patternCircle3} />
-                </View>
-                
-                <View style={styles.enhancedHeaderContent}>
-                    <View style={styles.headerTitleSection}>
-                        <View style={styles.headerIconWrapper}>
-                            <LinearGradient
-                                colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']}
-                                style={styles.headerIconGradient}
-                            >
-                                <Ionicons name="document-text" size={28} color="#FFFFFF" />
-                            </LinearGradient>
-                        </View>
-                        <View style={styles.headerTextWrapper}>
-                            <Text style={styles.enhancedHeaderTitle}>{exam?.title || 'Practice Exam'}</Text>
-                            <Text style={styles.enhancedHeaderSubtitle}>
-                                {exam?.category} • {exam?.duration} minutes • {exam?.spotsLeft} spots left
-                            </Text>
-                        </View>
+            {/* Compact light header with exam logo */}
+            <View style={styles.headerLightCompact}>
+                <View style={styles.headerTitleSection}>
+                    <View style={styles.headerIconLight}>
+                        {exam?.logoUrl && getImageUrl(exam.logoUrl) ? (
+                            <Image
+                                source={{ uri: getImageUrl(exam.logoUrl) }}
+                                style={styles.headerExamLogo}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <Ionicons name="document-text-outline" size={28} color="#475569" />
+                        )}
                     </View>
-
-
+                    <View style={styles.headerTextWrapper}>
+                        <Text style={styles.headerExamLabel}>Practice Exam</Text>
+                        <Text style={styles.headerTitleCompact} numberOfLines={2}>{exam?.title || 'Practice Exam'}</Text>
+                        <Text style={styles.headerSubtitleCompact}>
+                            {exam?.category}{exam?.subcategory ? ` · ${exam.subcategory}` : ''}
+                        </Text>
+                    </View>
                 </View>
-            </LinearGradient>
+            </View>
 
             <View style={styles.tabContainer}>
                 {['Info', 'Leaderboard'].map(tabName => (
@@ -568,20 +558,6 @@ const PracticeExamDetailsScreen = () => {
                               </View>
                             </View>
                           )}
-                          <View style={styles.detailItem}>
-                            <Ionicons name="time-outline" size={20} color="#667eea" />
-                            <View>
-                              <Text style={styles.detailLabel}>Duration</Text>
-                              <Text style={styles.detailValue}>{exam.duration} minutes</Text>
-                            </View>
-                          </View>
-                          <View style={styles.detailItem}>
-                            <Ionicons name="help-circle-outline" size={20} color="#667eea" />
-                            <View>
-                              <Text style={styles.detailLabel}>Questions</Text>
-                              <Text style={styles.detailValue}>{examMeta?.maxMarks || 'Not specified'}</Text>
-                            </View>
-                          </View>
                           <View style={styles.detailItem}>
                             <Ionicons name="trophy-outline" size={20} color="#667eea" />
                             <View>
@@ -720,59 +696,58 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: AppColors.lightGrey,
     },
-    // Enhanced Header Styles - Like Live Exam
-    enhancedMainHeader: {
-        paddingTop: 16,
+    headerLightCompact: {
+        backgroundColor: '#F8FAFC',
+        paddingTop: 12,
         paddingHorizontal: 16,
-        paddingBottom: 20,
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
-        position: 'relative',
-        overflow: 'hidden',
-    },
-    headerPattern: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        opacity: 0.15,
-    },
-    patternCircle1: {
-        position: 'absolute',
-        top: 15,
-        right: 25,
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    patternCircle2: {
-        position: 'absolute',
-        bottom: 30,
-        left: 15,
-        width: 35,
-        height: 35,
-        borderRadius: 17.5,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    patternCircle3: {
-        position: 'absolute',
-        top: 45,
-        left: 40,
-        width: 25,
-        height: 25,
-        borderRadius: 12.5,
-        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    },
-    enhancedHeaderContent: {
-        position: 'relative',
-        zIndex: 1,
+        paddingBottom: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
     },
     headerTitleSection: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+    },
+    headerIconLight: {
+        width: 56,
+        height: 56,
+        borderRadius: 14,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 14,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        overflow: 'hidden',
+    },
+    headerExamLogo: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 14,
+    },
+    headerTextWrapper: {
+        flex: 1,
+    },
+    headerExamLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#64748B',
+        letterSpacing: 1.2,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+    },
+    headerTitleCompact: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#0F172A',
+        marginBottom: 2,
+        lineHeight: 24,
+        letterSpacing: -0.3,
+    },
+    headerSubtitleCompact: {
+        fontSize: 13,
+        color: '#64748B',
+        fontWeight: '500',
     },
     headerIconWrapper: {
         marginRight: 12,
@@ -783,29 +758,15 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.25)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 6,
-    },
-    headerTextWrapper: {
-        flex: 1,
     },
     enhancedHeaderTitle: {
         fontSize: 24,
         fontWeight: '800',
-        color: '#FFFFFF',
-        marginBottom: 4,
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 4,
+        color: '#0F172A',
     },
     enhancedHeaderSubtitle: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.9)',
+        color: '#64748B',
         fontWeight: '500',
     },
     headerInfoSection: {
@@ -1029,7 +990,7 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     infoContainer: {
-        gap: 20,
+        gap: 12,
     },
     overviewCard: {
         backgroundColor: AppColors.white,
@@ -2942,7 +2903,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderRadius: 20,
         padding: 24,
-        marginBottom: 20,
+        marginBottom: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.15,
@@ -3029,7 +2990,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.2,
         shadowRadius: 12,
         elevation: 8,
-        marginTop: 4,
+        marginTop: 0,
         marginBottom: 20,
     },
     enhancedActionButtonDisabled: {

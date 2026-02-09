@@ -1,5 +1,5 @@
 import { AppColors } from '@/constants/Colors';
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -35,6 +36,7 @@ interface CategoryStats {
   totalExams: number;
   attemptedExams: number;
   subcategories: string[];
+  categoryLogoUrl?: string;
 }
 
 interface CategoryDisplay {
@@ -42,6 +44,7 @@ interface CategoryDisplay {
   icon: string;
   gradient: readonly [string, string];
   stats: CategoryStats;
+  categoryLogoUrl?: string;
 }
 
 const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
@@ -143,12 +146,13 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
   const calculateCategoryStats = () => {
     const stats: { [key: string]: CategoryStats } = {};
     
-    exams.forEach(exam => {
+    exams.forEach((exam: any) => {
       if (!stats[exam.category]) {
         stats[exam.category] = {
           totalExams: 0,
           attemptedExams: 0,
-          subcategories: []
+          subcategories: [],
+          categoryLogoUrl: exam.categoryLogoUrl || undefined
         };
       }
       
@@ -159,6 +163,11 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
       
       if (!stats[exam.category].subcategories.includes(exam.subcategory)) {
         stats[exam.category].subcategories.push(exam.subcategory);
+      }
+      
+      // Update categoryLogoUrl if not set and exam has it
+      if (!stats[exam.category].categoryLogoUrl && exam.categoryLogoUrl) {
+        stats[exam.category].categoryLogoUrl = exam.categoryLogoUrl;
       }
     });
     
@@ -212,7 +221,8 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
       name: category,
       icon: getCategoryIcon(category),
       gradient: getGradientColors(index),
-      stats: categoryStats[category]
+      stats: categoryStats[category],
+      categoryLogoUrl: categoryStats[category].categoryLogoUrl
     }));
 
     setTopCategories(top8Categories);
@@ -220,6 +230,20 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
 
   const handleCategoryClick = (category: string) => {
     router.push(`/(tabs)/exam-category?category=${encodeURIComponent(category)}`);
+  };
+
+  // Helper function to get full image URL
+  const getImageUrl = (logoUrl: string | undefined) => {
+    if (!logoUrl) return null;
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+      return logoUrl;
+    }
+    try {
+      return getImageUrlFromApi(logoUrl);
+    } catch (error) {
+      console.error('Error getting image URL:', error);
+      return null;
+    }
   };
 
   const handleViewAll = () => {
@@ -338,11 +362,25 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
                     >
                       <View style={styles.categoryContent}>
                         <View style={styles.categoryIconContainer}>
-                          <Ionicons 
-                            name={category.icon as any} 
-                            size={24} 
-                            color="#2C3E50" 
-                          />
+                          {category.categoryLogoUrl ? (
+                            <Image 
+                              source={{ uri: getImageUrl(category.categoryLogoUrl) || category.categoryLogoUrl }} 
+                              style={{ width: 48, height: 48, borderRadius: 8 }}
+                              resizeMode="cover"
+                              onError={(error) => {
+                                console.error('❌ Image load error for category:', category.name, 'URL:', category.categoryLogoUrl, 'Processed URL:', getImageUrl(category.categoryLogoUrl));
+                              }}
+                              onLoad={() => {
+                                console.log('✅ Image loaded successfully for category:', category.name, 'URL:', category.categoryLogoUrl);
+                              }}
+                            />
+                          ) : (
+                            <Ionicons 
+                              name={category.icon as any} 
+                              size={24} 
+                              color="#2C3E50" 
+                            />
+                          )}
                         </View>
                         <View style={styles.categoryInfo}>
                           <Text style={styles.categoryTitle}>{category.name}</Text>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, ReactNode, useContext, useState } from 'react';
 
 interface CategoryContextType {
   selectedCategory: string | null;
@@ -31,8 +31,13 @@ export const CategoryProvider = ({ children }: { children: ReactNode }) => {
 export const useCategory = () => {
   const context = useContext(CategoryContext);
   if (context === undefined) {
-    throw new Error('useCategory must be used within a CategoryProvider');
+    // Return default values instead of throwing error
+    // This allows components to work even if CategoryProvider is not available
+    return {
+      selectedCategory: null,
+      setSelectedCategory: () => {},
+      clearCategory: () => {},
+    };
   }
   return context;
 };
-

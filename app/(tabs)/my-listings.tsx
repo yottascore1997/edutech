@@ -1,10 +1,10 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface Book {
   id: string;
@@ -85,27 +85,29 @@ const MyListingsScreen = () => {
 
   const getListingTypeColor = (type: string) => {
     switch (type) {
-      case 'SELL': return '#EF4444';
-      case 'DONATE': return '#10B981';
-      case 'RENT': return '#3B82F6';
-      default: return '#6B7280';
+      case 'SELL': return '#DC2626';
+      case 'DONATE': return '#059669';
+      case 'RENT': return '#2563EB';
+      default: return '#64748B';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ACTIVE': return '#10B981';
-      case 'SOLD': return '#6B7280';
-      case 'RENTED': return '#3B82F6';
-      case 'INACTIVE': return '#EF4444';
-      default: return '#6B7280';
+      case 'ACTIVE': return '#059669';
+      case 'SOLD': return '#475569';
+      case 'RENTED': return '#2563EB';
+      case 'INACTIVE': return '#DC2626';
+      default: return '#64748B';
     }
   };
+
+  const coverUri = (img: string) => (img?.startsWith('http') ? img : getImageUrl(img));
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
+        <ActivityIndicator size="large" color="#6366F1" />
         <Text style={styles.loadingText}>Loading your listings...</Text>
       </View>
     );
@@ -113,73 +115,66 @@ const MyListingsScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Simple Heading */}
-      <View style={styles.simpleHeader}>
-        <Text style={styles.simpleHeaderTitle}>My Listings</Text>
-      </View>
-
-      {/* Summary Stats */}
-      <View style={styles.summaryContainer}>
-        <LinearGradient
-          colors={['#6366F1', '#8B5CF6']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.summaryCard}
-        >
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="book" size={16} color="#FFFFFF" />
+      {/* Hero header - same gradient as app header */}
+      <LinearGradient
+        colors={['#4F46E5', '#7C3AED']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.heroHeader}
+      >
+        <View style={styles.heroRow}>
+          <View style={styles.heroIconWrap}>
+            <Ionicons name="library" size={18} color="#FFFFFF" />
           </View>
-          <Text style={styles.summaryNumber}>{summary.total}</Text>
-          <Text style={styles.summaryLabel}>Total</Text>
-        </LinearGradient>
-        
-        <LinearGradient
-          colors={['#10B981', '#059669']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.summaryCard}
-        >
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-          </View>
-          <Text style={styles.summaryNumber}>{summary.active}</Text>
-          <Text style={styles.summaryLabel}>Active</Text>
-        </LinearGradient>
-        
-        <View style={styles.summaryCardPlain}>
-          <View style={[styles.summaryIconContainerPlain, { backgroundColor: '#F3F4F6' }]}>
-            <Ionicons name="checkmark-done" size={16} color="#6B7280" />
-          </View>
-          <Text style={[styles.summaryNumberPlain, { color: '#6B7280' }]}>{summary.sold}</Text>
-          <Text style={styles.summaryLabelPlain}>Sold</Text>
+          <Text style={styles.heroTitle}>My Listings</Text>
         </View>
-        
-        <LinearGradient
-          colors={['#3B82F6', '#2563EB']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.summaryCard}
-        >
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="time" size={16} color="#FFFFFF" />
+      </LinearGradient>
+
+      {/* Summary Stats - refined palette */}
+      <View style={styles.summaryContainer}>
+        <View style={[styles.summaryCard, styles.summaryCardTotal]}>
+          <View style={styles.summaryIconWrap}>
+            <Ionicons name="book" size={18} color="#6366F1" />
           </View>
-          <Text style={styles.summaryNumber}>{summary.rented}</Text>
+          <Text style={[styles.summaryNumber, styles.summaryNumberTotal]}>{summary.total}</Text>
+          <Text style={styles.summaryLabel}>Total</Text>
+        </View>
+        <View style={[styles.summaryCard, styles.summaryCardActive]}>
+          <View style={[styles.summaryIconWrap, styles.summaryIconGreen]}>
+            <Ionicons name="checkmark-circle" size={18} color="#059669" />
+          </View>
+          <Text style={[styles.summaryNumber, styles.summaryNumberActive]}>{summary.active}</Text>
+          <Text style={styles.summaryLabel}>Active</Text>
+        </View>
+        <View style={[styles.summaryCard, styles.summaryCardSold]}>
+          <View style={[styles.summaryIconWrap, styles.summaryIconSlate]}>
+            <Ionicons name="checkmark-done" size={18} color="#475569" />
+          </View>
+          <Text style={[styles.summaryNumber, styles.summaryNumberSlate]}>{summary.sold}</Text>
+          <Text style={styles.summaryLabel}>Sold</Text>
+        </View>
+        <View style={[styles.summaryCard, styles.summaryCardRented]}>
+          <View style={[styles.summaryIconWrap, styles.summaryIconBlue]}>
+            <Ionicons name="time" size={18} color="#2563EB" />
+          </View>
+          <Text style={[styles.summaryNumber, styles.summaryNumberBlue]}>{summary.rented}</Text>
           <Text style={styles.summaryLabel}>Rented</Text>
-        </LinearGradient>
+        </View>
       </View>
 
       <ScrollView
         style={styles.content}
+        contentContainerStyle={styles.contentInner}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6366F1']} tintColor="#6366F1" />
         }
       >
         {books.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconContainer}>
-              <Ionicons name="book-outline" size={64} color="#9CA3AF" />
+              <Ionicons name="book-outline" size={56} color="#6366F1" />
             </View>
-            <Text style={styles.emptyTitle}>No Listings Yet</Text>
+            <Text style={styles.emptyTitle}>No listings yet</Text>
             <Text style={styles.emptySubtitle}>Start listing your books to share with students</Text>
           </View>
         ) : (
@@ -188,11 +183,11 @@ const MyListingsScreen = () => {
               key={book.id}
               style={styles.bookCard}
               onPress={() => router.push(`/(tabs)/book-details?bookId=${book.id}`)}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
               <View style={styles.bookImageContainer}>
                 <Image
-                  source={{ uri: book.coverImage }}
+                  source={{ uri: coverUri(book.coverImage) }}
                   style={styles.bookImage}
                   resizeMode="cover"
                 />
@@ -200,41 +195,36 @@ const MyListingsScreen = () => {
                   <Text style={styles.statusText}>{book.status}</Text>
                 </View>
               </View>
-              
               <View style={styles.bookInfo}>
                 <View style={styles.bookHeader}>
-                  <View style={styles.bookTitleContainer}>
-                    <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-                    <Text style={styles.bookAuthor}>{book.author}</Text>
-                  </View>
+                  <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+                  <Text style={styles.bookAuthor}>{book.author}</Text>
                 </View>
-                
                 <View style={styles.bookMeta}>
-                  <View style={[styles.typeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
-                    <Text style={styles.typeText}>{book.listingType}</Text>
+                  <View style={[styles.typeBadge, { backgroundColor: getListingTypeColor(book.listingType) + '18' }]}>
+                    <Text style={[styles.typeText, { color: getListingTypeColor(book.listingType) }]}>{book.listingType}</Text>
                   </View>
                   <View style={styles.conditionBadge}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
+                    <Ionicons name="star" size={12} color="#B45309" />
                     <Text style={styles.conditionText}>{book.condition}</Text>
                   </View>
                 </View>
-                
                 <View style={styles.bookFooter}>
                   <View>
                     <Text style={styles.price}>
                       {book.listingType === 'DONATE' ? 'Free' : `₹${book.price}`}
                     </Text>
-                    {book.listingType === 'RENT' && book.rentPrice && (
-                      <Text style={styles.rentPrice}>₹{book.rentPrice}/month</Text>
+                    {book.listingType === 'RENT' && book.rentPrice != null && (
+                      <Text style={styles.rentPrice}>₹{book.rentPrice}/mo</Text>
                     )}
                   </View>
                   <View style={styles.stats}>
                     <View style={styles.statItem}>
-                      <Ionicons name="eye-outline" size={14} color="#6B7280" />
+                      <Ionicons name="eye-outline" size={14} color="#64748B" />
                       <Text style={styles.statText}>{book.views}</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Ionicons name="heart-outline" size={14} color="#6B7280" />
+                      <Ionicons name="heart-outline" size={14} color="#64748B" />
                       <Text style={styles.statText}>{book.likes}</Text>
                     </View>
                   </View>
@@ -251,133 +241,145 @@ const MyListingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6B7280',
+    color: '#64748B',
+    fontWeight: '500',
   },
-  simpleHeader: {
-    paddingTop: 20,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+  heroHeader: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomWidth: 1.5,
+    borderBottomColor: 'rgba(255, 255, 255, 0.25)',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6 }
+      : { elevation: 4 }),
   },
-  simpleHeaderTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1F2937',
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  heroIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
     letterSpacing: 0.3,
   },
   summaryContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-    backgroundColor: '#FFFFFF',
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 10,
   },
   summaryCard: {
     flex: 1,
-    borderRadius: 12,
-    padding: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  summaryCardPlain: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 10,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  summaryIconContainer: {
-    width: 28,
-    height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6 }
+      : { elevation: 0 }),
+  },
+  summaryCardTotal: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  summaryCardActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  summaryCardSold: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  summaryCardRented: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  summaryIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 6,
   },
-  summaryIconContainerPlain: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
+  summaryIconGreen: { backgroundColor: 'rgba(5, 150, 105, 0.2)' },
+  summaryIconSlate: { backgroundColor: '#E2E8F0' },
+  summaryIconBlue: { backgroundColor: 'rgba(37, 99, 235, 0.2)' },
   summaryNumber: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#FFFFFF',
     marginBottom: 2,
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
-  summaryNumberPlain: {
-    fontSize: 18,
-    fontWeight: '800',
-    marginBottom: 2,
-    letterSpacing: 0.3,
-  },
+  summaryNumberTotal: { color: '#4338CA' },
+  summaryNumberActive: { color: '#047857' },
+  summaryNumberSlate: { color: '#475569' },
+  summaryNumberBlue: { color: '#1D4ED8' },
   summaryLabel: {
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  summaryLabelPlain: {
-    fontSize: 10,
-    color: '#6B7280',
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    color: '#64748B',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   content: {
     flex: 1,
+  },
+  contentInner: {
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
-    paddingHorizontal: 40,
+    paddingVertical: 80,
+    paddingHorizontal: 32,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F3F4F6',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#334155',
     marginBottom: 8,
-    letterSpacing: 0.3,
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -385,22 +387,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 10 }
+      : { elevation: 0 }),
   },
   bookImageContainer: {
     position: 'relative',
   },
   bookImage: {
-    width: 110,
-    height: 150,
+    width: 100,
+    height: 140,
+    backgroundColor: '#F1F5F9',
   },
   statusBadgeAbsolute: {
     position: 'absolute',
@@ -409,73 +410,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
   bookInfo: {
     flex: 1,
-    padding: 16,
+    padding: 14,
     justifyContent: 'space-between',
   },
   bookHeader: {
-    marginBottom: 12,
-  },
-  bookTitleContainer: {
-    flex: 1,
+    marginBottom: 10,
   },
   bookTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 6,
+    color: '#1E293B',
+    marginBottom: 4,
     lineHeight: 22,
-    letterSpacing: 0.2,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
   },
   statusText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   bookAuthor: {
     fontSize: 13,
-    color: '#6B7280',
+    color: '#64748B',
     fontWeight: '500',
   },
   bookMeta: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
     flexWrap: 'wrap',
   },
   typeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
   },
   typeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   conditionBadge: {
     flexDirection: 'row',
@@ -483,37 +459,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FFFBEB',
     gap: 4,
   },
   conditionText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#92400E',
+    color: '#B45309',
   },
   bookFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
   price: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: 0.3,
+    color: '#1E293B',
   },
   rentPrice: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#64748B',
     fontWeight: '500',
     marginTop: 2,
   },
   stats: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 14,
     alignItems: 'center',
   },
   statItem: {
@@ -523,7 +498,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#64748B',
     fontWeight: '600',
   },
 });

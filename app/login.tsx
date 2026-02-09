@@ -11,6 +11,7 @@ import {
     Dimensions,
     Keyboard,
     Platform,
+    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
@@ -81,19 +82,25 @@ const Login = () => {
     };
   }, []);
 
-  // Email/password login
+  // Email/password login (basic validation – backend must also validate)
   const handleLogin = async () => {
     if (isSubmitting) return;
     try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     
-    if (!email || !password) {
+    const trimmedEmail = (email || '').trim();
+    const trimmedPassword = (password || '').trim();
+    if (!trimmedEmail || !trimmedPassword) {
       showError('Please enter both email and password.');
+      return;
+    }
+    if (trimmedPassword.length < 6) {
+      showError('Password must be at least 6 characters.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const result = await auth.login(email, password);
+      const result = await auth.login(trimmedEmail, trimmedPassword);
       showSuccess('Login successful! Welcome back.');
     } catch (error: any) {
       showError(error?.message || 'Login failed.');
@@ -119,26 +126,43 @@ const Login = () => {
           <View style={styles.circle3} />
         </View>
 
-        <TouchableOpacity 
-          style={styles.touchableContainer}
-          activeOpacity={1}
-          onPress={() => {
-            setEmailFocused(false);
-            setPasswordFocused(false);
-            Keyboard.dismiss();
-          }}
+        {/* Back Button */}
+        <TouchableOpacity
+          onPress={() => router.back()} 
+          style={styles.backButton}
+          activeOpacity={0.7}
         >
-            {/* Header Section with Logo */}
-            <Animated.View 
-              style={[
-                styles.headerSection,
-                {
-                  transform: [
-                    { translateY: keyboardHeight > 0 ? -keyboardHeight * 0.4 : 0 }
-                  ]
-                }
-              ]}
-            >
+          <View style={styles.backButtonGradient}>
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity 
+            style={styles.touchableContainer}
+            activeOpacity={1}
+            onPress={() => {
+              setEmailFocused(false);
+              setPasswordFocused(false);
+              Keyboard.dismiss();
+            }}
+          >
+              {/* Header Section with Logo */}
+              <Animated.View 
+                style={[
+                  styles.headerSection,
+                  {
+                    transform: [
+                      { translateY: keyboardHeight > 0 ? -keyboardHeight * 0.2 : 0 }
+                    ]
+                  }
+                ]}
+              >
               <Animated.View 
                 style={[
                   styles.logoContainer,
@@ -206,17 +230,6 @@ const Login = () => {
               </Animated.View>
             </Animated.View>
 
-            {/* Back Button */}
-            <TouchableOpacity
-              onPress={() => router.back()} 
-              style={styles.backButton}
-              activeOpacity={0.7}
-            >
-              <View style={styles.backButtonGradient}>
-                <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-
             {/* Main Content Card */}
             <Animated.View 
               style={[
@@ -224,8 +237,7 @@ const Login = () => {
                 {
                   opacity: fadeAnim,
                   transform: [
-                    { translateY: slideAnim },
-                    { translateY: keyboardHeight > 0 ? -keyboardHeight * 0.6 : 0 }
+                    { translateY: slideAnim }
                   ]
                 }
               ]}
@@ -336,7 +348,8 @@ const Login = () => {
                 </>
               )}
             </Animated.View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </ScrollView>
       </LinearGradient>
     </View>
   );
@@ -386,6 +399,13 @@ const styles = StyleSheet.create({
   },
   touchableContainer: {
     flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   
   // Header Section
@@ -522,8 +542,7 @@ const styles = StyleSheet.create({
   // Main Card
   mainCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderRadius: 28,
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: Platform.OS === 'ios' ? 30 : 20,
@@ -532,9 +551,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 10,
-    marginTop: 'auto',
-    minHeight: height * 0.45,
-    maxHeight: height * 0.6,
+    marginTop: 20,
+    marginHorizontal: 16,
+    marginBottom: 20,
   },
   cardHeader: {
     alignItems: 'center',

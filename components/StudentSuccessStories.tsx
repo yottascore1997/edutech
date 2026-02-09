@@ -1,8 +1,10 @@
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
+import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     FlatList,
     Image,
@@ -16,7 +18,8 @@ const { width: screenWidth } = Dimensions.get('window');
 const CARD_WIDTH = screenWidth * 0.55;
 const CARD_SPACING = 12;
 
-interface SuccessStory {
+/** Success story item – matches API response (admin adds these from backend). */
+export interface SuccessStory {
   id: string;
   studentName: string;
   achievement: string;
@@ -26,6 +29,43 @@ interface SuccessStory {
   brandLogo?: string;
   brandName?: string;
   description?: string;
+  /** Video URL from admin – used when user taps to play. */
+  videoUrl?: string;
+}
+
+/** Get YouTube thumbnail URL from video/shorts URL. */
+function getYouTubeThumbnail(url: string): string {
+  const match = url?.match(/(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  const videoId = match?.[1];
+  if (!videoId) return '';
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
+/** Map API response to SuccessStory. Supports both old shape and new (title, mediaUrl, mediaType). */
+function mapApiItemToStory(raw: any): SuccessStory {
+  const mediaUrl = raw.mediaUrl ?? raw.media_url ?? raw.videoUrl ?? raw.video_url ?? '';
+  const mediaType = (raw.mediaType ?? raw.media_type ?? '').toUpperCase();
+  const title = raw.title ?? raw.studentName ?? raw.student_name ?? '';
+  const thumbnail = raw.videoThumbnail ?? raw.video_thumbnail ?? '';
+  const thumbUri = thumbnail && !thumbnail.startsWith('http')
+    ? getImageUrl(thumbnail)
+    : thumbnail;
+  const thumbnailFinal =
+    thumbUri ||
+    (mediaType === 'YOUTUBE' && mediaUrl ? getYouTubeThumbnail(mediaUrl) : '') ||
+    'https://via.placeholder.com/300x400/7C3AED/FFFFFF?text=Story';
+  return {
+    id: String(raw.id ?? raw._id ?? ''),
+    studentName: title,
+    achievement: raw.achievement ?? '',
+    videoThumbnail: thumbnailFinal,
+    duration: raw.duration ?? '0:00',
+    followers: Number(raw.followers ?? 0),
+    brandLogo: raw.brandLogo ?? raw.brand_logo,
+    brandName: raw.brandName ?? raw.brand_name,
+    description: raw.description,
+    videoUrl: mediaUrl || undefined,
+  };
 }
 
 const defaultStories: SuccessStory[] = [
@@ -71,14 +111,54 @@ const defaultStories: SuccessStory[] = [
   },
 ];
 
+const SUCCESS_STORIES_ENDPOINT = '/student/success-stories';
+
 export default function StudentSuccessStories() {
   const router = useRouter();
-  const [stories] = useState<SuccessStory[]>(defaultStories);
+  const { user } = useAuth();
+  const [stories, setStories] = useState<SuccessStory[]>(defaultStories);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStories = useCallback(async () => {
+    if (!user?.token) {
+      setLoading(false);
+      setStories(defaultStories);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await apiFetchAuth(SUCCESS_STORIES_ENDPOINT, user.token);
+      if (res.ok && res.data) {
+        const list = Array.isArray(res.data) ? res.data : res.data?.data ?? res.data?.list ?? [];
+        const mapped = list.map(mapApiItemToStory).filter((s) => s.id);
+        if (mapped.length > 0) setStories(mapped);
+      }
+    } catch (e) {
+      console.warn('Success stories API not available, using defaults:', e);
+      setError(null);
+      setStories(defaultStories);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.token]);
+
+  useEffect(() => {
+    fetchStories();
+  }, [fetchStories]);
 
   const handleVideoPress = (story: SuccessStory) => {
-    // Navigate to video detail page or play video
-    console.log('Playing video:', story.id);
-    // router.push(`/success-story/${story.id}`);
+    router.push({
+      pathname: '/success-story/[id]',
+      params: {
+        id: story.id,
+        videoUrl: story.videoUrl ?? '',
+        studentName: story.studentName,
+        achievement: story.achievement,
+        description: story.description ?? '',
+      },
+    });
   };
 
   const renderVideoCard = ({ item, index }: { item: SuccessStory; index: number }) => {
@@ -153,14 +233,11 @@ export default function StudentSuccessStories() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.headerIconContainer}>
-            <LinearGradient
-              colors={['#F97316', '#EA580C', '#DC2626']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerIconGradient}
-            >
-              <Ionicons name="star" size={24} color="#FFFFFF" />
-            </LinearGradient>
+            <Image
+              source={require('../assets/images/icons/instagram-stories.png')}
+              style={styles.headerStoriesIcon}
+              resizeMode="contain"
+            />
           </View>
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle}>Stories that</Text>
@@ -168,9 +245,19 @@ export default function StudentSuccessStories() {
           </View>
         </View>
         <View style={styles.headerStats}>
-          <Text style={styles.headerStatsText}>500+ Success Stories</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#F97316" />
+          ) : (
+            <Text style={styles.headerStatsText}>{stories.length}+ Success Stories</Text>
+          )}
         </View>
       </View>
+
+      {error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
 
       {/* Video Cards Horizontal Scroll */}
       <FlatList
@@ -208,6 +295,10 @@ const styles = StyleSheet.create({
   },
   headerIconContainer: {
     marginRight: 12,
+  },
+  headerStoriesIcon: {
+    width: 50,
+    height: 50,
   },
   headerIconGradient: {
     width: 50,
@@ -252,6 +343,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F97316',
     letterSpacing: 0.3,
+  },
+  errorContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#DC2626',
+    fontWeight: '600',
   },
   listContent: {
     paddingRight: 20,

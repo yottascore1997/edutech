@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -220,7 +220,7 @@ export default function CategoryBooksScreen() {
               <View key={book.id} style={styles.bookCard}>
                 <View style={styles.bookImageContainer}>
                   <Image
-                    source={{ uri: `http://192.168.1.5:3000${book.coverImage}` }}
+                    source={{ uri: book.coverImage ? getImageUrl(book.coverImage) : '' }}
                     style={styles.bookImage}
                     defaultSource={require('@/assets/images/book.jpg')}
                   />

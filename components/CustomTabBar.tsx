@@ -1,16 +1,17 @@
+import { useLiveExam } from '@/context/LiveExamContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 75;
-const ICON_SIZE = 22;
+const ICON_SIZE = 26;
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
     const { routes, index: activeIndex } = state;
+    const { isLiveExamInProgress } = useLiveExam();
 
     // Filter to only the routes we expect, to prevent duplicates
-    // Temporarily using timetable and book-store instead of social and profile
     const expectedRoutes = ['home', 'exam', 'quiz', 'timetable', 'book-store'];
     const filteredRoutes = routes.filter((r: any) => expectedRoutes.includes(r.name));
 
@@ -22,6 +23,17 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         });
 
         if (!isFocused && !event.defaultPrevented) {
+            if (isLiveExamInProgress) {
+                Alert.alert(
+                    'Leave exam?',
+                    'Leaving will save your progress. You can resume when you return. Time will keep counting down.',
+                    [
+                        { text: 'Stay', style: 'cancel' },
+                        { text: 'Leave', style: 'destructive', onPress: () => navigation.navigate(route.name) },
+                    ]
+                );
+                return;
+            }
             navigation.navigate(route.name);
         }
     };
@@ -40,15 +52,18 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
 
                     let iconName: any = 'home';
                     let label = 'Home';
+                    let tabIconImage: number | null = null;
 
                     switch (route.name) {
                         case 'home':
                             iconName = isFocused ? 'home' : 'home-outline';
                             label = 'Home';
+                            tabIconImage = require('@/assets/images/icons/home.png');
                             break;
                         case 'exam':
                             iconName = isFocused ? 'book' : 'book-outline';
                             label = 'Exam';
+                            tabIconImage = require('@/assets/images/icons/exam2.png');
                             break;
                         case 'quiz':
                             iconName = 'qr-code';
@@ -57,20 +72,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                         case 'timetable':
                             iconName = isFocused ? 'calendar' : 'calendar-outline';
                             label = 'Timetable';
+                            tabIconImage = require('@/assets/images/icons/3d-alarm.png');
                             break;
                         case 'book-store':
                             iconName = isFocused ? 'library' : 'library-outline';
                             label = 'Books';
+                            tabIconImage = require('@/assets/images/icons/book.png');
                             break;
-                        // Temporarily commented - will be added back in next launch
-                        // case 'social':
-                        //     iconName = isFocused ? 'people' : 'people-outline';
-                        //     label = 'Social';
-                        //     break;
-                        // case 'profile':
-                        //     iconName = isFocused ? 'person' : 'person-outline';
-                        //     label = 'Profile';
-                        //     break;
                     }
                     
                     const isCenter = route.name === 'quiz';
@@ -105,11 +113,15 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                                 styles.iconContainer,
                                 isFocused && styles.activeIconContainer
                             ]}>
-                                <Ionicons 
-                                    name={iconName} 
-                                    size={ICON_SIZE} 
-                                    color={isFocused ? "#6366F1" : "#64748B"}
-                                />
+                                {tabIconImage ? (
+                                    <Image source={tabIconImage} style={styles.tabIconImage} resizeMode="contain" />
+                                ) : (
+                                    <Ionicons 
+                                        name={iconName} 
+                                        size={ICON_SIZE} 
+                                        color={isFocused ? "#6366F1" : "#64748B"}
+                                    />
+                                )}
                             </View>
                             <Text style={[
                                 styles.label, 
@@ -130,21 +142,36 @@ const styles = StyleSheet.create({
     tabBarContainer: {
         position: 'absolute',
         bottom: 0,
+        left: 0,
+        right: 0,
         width: width,
         height: TAB_BAR_HEIGHT,
         alignItems: 'center',
+        backgroundColor: 'transparent',
+        overflow: 'visible',
     },
     whiteBackground: {
         position: 'absolute',
         bottom: 0,
+        left: 0,
+        right: 0,
         width: width,
         height: TAB_BAR_HEIGHT,
         backgroundColor: '#FFFFFF',
         borderTopLeftRadius: 25,
         borderTopRightRadius: 25,
-        elevation: 0,
         borderWidth: 1,
-        borderColor: 'rgba(226, 232, 240, 0.6)',
+        borderColor: '#E2E8F0',
+        zIndex: 0,
+        elevation: 0,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.06,
+                shadowRadius: 8,
+            },
+        }),
     },
     backgroundPattern: {
         position: 'absolute',
@@ -190,7 +217,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 8,
         paddingHorizontal: 8,
-        zIndex: 1,
+        zIndex: 2,
+        elevation: 2,
     },
     tab: {
         flex: 1,
@@ -205,10 +233,9 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 6,
-        backgroundColor: 'rgba(248, 250, 252, 0.8)',
-        borderWidth: 1.5,
-        borderColor: 'rgba(226, 232, 240, 0.6)',
-        elevation: 0,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
     activeIconContainer: {
         backgroundColor: 'rgba(99, 102, 241, 0.12)',
@@ -216,6 +243,10 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         elevation: 0,
         transform: [{ scale: 1.05 }],
+    },
+    tabIconImage: {
+        width: 30,
+        height: 30,
     },
     label: {
         fontSize: 12,

@@ -1,4 +1,4 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { useCategory } from '@/context/CategoryContext';
 import { useWallet } from '@/context/WalletContext';
@@ -7,7 +7,9 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface CommonHeaderProps {
   showMainOptions?: boolean;
@@ -18,6 +20,7 @@ interface Category {
   name: string;
   icon: string;
   color: string;
+  categoryLogoUrl?: string;
 }
 
 const CommonHeader: React.FC<CommonHeaderProps> = ({ 
@@ -55,7 +58,13 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
               name: exam.category,
               icon: getCategoryIcon(exam.category),
               color: getCategoryColor(exam.category),
+              categoryLogoUrl: exam.categoryLogoUrl || undefined,
             });
+          } else {
+            const existing = categoryMap.get(exam.category)!;
+            if (!existing.categoryLogoUrl && exam.categoryLogoUrl) {
+              existing.categoryLogoUrl = exam.categoryLogoUrl;
+            }
           }
         });
         
@@ -123,26 +132,25 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
   return (
     <View style={styles.headerContainer}>
       <LinearGradient
-        colors={['#4F46E5', '#7C3AED', '#9333EA', '#A855F7']}
+        colors={['#4338CA', '#5B21B6', '#6D28D9', '#7C3AED']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradientBackground}
       >
-        {/* Premium Glass Effect Overlay */}
         <View style={styles.glassOverlay} />
+        <View style={styles.glassShine} />
         
-        {/* Top Header */}
         <View style={styles.topHeader}>
-          {/* Menu Button - Premium Style */}
-          <TouchableOpacity 
+          <Pressable
             style={styles.menuButton}
             onPress={() => navigation.toggleDrawer()}
-            activeOpacity={0.8}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: true }}
           >
-            <View style={styles.menuButtonContainer}>
+            <View style={styles.menuButtonContainer} collapsable={false}>
               <Ionicons name="menu" size={22} color="#FFFFFF" />
             </View>
-          </TouchableOpacity>
+          </Pressable>
           
           {/* Center - Select Exam Button */}
           <TouchableOpacity 
@@ -171,7 +179,7 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
             </View>
           </TouchableOpacity>
           
-          {/* Right Actions - Premium Style */}
+          {/* Right Actions - Message icon hidden for now */}
           <View style={styles.rightActions}>
             <TouchableOpacity 
               style={styles.actionButton}
@@ -181,16 +189,6 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
               <View style={styles.actionButtonContainer}>
                 <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
                 <View style={styles.notificationDot} />
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('(tabs)', { screen: 'messages' })}
-              activeOpacity={0.7}
-            >
-              <View style={styles.actionButtonContainer}>
-                <Ionicons name="chatbubble-ellipses-outline" size={20} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
             
@@ -278,7 +276,7 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
         >
           <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Practice Exam Category</Text>
+              <Text style={styles.modalTitle}>Select your Exam</Text>
               <TouchableOpacity 
                 onPress={() => setShowCategoryModal(false)}
                 style={styles.closeButton}
@@ -290,6 +288,7 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
             <ScrollView 
               style={styles.categoriesList}
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesListContent}
             >
               {loadingCategories ? (
                 <View style={styles.loadingContainer}>
@@ -301,27 +300,36 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({
                   <Text style={styles.emptyText}>No categories available</Text>
                 </View>
               ) : (
-                categories.map((category, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.categoryItem}
-                    onPress={() => handleCategorySelect(category.name)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[
-                      styles.categoryIconContainer,
-                      { backgroundColor: category.color + '20' }
-                    ]}>
-                      <Ionicons 
-                        name={category.icon as any} 
-                        size={24} 
-                        color={category.color} 
-                      />
-                    </View>
-                    <Text style={styles.categoryName}>{category.name}</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
-                ))
+                <View style={styles.categoryGrid}>
+                  {categories.map((category, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.categoryCard}
+                      onPress={() => handleCategorySelect(category.name)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[
+                        styles.categoryImageWrap,
+                        { backgroundColor: category.color + '18' }
+                      ]}>
+                        {category.categoryLogoUrl && getImageUrl(category.categoryLogoUrl) ? (
+                          <Image
+                            source={{ uri: getImageUrl(category.categoryLogoUrl)! }}
+                            style={styles.categoryImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Ionicons
+                            name={category.icon as any}
+                            size={26}
+                            color={category.color}
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.categoryCardName} numberOfLines={1}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               )}
             </ScrollView>
           </View>
@@ -336,19 +344,21 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
     paddingHorizontal: 0,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 15,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#3730A3',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+    } : {}),
+    elevation: Platform.OS === 'android' ? 0 : 8,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#4338CA',
   },
   
   gradientBackground: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 0,
-    paddingBottom: 12,
+    paddingBottom: 6,
   },
   
   glassOverlay: {
@@ -357,9 +367,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderBottomWidth: 2,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.2)',
+  },
+  glassShine: {
+    position: 'absolute',
+    top: 0,
+    left: '20%',
+    right: '20%',
+    height: '50%',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderBottomLeftRadius: 80,
+    borderBottomRightRadius: 80,
   },
   
   topHeader: {
@@ -367,31 +387,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 0,
-    paddingTop: 48,
-    paddingBottom: 14,
+    paddingTop: 38,
+    paddingBottom: 4,
     zIndex: 1,
-    minHeight: 56,
+    minHeight: 40,
   },
   
   menuButton: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
+    minWidth: 42,
+    minHeight: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
   
   menuButtonContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1.5,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#1E1B4B',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+    } : {}),
+    elevation: 0,
   },
   
   userInfo: {
@@ -411,22 +438,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minHeight: 32,
+    gap: 4,
   },
   
   selectExamText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
     flexShrink: 1,
     flex: 1,
+    textShadowColor: 'rgba(0,0,0,0.15)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   clearButton: {
     marginLeft: 4,
@@ -457,8 +488,8 @@ const styles = StyleSheet.create({
   },
   
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#1F2937',
     flex: 1,
   },
@@ -473,36 +504,47 @@ const styles = StyleSheet.create({
   },
   
   categoriesList: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  
-  categoryItem: {
+  categoriesListContent: {
+    paddingBottom: 20,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  categoryCard: {
+    width: (screenWidth - 32 - 8) / 2,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
+    gap: 8,
   },
-  
-  categoryIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+  categoryImageWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    overflow: 'hidden',
   },
-  
-  categoryName: {
+  categoryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  categoryCardName: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#1F2937',
+    lineHeight: 16,
   },
   
   loadingContainer: {
@@ -557,25 +599,27 @@ const styles = StyleSheet.create({
   },
   
   actionButton: {
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   
   actionButtonContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1.5,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#1E1B4B',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+    } : {}),
+    elevation: 0,
   },
   
   notificationDot: {
@@ -596,40 +640,42 @@ const styles = StyleSheet.create({
   },
   
   walletButton: {
-    borderRadius: 18,
+    borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#B45309',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+    } : {}),
+    elevation: 0,
   },
   
   walletButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    borderWidth: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.4)',
-    minWidth: 75,
+    minWidth: 72,
   },
   
   walletIconContainer: {
-    marginRight: 6,
+    marginRight: 5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   
   walletText: {
-    fontSize: 14,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.4,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   
   mainOptionsContainer: {

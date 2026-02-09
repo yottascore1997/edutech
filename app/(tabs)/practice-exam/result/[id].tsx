@@ -531,7 +531,7 @@ export default function PracticeExamResultScreen() {
                         style={styles.statGradient}
                       >
                         <View style={styles.statIcon}>
-                          <Ionicons name="checkmark-circle" size={32} color="#059669" />
+                          <Ionicons name="checkmark-circle" size={24} color="#059669" />
                         </View>
                         <Text style={styles.statValue}>{result.correctAnswers}</Text>
                         <Text style={styles.statLabel}>Correct</Text>
@@ -547,7 +547,7 @@ export default function PracticeExamResultScreen() {
                         style={styles.statGradient}
                       >
                         <View style={styles.statIcon}>
-                          <Ionicons name="close-circle" size={32} color="#DC2626" />
+                          <Ionicons name="close-circle" size={24} color="#DC2626" />
                         </View>
                         <Text style={styles.statValue}>{result.wrongAnswers}</Text>
                         <Text style={styles.statLabel}>Wrong</Text>
@@ -563,7 +563,7 @@ export default function PracticeExamResultScreen() {
                         style={styles.statGradient}
                       >
                         <View style={styles.statIcon}>
-                          <Ionicons name="help-circle" size={32} color="#4F46E5" />
+                          <Ionicons name="help-circle" size={24} color="#4F46E5" />
                         </View>
                         <Text style={styles.statValue}>{result.totalQuestions}</Text>
                         <Text style={styles.statLabel}>Total</Text>
@@ -577,7 +577,7 @@ export default function PracticeExamResultScreen() {
                         style={styles.statGradient}
                       >
                         <View style={styles.statIcon}>
-                          <Ionicons name="time" size={32} color="#D97706" />
+                          <Ionicons name="time" size={24} color="#D97706" />
                         </View>
                         <Text style={styles.statValue}>{result.timeTakenMinutes}</Text>
                         <Text style={styles.statLabel}>Minutes</Text>
@@ -887,12 +887,14 @@ export default function PracticeExamResultScreen() {
                 {improvementData && improvementData.hasEnoughData && improvementData.suggestions && improvementData.suggestions.length > 0 && (
                   <View style={styles.improvementCard}>
                     <LinearGradient
-                      colors={['#FEF3C7', '#FDE68A']}
+                      colors={['#F0FDF4', '#ECFEFF']}
                       style={styles.improvementGradient}
                     >
                       <View style={styles.improvementHeader}>
-                        <Ionicons name="bulb" size={28} color="#D97706" />
-                        <Text style={styles.improvementTitle}>💡 Improvement Suggestions</Text>
+                        <View style={styles.improvementIconWrap}>
+                          <Ionicons name="bulb" size={26} color="#0D9488" />
+                        </View>
+                        <Text style={styles.improvementTitle}>Improvement Suggestions</Text>
                       </View>
                       <Text style={styles.improvementSubtext}>
                         Personalized recommendations to boost your performance
@@ -977,7 +979,7 @@ export default function PracticeExamResultScreen() {
 
                               {/* Action Text */}
                               <View style={styles.actionSection}>
-                                <Ionicons name="arrow-forward-circle" size={18} color="#D97706" />
+                                <Ionicons name="arrow-forward-circle" size={18} color="#0D9488" />
                                 <Text style={styles.actionText}>{suggestion.action}</Text>
                               </View>
                             </View>
@@ -988,7 +990,7 @@ export default function PracticeExamResultScreen() {
                       {/* Next Steps Section */}
                       {improvementData.nextSteps && improvementData.nextSteps.length > 0 && (
                         <View style={styles.nextStepsSection}>
-                          <Text style={styles.nextStepsTitle}>📋 Next Steps</Text>
+                          <Text style={styles.nextStepsTitle}>Next Steps</Text>
                           {improvementData.nextSteps.map((step: string, index: number) => (
                             <View key={index} style={styles.nextStepItem}>
                               <View style={styles.nextStepNumber}>
@@ -1199,115 +1201,115 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   ultraHeaderSection: {
-    marginTop: 20,
-    marginBottom: 24,
+    marginTop: 12,
+    marginBottom: 14,
     marginHorizontal: 16,
-    borderRadius: 28,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.25,
-    shadowRadius: 32,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   ultraHeaderGradient: {
-    padding: 28,
-    paddingTop: 32,
-    paddingBottom: 32,
+    padding: 16,
+    paddingTop: 18,
+    paddingBottom: 18,
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
   },
   decorativeCircle1: {
     position: 'absolute',
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    top: -60,
-    right: -40,
-  },
-  decorativeCircle2: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    bottom: -30,
-    left: -30,
-  },
-  decorativeCircle3: {
-    position: 'absolute',
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    top: 50,
-    left: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    top: -30,
+    right: -20,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    bottom: -15,
+    left: -15,
+  },
+  decorativeCircle3: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    top: 24,
+    left: 16,
   },
   ultraHeaderTitle: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 8,
-    letterSpacing: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 6,
+    marginBottom: 4,
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
     textAlign: 'center',
   },
   ultraHeaderSubtitle: {
-    fontSize: 15,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.95)',
-    fontWeight: '700',
-    marginBottom: 20,
+    fontWeight: '600',
+    marginBottom: 10,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    paddingHorizontal: 16,
+    textShadowRadius: 2,
+    paddingHorizontal: 12,
   },
   massiveScoreContainer: {
-    marginVertical: 16,
+    marginVertical: 8,
     alignItems: 'center',
   },
   scoreRing: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 14,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   scoreInnerRing: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: 'rgba(255, 255, 255, 0.6)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
     overflow: 'hidden',
   },
   scoreLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.95)',
-    letterSpacing: 2,
-    marginBottom: 12,
+    letterSpacing: 1.5,
+    marginBottom: 6,
     textTransform: 'uppercase',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
@@ -1319,14 +1321,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   massiveScore: {
-    fontSize: 52,
+    fontSize: 36,
     fontWeight: '900',
     color: '#1F2937',
-    lineHeight: 52,
-    letterSpacing: -1.5,
+    lineHeight: 36,
+    letterSpacing: -1,
   },
   scorePercentage: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '800',
     color: '#64748B',
     marginLeft: 2,
@@ -1334,21 +1336,21 @@ const styles = StyleSheet.create({
   },
   performancePill: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 16,
-    borderWidth: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginTop: 8,
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   performancePillText: {
-    fontSize: 11,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -1358,20 +1360,20 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 4,
-    marginBottom: 20,
-    marginHorizontal: 20,
+    marginBottom: 16,
+    marginHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
   },
   activeTab: {
@@ -1485,51 +1487,51 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   statsSection: {
-    marginHorizontal: 20,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#1F2937',
-    marginBottom: 16,
+    marginBottom: 10,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   statCard: {
-    width: (width - 64) / 2,
-    borderRadius: 16,
+    width: (width - 48) / 2,
+    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statGradient: {
-    padding: 20,
+    padding: 14,
     alignItems: 'center',
   },
   statIcon: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   statValue: {
-    fontSize: 36,
-    fontWeight: '900',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#1F2937',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statPercentage: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: '#9CA3AF',
   },
@@ -1824,7 +1826,7 @@ const styles = StyleSheet.create({
   rankPreviewTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#0C4A6E',
+    color: '#0F172A',
     flex: 1,
   },
   examTypeBadge: {
@@ -1836,7 +1838,7 @@ const styles = StyleSheet.create({
   examTypeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#0284C7',
+    color: '#0F172A',
     textTransform: 'uppercase',
   },
   projectedScoreContainer: {
@@ -1856,7 +1858,7 @@ const styles = StyleSheet.create({
   projectedScoreLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#075985',
+    color: '#0F172A',
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -1869,13 +1871,13 @@ const styles = StyleSheet.create({
   projectedScoreValue: {
     fontSize: 48,
     fontWeight: '900',
-    color: '#0284C7',
+    color: '#0F172A',
     lineHeight: 52,
   },
   projectedScoreUnit: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#0284C7',
+    color: '#0F172A',
     marginLeft: 2,
   },
   rankPreviewMetricsRow: {
@@ -1907,14 +1909,14 @@ const styles = StyleSheet.create({
   rankRangeLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#075985',
+    color: '#0F172A',
     marginBottom: 6,
     textAlign: 'center',
   },
   rankRangeValue: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0284C7',
+    color: '#0F172A',
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -1930,14 +1932,14 @@ const styles = StyleSheet.create({
   performanceIndexLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#075985',
+    color: '#0F172A',
     marginBottom: 6,
     textAlign: 'center',
   },
   performanceIndexValue: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#0284C7',
+    color: '#0F172A',
     textAlign: 'center',
   },
   breakdownSection: {
@@ -1949,7 +1951,7 @@ const styles = StyleSheet.create({
   breakdownTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0C4A6E',
+    color: '#0F172A',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -1970,12 +1972,12 @@ const styles = StyleSheet.create({
   breakdownValue: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#0284C7',
+    color: '#0F172A',
   },
   breakdownLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#075985',
+    color: '#0F172A',
   },
   breakdownProgressBar: {
     height: 6,
@@ -2005,44 +2007,56 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   improvementCard: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
     shadowRadius: 16,
-    elevation: 10,
+    elevation: 6,
   },
   improvementGradient: {
-    padding: 24,
+    padding: 22,
   },
   improvementHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  improvementIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#CCFBF1',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   improvementTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#92400E',
+    flex: 1,
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   improvementSubtext: {
     fontSize: 14,
-    color: '#B45309',
-    fontWeight: '600',
+    color: '#475569',
+    fontWeight: '500',
     marginBottom: 16,
+    lineHeight: 20,
   },
   improvementContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 14,
     padding: 16,
   },
   improvementText: {
     fontSize: 14,
-    color: '#92400E',
+    color: '#334155',
     fontWeight: '500',
     lineHeight: 20,
   },
@@ -2055,15 +2069,17 @@ const styles = StyleSheet.create({
   suggestionText: {
     flex: 1,
     fontSize: 14,
-    color: '#92400E',
+    color: '#334155',
     fontWeight: '500',
     lineHeight: 20,
   },
   improvementSummary: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -2076,39 +2092,44 @@ const styles = StyleSheet.create({
   },
   summaryDivider: {
     width: 1,
-    height: 40,
-    backgroundColor: 'rgba(146, 64, 14, 0.2)',
+    height: 36,
+    backgroundColor: '#E2E8F0',
   },
   summaryLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 6,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
     textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   summaryValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#D97706',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0D9488',
     textAlign: 'center',
   },
   summaryValueSmall: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#0F172A',
   },
   suggestionsList: {
     gap: 12,
     marginBottom: 16,
   },
   suggestionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   suggestionCardHeader: {
     flexDirection: 'row',
@@ -2139,13 +2160,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   improvementBadge: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#059669',
-    backgroundColor: '#D1FAE5',
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0D9488',
+    backgroundColor: '#CCFBF1',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   progressSection: {
     marginBottom: 12,
@@ -2190,36 +2211,38 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   targetValue: {
-    color: '#059669',
+    color: '#0D9488',
     fontWeight: '800',
   },
   actionSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: 'rgba(217, 119, 6, 0.1)',
+    gap: 10,
+    backgroundColor: '#F0FDF4',
     padding: 12,
-    borderRadius: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#D97706',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0D9488',
   },
   actionText: {
     flex: 1,
     fontSize: 13,
-    color: '#92400E',
+    color: '#0F172A',
     fontWeight: '600',
     lineHeight: 18,
   },
   nextStepsSection: {
     marginTop: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   nextStepsTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#92400E',
+    color: '#0F172A',
     marginBottom: 12,
   },
   nextStepItem: {
@@ -2229,23 +2252,23 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   nextStepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#D97706',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#0D9488',
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
   },
   nextStepNumberText: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   nextStepText: {
     flex: 1,
     fontSize: 13,
-    color: '#1F2937',
+    color: '#334155',
     fontWeight: '500',
     lineHeight: 18,
   },
