@@ -1,14 +1,16 @@
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
+import { SoundManager } from '@/utils/sounds';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SoundManager } from '@/utils/sounds';
-import * as Haptics from 'expo-haptics';
 import {
     Animated,
     Dimensions,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -72,6 +74,7 @@ export default function BattleRoomScreen() {
   const questionTimerRef = useRef<number | null>(null);
   const socketListenersRef = useRef<Set<string>>(new Set());
   const lastQuestionIndexRef = useRef<number>(-1);
+  const hasFinishedRef = useRef<boolean>(false);
 
   // Animation values for victory screen
   const confettiAnim = useRef(new Animated.Value(0)).current;
@@ -101,6 +104,8 @@ export default function BattleRoomScreen() {
       optionsCount: battleState.question?.options?.length,
       timeLeft: battleState.timeLeft
     });
+    // Track finished state to avoid reacting to server "match_not_found" after match ends
+    hasFinishedRef.current = battleState.status === 'finished';
   }, [battleState]);
 
   // Trigger victory animation when battle ends
@@ -283,12 +288,12 @@ export default function BattleRoomScreen() {
 
 
       
-      const newSocket = io('http://192.168.1.5:3001', {
+      const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: user.token
         },
         transports: ['polling', 'websocket'], // Prefer polling for React Native
-        path: '/api/socket',
+        path: WEBSOCKET_CONFIG.CONNECTION_OPTIONS.path,
         timeout: 20000, // Longer timeout for React Native
         forceNew: true
       });
@@ -355,7 +360,7 @@ export default function BattleRoomScreen() {
     if (!socket) return;
     
 
-    const events = ['match_started', 'next_question', 'match_ended', 'opponent_answered', 'match_not_found', 'pong', 'session_cleanup_complete'];
+    const events = ['match_started', 'next_question', 'match_ended', 'opponent_answered', 'score_update', 'match_not_found', 'pong', 'session_cleanup_complete'];
     
     events.forEach(event => {
       if (socketListenersRef.current.has(event)) {
@@ -432,11 +437,16 @@ export default function BattleRoomScreen() {
       setTimeout(() => {
 
         setBattleState(prev => {
+          // Only advance if this is a future question index (prevents resets)
+          if (data.questionIndex <= prev.currentQuestion) {
+            return prev;
+          }
+          const timeLimit = (data as any).timeLimit ?? 10; // use provided timeLimit if any
           const newState = {
             ...prev,
             currentQuestion: data.questionIndex,
             question: data.question,
-            timeLeft: 10 // Default time limit
+            timeLeft: timeLimit
           };
 
           return newState;
@@ -444,9 +454,8 @@ export default function BattleRoomScreen() {
         
         // Start timer after state update
         setTimeout(() => {
-
-          startQuestionTimer(10);
-
+          const timeLimit = (data as any).timeLimit ?? 10;
+          startQuestionTimer(timeLimit);
         }, 100);
       }, 100); // Longer delay for React Native
       
@@ -565,12 +574,23 @@ const handleMatchEnded = (data: {
           [data.questionIndex]: data.answer // Store the specific answer
         }
       }));
+    
+    // After recording opponent answer, nudge server to send next question if ready
+    try {
+      socket?.emit('get_match_status', { matchId });
+    } catch (err) {
+      // ignore
+    }
       
 
     };
 
     // Match not found event
     const handleMatchNotFound = (data: { matchId: string }) => {
+      // If the battle already finished (we're showing result), ignore spurious match_not_found events.
+      if (hasFinishedRef.current) {
+        return;
+      }
 
       setError('Match not found or has already ended. Please start a new match.');
     };
@@ -592,19 +612,88 @@ const handleMatchEnded = (data: {
 
       }
     };
+    // Score update event (optional server event)
+    const handleScoreUpdate = (data: {
+      playerScores?: { player1?: number; player2?: number };
+      myScore?: number;
+      opponentScore?: number;
+      myPosition?: 'player1' | 'player2' | string;
+    }) => {
+      setBattleState(prev => {
+        let newPlayer1Score = prev.player1Score;
+        let newPlayer2Score = prev.player2Score;
+
+        if (data.playerScores) {
+          newPlayer1Score = typeof data.playerScores.player1 === 'number' ? data.playerScores.player1 : newPlayer1Score;
+          newPlayer2Score = typeof data.playerScores.player2 === 'number' ? data.playerScores.player2 : newPlayer2Score;
+        } else if (typeof data.myScore === 'number' && typeof data.opponentScore === 'number') {
+          if (data.myPosition === 'player2') {
+            newPlayer2Score = data.myScore;
+            newPlayer1Score = data.opponentScore;
+          } else {
+            newPlayer1Score = data.myScore;
+            newPlayer2Score = data.opponentScore;
+          }
+        }
+
+        return {
+          ...prev,
+          player1Score: newPlayer1Score,
+          player2Score: newPlayer2Score
+        };
+      });
+    };
+    // Also listen for scores embedded in next_question payloads
+    const handleNextQuestionScores = (data: any) => {
+      // data may include playerScores or myScore/opponentScore/myPosition
+      const playerScores = data.playerScores;
+      const myScore = data.myScore;
+      const opponentScore = data.opponentScore;
+      const myPosition = data.myPosition;
+
+      if (playerScores || (typeof myScore === 'number' && typeof opponentScore === 'number')) {
+        setBattleState(prev => {
+          let newPlayer1Score = prev.player1Score;
+          let newPlayer2Score = prev.player2Score;
+
+          if (playerScores) {
+            newPlayer1Score = typeof playerScores.player1 === 'number' ? playerScores.player1 : newPlayer1Score;
+            newPlayer2Score = typeof playerScores.player2 === 'number' ? playerScores.player2 : newPlayer2Score;
+          } else {
+            if (myPosition === 'player2') {
+              newPlayer2Score = myScore;
+              newPlayer1Score = opponentScore;
+            } else {
+              newPlayer1Score = myScore;
+              newPlayer2Score = opponentScore;
+            }
+          }
+
+          return {
+            ...prev,
+            player1Score: newPlayer1Score,
+            player2Score: newPlayer2Score
+          };
+        });
+      }
+    };
     // Attach listeners
     socket.on('match_started', handleMatchStarted);
     socket.on('next_question', handleNextQuestion);
+    socket.on('next_question', handleNextQuestionScores);
     socket.on('match_ended', handleMatchEnded);
     socket.on('opponent_answered', handleOpponentAnswered);
+    socket.on('score_update', handleScoreUpdate);
     socket.on('match_not_found', handleMatchNotFound);
     socket.on('pong', handlePong);
     socket.on('session_cleanup_complete', handleSessionCleanupComplete);
     // Track attached listeners
     socketListenersRef.current.add('match_started');
     socketListenersRef.current.add('next_question');
+    socketListenersRef.current.add('next_question_scores');
     socketListenersRef.current.add('match_ended');
     socketListenersRef.current.add('opponent_answered');
+    socketListenersRef.current.add('score_update');
     socketListenersRef.current.add('match_not_found');
     socketListenersRef.current.add('pong');
     socketListenersRef.current.add('session_cleanup_complete');
@@ -752,7 +841,7 @@ const handleMatchEnded = (data: {
       setBattleState(prev => {
         if (prev.timeLeft <= 1) {
           // Time's up, auto-submit if not answered
-          if (!prev.answers[prev.currentQuestion]) {
+          if (prev.answers[prev.currentQuestion] === undefined) {
             handleAnswer(-1); // -1 means no answer
           }
           return prev;
@@ -764,11 +853,14 @@ const handleMatchEnded = (data: {
 
   const handleAnswer = (answerIndex: number) => {
     if (!socket || !isConnected) {
-
       return;
     }
     
     const questionIndex = battleState.currentQuestion;
+    // Prevent duplicate submissions if already answered
+    if (battleState.answers[questionIndex] !== undefined) {
+      return;
+    }
     const timeSpent = 10 - battleState.timeLeft;
     
 
@@ -807,6 +899,13 @@ const handleMatchEnded = (data: {
       clearInterval(questionTimerRef.current);
       questionTimerRef.current = null;
     }
+    
+    // Nudge server to advance match status immediately (helps reduce delay after timeout)
+    try {
+      socket.emit('get_match_status', { matchId });
+    } catch (err) {
+      // ignore
+    }
   };
 
   const getAnswerStatus = (questionIndex: number) => {
@@ -838,7 +937,7 @@ const handleMatchEnded = (data: {
         style={styles.container}
       >
         <View style={styles.errorContainer}>
-          <Ionicons name="close-circle" size={80} color="#fff" style={styles.errorIcon} />
+          <Ionicons name="close-circle" size={56} color="#fff" style={styles.errorIcon} />
           <Text style={styles.errorTitle}>Battle Error</Text>
           <Text style={styles.errorMessage}>{error}</Text>
           <TouchableOpacity
@@ -906,7 +1005,7 @@ const handleMatchEnded = (data: {
         >
           {/* Confetti Background */}
           <View style={styles.confettiContainer}>
-            {[...Array(20)].map((_, i) => (
+            {[...Array(Platform.OS === 'android' ? 8 : 20)].map((_, i) => (
               <Animated.View
                 key={i}
                 style={[
@@ -917,12 +1016,12 @@ const handleMatchEnded = (data: {
                     transform: [{
                       translateY: confettiAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0, -300 - Math.random() * 200],
+                        outputRange: [0, (Platform.OS === 'android' ? -220 - Math.random() * 80 : -300 - Math.random() * 200)],
                       })
                     }, {
                       rotate: confettiAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: ['0deg', `${360 + Math.random() * 360}deg`],
+                        outputRange: ['0deg', `${Platform.OS === 'android' ? 180 + Math.random() * 180 : 360 + Math.random() * 360}deg`],
                       })
                     }],
                     opacity: confettiAnim.interpolate({
@@ -937,7 +1036,7 @@ const handleMatchEnded = (data: {
 
           {/* Enhanced Sparkle Background */}
           <View style={styles.sparkleBackground}>
-            {[...Array(15)].map((_, i) => (
+            {[...Array(Platform.OS === 'android' ? 8 : 15)].map((_, i) => (
               <Animated.View
                 key={i}
                 style={[
@@ -962,9 +1061,7 @@ const handleMatchEnded = (data: {
                     })
                   }
                 ]}
-              >
-                <Text style={styles.sparkleText}>✨</Text>
-              </Animated.View>
+              />
             ))}
           </View>
 
@@ -987,14 +1084,17 @@ const handleMatchEnded = (data: {
                 }
               ]}
             >
-              <LinearGradient
-                colors={["#FFD700", "#FF8C00", "#FF6B35"]}
-                style={styles.trophyGradient}
-              >
-                <Ionicons name="trophy" size={80} color="#fff" />
-                {/* Trophy glow effect */}
-                <View style={styles.trophyGlow} />
-              </LinearGradient>
+              <View style={styles.trophyRing}>
+                <LinearGradient
+                  colors={['#B8860B', '#FFD700']}
+                  style={styles.trophyGradient}
+                >
+                  <Ionicons name="trophy" size={Platform.OS === 'android' ? 68 : 88} color="#fff" />
+                </LinearGradient>
+                <View style={styles.medalRibbon}>
+                  <Text style={styles.medalText}>🏅</Text>
+                </View>
+              </View>
               
               {/* Crown above trophy */}
               <Animated.View 
@@ -1035,6 +1135,7 @@ const handleMatchEnded = (data: {
                 style={[
                   styles.victoryTitle,
                   {
+                    color: '#000',
                     transform: [{ scale: pulseAnim }]
                   }
                 ]}
@@ -1297,93 +1398,178 @@ const handleMatchEnded = (data: {
       );
     }
 
-    // Draw or Defeat screen
+    // Draw or Defeat screen (enhanced premium layouts)
     return (
-      <LinearGradient 
-        colors={isDraw ? ["#4F46E5", "#7C3AED", "#8B5CF6"] : ["#FF6B6B", "#FF8E53", "#FF6B35"]}
+      <LinearGradient
+        colors={isDraw ? ['#3f3cbb', '#5b21b6'] : ['#FFD700', '#FF6B35', '#FF1744', '#9C27B0']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.container}
       >
-        {/* Tears Animation for Defeat */}
         {!isDraw && (
-          <View style={styles.tearsContainer}>
-            {[...Array(5)].map((_, i) => (
+          <Animated.View style={styles.defeatBackgroundOrbs}>
+            {[...Array(6)].map((_, i) => (
               <Animated.View
                 key={i}
                 style={[
-                  styles.tear,
+                  styles.defeatOrb,
                   {
-                    left: `${20 + i * 15}%`,
-                    transform: [{
-                      translateY: tearAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 200 + Math.random() * 100],
-                      })
-                    }],
-                    opacity: tearAnim.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [0, 1, 0],
-                    })
+                    left: `${10 + i * 14}%`,
+                    opacity: tearAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.6] }),
+                    transform: [{ scale: tearAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.1] }) }]
                   }
                 ]}
               />
             ))}
-          </View>
+          </Animated.View>
         )}
 
         <View style={styles.finishedContainer}>
-          <Animated.View
-            style={[
-              styles.resultIcon,
-              {
-                transform: [{
-                  translateX: defeatAnim.interpolate({
-                    inputRange: [0, 0.25, 0.5, 0.75, 1],
-                    outputRange: [0, -10, 10, -10, 0],
-                  })
-                }]
-              }
-            ]}
-          >
-            <LinearGradient
-              colors={isDraw ? ["#6C63FF", "#7366FF"] : ["#FF6CAB", "#EA4335"]}
-              style={styles.resultIconGradient}
-            >
-              <Ionicons 
-                name={isDraw ? "flag" : "close-circle"} 
-                size={60} 
-                color="#fff" 
-              />
-            </LinearGradient>
-          </Animated.View>
-          
-          <Text style={styles.resultTitle}>
-            {isDraw ? '🤝 Draw!' : '💪 Better Luck Next Time!'}
-          </Text>
-          
-          <View style={styles.finalScores}>
-            <View style={styles.scoreRow}>
-              <Text style={styles.finalScoreLabel}>You:</Text>
-              <Text style={styles.finalScoreValue}>{battleState.player1Score} pts</Text>
+          {isDraw ? (
+            // Compact Draw screen
+            <View style={styles.drawPanel}>
+              <LinearGradient colors={['#6C63FF', '#7366FF']} style={styles.drawIconGradient}>
+                <Ionicons name="flag" size={Platform.OS === 'android' ? 44 : 56} color="#fff" />
+              </LinearGradient>
+              <Text style={styles.resultTitle}>🤝 Draw!</Text>
+              <Text style={styles.drawSubtitle}>Nobody won this round. Good match!</Text>
+              <View style={styles.finalScores}>
+                <View style={styles.scoreRow}>
+                  <Text style={styles.finalScoreLabel}>You</Text>
+                  <Text style={styles.finalScoreValue}>{battleState.player1Score} pts</Text>
+                </View>
+                <View style={styles.scoreRow}>
+                  <Text style={styles.finalScoreLabel}>Opponent</Text>
+                  <Text style={styles.finalScoreValue}>{battleState.player2Score} pts</Text>
+                </View>
+              </View>
+              <View style={styles.victoryButtonsContainer}>
+                <TouchableOpacity style={styles.victoryButton} onPress={() => router.push('/(tabs)/quiz')}>
+                  <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
+                    <Text style={styles.victoryButtonText}>Back to Quiz</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-            <View style={styles.scoreRow}>
-              <Text style={styles.finalScoreLabel}>Opponent:</Text>
-              <Text style={styles.finalScoreValue}>{battleState.player2Score} pts</Text>
+          ) : (
+            // Defeat screen styled like Champion (premium, but muted)
+            <View style={styles.victoryContainer}>
+              <Text style={styles.sadEmoji}>😢</Text>
+              {/* Muted confetti / particles */}
+              <View style={styles.confettiContainer}>
+                {[...Array(Platform.OS === 'android' ? 6 : 12)].map((_, i) => (
+                  <Animated.View
+                    key={i}
+                    style={[
+                      styles.confetti,
+                      {
+                        left: `${Math.random() * 100}%`,
+                        backgroundColor: ['#FFD452', '#FFD166', '#F59E0B'][Math.floor(Math.random() * 3)],
+                        transform: [{
+                          translateY: confettiAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, Platform.OS === 'android' ? -160 - Math.random() * 60 : -240 - Math.random() * 160],
+                          })
+                        }],
+                        opacity: 0.7
+                      }
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {/* Subtle sparkles */}
+              <View style={styles.sparkleBackground}>
+                {[...Array(Platform.OS === 'android' ? 6 : 10)].map((_, i) => (
+                  <Animated.View
+                    key={i}
+                    style={[
+                      styles.sparkle,
+                      {
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        opacity: 0.6,
+                      }
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {/* Trophy in muted silver ring */}
+              <Animated.View
+                style={[
+                  styles.trophyContainer,
+                  {
+                    transform: [
+                      { scale: trophyScaleAnim },
+                      { scale: pulseAnim },
+                      {
+                        translateY: floatAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -8],
+                        })
+                      }
+                    ]
+                  }
+                ]}
+              >
+                <View style={styles.trophyRing}>
+                  <LinearGradient
+                    colors={['#B8860B', '#FFD700']}
+                    style={styles.trophyGradient}
+                  >
+                    <Ionicons name="trophy" size={Platform.OS === 'android' ? 68 : 88} color="#fff" />
+                  </LinearGradient>
+                </View>
+              </Animated.View>
+
+              {/* Title */}
+              <Animated.View style={styles.victoryTextContainer}>
+                <Animated.Text style={[styles.victoryTitle, { color: '#000' }]}>
+                  💔 Better Luck Next Time
+                </Animated.Text>
+                <Text style={styles.victoryMotivation}>You'll get it next time — go warm up!</Text>
+              </Animated.View>
+
+              {/* Score Display (same layout as champion) */}
+              <View style={styles.victoryScoreContainer}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.12)']}
+                  style={styles.victoryScoreGradient}
+                >
+                  <Text style={styles.victoryScoreLabel}>Your Score</Text>
+                  <Animated.Text style={[styles.victoryScoreValue]}>
+                    {battleState.player1Score}
+                  </Animated.Text>
+                  <Text style={styles.victoryScoreLabel}>Opponent Score</Text>
+                  <Text style={styles.victoryScoreValue}>{battleState.player2Score}</Text>
+                </LinearGradient>
+              </View>
+
+              {/* Actions */}
+              <View style={styles.victoryButtonsContainer}>
+                <TouchableOpacity
+                  style={styles.victoryButton}
+                  onPress={() => router.push('/(tabs)/quiz')}
+                >
+                  <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
+                    <Ionicons name="refresh" size={18} color="#fff" />
+                    <Text style={styles.victoryButtonText}>Play Again</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.victoryButton}
+                  onPress={() => router.push('/(tabs)/quiz')}
+                >
+                  <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.victoryButtonGradient}>
+                    <Ionicons name="arrow-back" size={18} color="#fff" />
+                    <Text style={styles.victoryButtonText}>Back to Quiz</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-          
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <LinearGradient
-              colors={["#6C63FF", "#7366FF"]}
-              style={styles.backButtonGradient}
-            >
-              <Text style={styles.backButtonText}>Back to Battle Quiz</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          )}
         </View>
       </LinearGradient>
     );
@@ -1531,7 +1717,6 @@ const handleMatchEnded = (data: {
           
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>⚔️ Battle Arena</Text>
-            <Text style={styles.headerSubtitle}>Question {battleState.currentQuestion + 1} of {battleState.totalQuestions}</Text>
           </View>
         </View>
 
@@ -1578,14 +1763,36 @@ const handleMatchEnded = (data: {
             
             <View style={styles.timerContainer}>
               <LinearGradient
-                colors={battleState.timeLeft <= 5 ? ["#FF6B6B", "#FF5252"] : ["#4F46E5", "#7C3AED"]}
+                colors={
+                  battleState.answers[battleState.currentQuestion] !== undefined &&
+                  battleState.opponentAnswers[battleState.currentQuestion] === undefined
+                    ? ["#F59E0B", "#D97706"]
+                    : battleState.timeLeft <= 5
+                    ? ["#FF6B6B", "#FF5252"]
+                    : ["#4F46E5", "#7C3AED"]
+                }
                 style={styles.timerGradient}
               >
-                <Ionicons name="time" size={18} color="#fff" />
-                <Text style={styles.timerText}>
-                  {battleState.timeLeft}s
-                </Text>
+                {battleState.answers[battleState.currentQuestion] !== undefined &&
+                battleState.opponentAnswers[battleState.currentQuestion] === undefined ? (
+                  <>
+                    <Ionicons name="hourglass-outline" size={18} color="#fff" />
+                    <Text style={[styles.timerText, styles.timerWaitingText]}>Waiting for opponent...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="time" size={18} color="#fff" />
+                    <Text style={styles.timerText}>
+                      {battleState.timeLeft}s
+                    </Text>
+                  </>
+                )}
               </LinearGradient>
+            </View>
+            <View style={styles.questionCountBadge}>
+              <Text style={styles.questionCountText}>
+                Q {battleState.currentQuestion + 1}/{battleState.totalQuestions}
+              </Text>
             </View>
           </LinearGradient>
         </View>
@@ -1812,42 +2019,38 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 20,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   headerBackButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   statusContainer: {
-    marginTop: 12,
+    marginTop: 6,
     alignItems: 'center',
   },
   statusGradient: {
-    padding: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   statusText: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#fff',
     textAlign: 'center',
     textShadowColor: 'rgba(0,0,0,0.3)',
@@ -1872,10 +2075,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 2,
+    marginBottom: 0,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
@@ -1886,48 +2089,52 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   scoreBoard: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   scoreBoardGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 16,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
+    flexWrap: 'wrap',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    // remove Android shadow to avoid corner artifacts
+    shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+    shadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 8 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.18,
+    shadowRadius: Platform.OS === 'android' ? 0 : 24,
+    elevation: Platform.OS === 'android' ? 0 : 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   scoreContainer: {
     alignItems: 'center',
     flex: 1,
   },
   playerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginBottom: 3,
+    // remove hard shadows on Android (causes corner artifact)
+    shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+    shadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 4 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.3,
+    shadowRadius: Platform.OS === 'android' ? 0 : 8,
+    elevation: Platform.OS === 'android' ? 0 : 6,
   },
   avatarGradient: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   scoreLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: '#fff',
     marginBottom: 2,
     fontWeight: '600',
@@ -1935,7 +2142,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   scoreValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
     textShadowColor: 'rgba(0,0,0,0.3)',
@@ -1948,16 +2155,17 @@ const styles = StyleSheet.create({
   },
   vsGradient: {
     borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    // avoid Android elevation which creates visible corner shadow
+    shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+    shadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 4 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.3,
+    shadowRadius: Platform.OS === 'android' ? 0 : 8,
+    elevation: Platform.OS === 'android' ? 0 : 6,
   },
   vsText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#fff',
     textShadowColor: 'rgba(0,0,0,0.3)',
@@ -1971,8 +2179,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1980,7 +2188,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   timerText: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: 'bold',
     color: '#fff',
     marginLeft: 4,
@@ -1988,75 +2196,89 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
+  timerWaitingText: {
+    fontSize: 10,
+  },
+  questionCountBadge: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  questionCountText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
   progressContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   progressGradient: {
-    borderRadius: 16,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
+    borderRadius: 12,
+    padding: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   progressRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   progressDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: Platform.OS === 'android' ? 32 : 36,
+    height: Platform.OS === 'android' ? 32 : 36,
+    borderRadius: Platform.OS === 'android' ? 16 : 18,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    // subtle elevated look on iOS only to avoid Android corner artifacts
+    shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+    shadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 6 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.12,
+    shadowRadius: Platform.OS === 'android' ? 0 : 8,
+    elevation: Platform.OS === 'android' ? 0 : 4,
   },
   progressDotGradient: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: Platform.OS === 'android' ? 16 : 18,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: Platform.OS === 'android' ? 12 : 14,
+    fontWeight: '900',
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.6,
   },
   questionContainer: {
     flex: 1,
   },
   questionGradient: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: Platform.OS === 'android' ? 12 : 18,
     flex: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(2,6,23,0.06)',
+    backgroundColor: Platform.OS === 'android' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.98)',
+    shadowColor: Platform.OS === 'android' ? 'transparent' : 'rgba(2,6,23,0.08)',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 1,
+    shadowRadius: Platform.OS === 'android' ? 0 : 16,
+    elevation: Platform.OS === 'android' ? 0 : 6,
   },
   questionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   questionIconGradient: {
-    borderRadius: 12,
-    padding: 8,
+    borderRadius: 10,
+    padding: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -2064,44 +2286,36 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   questionNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0b1220',
     marginLeft: 8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    letterSpacing: 0.6,
   },
   questionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 16,
-    lineHeight: 22,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    fontSize: Platform.OS === 'android' ? 15 : 18,
+    fontWeight: '700',
+    color: '#0b1220',
+    marginBottom: 14,
+    lineHeight: Platform.OS === 'android' ? 20 : 24,
   },
   optionsContainer: {
-    gap: 10,
+    gap: 8,
+    marginTop: 6,
   },
   optionButton: {
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(2,6,23,0.06)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
   },
   optionButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === 'android' ? 10 : 14,
+    paddingHorizontal: Platform.OS === 'android' ? 12 : 16,
   },
   optionContent: {
     flexDirection: 'row',
@@ -2109,8 +2323,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   answerIndicator: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 8,
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 12,
     marginLeft: 8,
@@ -2119,48 +2333,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B6B',
   },
   answerIndicatorText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  selectedOption: {
-    borderWidth: 3,
-    borderColor: '#fff',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  optionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333',
-    flex: 1,
-    lineHeight: 18,
-  },
-  selectedOptionText: {
     color: '#fff',
+    fontSize: 10,
     fontWeight: '700',
   },
+  selectedOption: {
+    borderWidth: 2,
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(159,122,234,0.06)',
+  },
+  optionText: {
+    fontSize: Platform.OS === 'android' ? 14 : 16,
+    fontWeight: '600',
+    color: '#0b1220',
+    flex: 1,
+    lineHeight: Platform.OS === 'android' ? 18 : 20,
+  },
+  selectedOptionText: {
+    color: '#0b1220',
+    fontWeight: '800',
+  },
   optionNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(2,6,23,0.04)',
   },
   optionNumberGradient: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionNumberText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: '#4F46E5',
   },
   selectedOptionNumberText: {
@@ -2183,38 +2395,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+    marginTop: 40,
   },
   errorIcon: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   errorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   errorMessage: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 30,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 18,
     textAlign: 'center',
   },
   errorButton: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   errorButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
   errorButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '700',
     color: '#fff',
   },
   preparingContainer: {
@@ -2269,14 +2482,19 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   finalScores: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 30,
+    backgroundColor: 'rgba(10,10,10,0.45)',
+    borderRadius: 14,
+    padding: Platform.OS === 'android' ? 10 : 16,
+    marginBottom: Platform.OS === 'android' ? 10 : 24,
     width: '100%',
-    maxWidth: 300,
+    maxWidth: Platform.OS === 'android' ? 260 : 340,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,215,0,0.08)',
+    shadowColor: 'rgba(0,0,0,0.35)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.12,
+    shadowRadius: Platform.OS === 'android' ? 0 : 8,
+    elevation: Platform.OS === 'android' ? 0 : 5,
   },
   scoreRow: {
     flexDirection: 'row',
@@ -2298,8 +2516,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backButtonGradient: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
   },
   backButtonText: {
     fontSize: 16,
@@ -2324,60 +2542,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    paddingHorizontal: 18,
   },
   trophyContainer: {
     marginBottom: 20,
   },
   trophyGradient: {
-    borderRadius: 30,
-    padding: 20,
+    borderRadius: 36,
+    padding: Platform.OS === 'android' ? 12 : 20,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 10,
+    // subtle sheen instead of heavy shadow
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: Platform.OS === 'android' ? 0 : 6,
+  },
+  trophyRing: {
+    borderRadius: 48,
+    padding: 6,
+    backgroundColor: 'rgba(255,215,0,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Platform.OS === 'android' ? 8 : 16,
+  },
+  medalRibbon: {
+    position: 'absolute',
+    bottom: -8,
+    alignSelf: 'center',
+    backgroundColor: 'transparent',
+  },
+  medalText: {
+    fontSize: Platform.OS === 'android' ? 20 : 26,
+    textAlign: 'center',
   },
   victoryTextContainer: {
-    marginBottom: 30,
+    marginBottom: Platform.OS === 'android' ? 12 : 30,
   },
   victoryTitle: {
-    fontSize: 42,
+    fontSize: Platform.OS === 'android' ? 24 : 36,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#FFD966',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 6 },
-    textShadowRadius: 12,
-    letterSpacing: 2,
-    marginBottom: 8,
+    letterSpacing: 0.8,
+    marginBottom: Platform.OS === 'android' ? 6 : 8,
   },
   victorySubtitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.95)',
+    fontSize: Platform.OS === 'android' ? 12 : 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 6,
-    letterSpacing: 1,
+    marginBottom: 6,
   },
   victoryScoreContainer: {
-    marginBottom: 30,
+    marginBottom: Platform.OS === 'android' ? 12 : 30,
   },
   victoryScoreGradient: {
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 14,
+    padding: Platform.OS === 'android' ? 10 : 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,215,0,0.18)', // gold accent
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    elevation: 0,
+    minWidth: Platform.OS === 'android' ? 220 : 300,
   },
   victoryScoreLabel: {
     fontSize: 18,
@@ -2386,16 +2616,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   victoryScoreValue: {
-    fontSize: 40,
+    fontSize: Platform.OS === 'android' ? 32 : 40,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: Platform.OS === 'android' ? 8 : 10,
   },
   victoryButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    maxWidth: 350,
+    maxWidth: Platform.OS === 'android' ? 320 : 420,
+    marginTop: Platform.OS === 'android' ? -8 : -12,
   },
   victoryButton: {
     flex: 1,
@@ -2404,21 +2635,21 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: Platform.OS === 'android' ? 8 : 12,
   },
   victoryButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: Platform.OS === 'android' ? 8 : 12,
+    paddingHorizontal: Platform.OS === 'android' ? 10 : 16,
     borderRadius: 16,
   },
   victoryButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '800',
     color: '#fff',
-    marginLeft: 10,
+    marginLeft: 8,
   },
   firecrackersContainer: {
     position: 'absolute',
@@ -2576,24 +2807,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
   },
-  // Enhanced Trophy Styles
+  // Enhanced Trophy Styles (compact)
   trophyContainer: {
-    marginBottom: 40,
+    marginBottom: Platform.OS === 'android' ? 12 : 24,
     alignItems: 'center',
   },
   trophyGradient: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: Platform.OS === 'android' ? 72 : 96,
+    height: Platform.OS === 'android' ? 72 : 96,
+    borderRadius: Platform.OS === 'android' ? 36 : 48,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 15,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: Platform.OS === 'android' ? 0 : 10,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   // Enhanced Result Styles
   resultTitle: {
@@ -2632,17 +2863,18 @@ const styles = StyleSheet.create({
   },
   // Enhanced Final Scores
   finalScores: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    padding: Platform.OS === 'android' ? 12 : 20,
+    marginBottom: Platform.OS === 'android' ? 12 : 30,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    // remove heavy shadows for compact/flat look (esp. Android)
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   scoreRow: {
     flexDirection: 'row',
@@ -2666,13 +2898,14 @@ const styles = StyleSheet.create({
   },
   // Enhanced Back Button
   backButton: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 10,
+    // make flat on Android to avoid heavy outline
+    shadowColor: Platform.OS === 'android' ? 'transparent' : '#000',
+    shadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 6 },
+    shadowOpacity: Platform.OS === 'android' ? 0 : 0.3,
+    shadowRadius: Platform.OS === 'android' ? 0 : 12,
+    elevation: Platform.OS === 'android' ? 0 : 10,
   },
   backButtonGradient: {
     paddingVertical: 16,
@@ -2712,13 +2945,123 @@ const styles = StyleSheet.create({
   },
   trophyGlow: {
     position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 215, 0, 0.3)',
-    top: -10,
-    left: -10,
+    width: Platform.OS === 'android' ? 0 : 140,
+    height: Platform.OS === 'android' ? 0 : 140,
+    borderRadius: Platform.OS === 'android' ? 0 : 70,
+    backgroundColor: Platform.OS === 'android' ? 'transparent' : 'rgba(255, 215, 0, 0.3)',
+    top: Platform.OS === 'android' ? 0 : -10,
+    left: Platform.OS === 'android' ? 0 : -10,
     zIndex: -1,
+  },
+  // New styles for enhanced defeat/draw panels
+  defeatBackgroundOrbs: {
+    position: 'absolute',
+    top: -40,
+    left: 0,
+    right: 0,
+    height: 220,
+    zIndex: 0,
+    overflow: 'hidden',
+  },
+  defeatOrb: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    zIndex: 0,
+  },
+  drawPanel: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  drawIconGradient: {
+    borderRadius: 28,
+    padding: 14,
+    marginBottom: 8,
+  },
+  drawSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  // Defeat styles
+  defeatPanel: {
+    width: '100%',
+    maxWidth: Platform.OS === 'android' ? 340 : 420,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    zIndex: 2,
+  },
+  defeatHeader: {
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  defeatTitle: {
+    fontSize: Platform.OS === 'android' ? 20 : 26,
+    fontWeight: '900',
+    color: '#fff',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  defeatSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  defeatCards: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  youCard: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  opponentCard: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  cardLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+  },
+  cardScore: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  defeatActions: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  rematchButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  rematchButtonGradient: {
+    paddingVertical: Platform.OS === 'android' ? 10 : 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  rematchButtonText: {
+    color: '#fff',
+    fontWeight: '800',
   },
   crownContainer: {
     position: 'absolute',
@@ -2731,6 +3074,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(255, 215, 0, 0.8)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
+  },
+  sadEmoji: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 72 : 56,
+    alignSelf: 'center',
+    zIndex: 4,
+    fontSize: Platform.OS === 'android' ? 64 : 88,
+    textAlign: 'center',
+    color: '#FFD966',
   },
   victoryMotivation: {
     fontSize: 16,

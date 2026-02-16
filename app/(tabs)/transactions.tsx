@@ -42,11 +42,16 @@ export default function TransactionsScreen() {
   const scrollY = React.useRef(new Animated.Value(0)).current;
 
   // Filter transactions based on active filter - moved before conditional returns
+  // BATTLE_QUIZ_ENTRY: negative amount → Deductions, positive amount → Winnings
   const filteredTransactions = React.useMemo(() => {
     if (activeFilter === 'deposit') return transactions.filter(t => t.type === 'DEPOSIT');
     if (activeFilter === 'withdrawal') return transactions.filter(t => t.type === 'WITHDRAWAL');
-    if (activeFilter === 'winning') return transactions.filter(t => t.type === 'EXAM_WIN' || t.type === 'WINNING');
-    if (activeFilter === 'deduction') return transactions.filter(t => t.type === 'DEDUCTION' || t.type === 'EXAM_ENTRY');
+    if (activeFilter === 'winning') return transactions.filter(t =>
+      t.type === 'EXAM_WIN' || t.type === 'WINNING' || (t.type === 'BATTLE_QUIZ_ENTRY' && t.amount > 0)
+    );
+    if (activeFilter === 'deduction') return transactions.filter(t =>
+      t.type === 'DEDUCTION' || t.type === 'EXAM_ENTRY' || (t.type === 'BATTLE_QUIZ_ENTRY' && t.amount < 0)
+    );
     return transactions.filter(t => t.type === 'DEPOSIT');
   }, [transactions, activeFilter]);
 
@@ -552,7 +557,7 @@ export default function TransactionsScreen() {
                 : activeFilter === 'withdrawal'
                 ? 'No withdraw transactions found. Win some quizzes and earn rewards to make withdrawals!'
                 : activeFilter === 'deduction'
-                ? 'No deduction transactions found. Exam entry fees and deductions will appear here.'
+                ? 'No deduction transactions found. Exam entry, battle quiz entry and other deductions will appear here.'
                 : 'No winnings yet. Participate in quizzes to win rewards and see your earnings here!'}
             </Text>
           </View>

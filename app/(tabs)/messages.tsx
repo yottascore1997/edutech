@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { apiFetchAuth } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -133,12 +134,12 @@ export default function MessagesScreen() {
     
     if (user?.token) {
 
-      const newSocket = io('http://192.168.1.5:3001', {
+      const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: user.token
         },
         transports: ['polling', 'websocket'],
-        path: '/api/socket',
+        path: WEBSOCKET_CONFIG.CONNECTION_OPTIONS.path,
         timeout: 20000,
         forceNew: true
       });

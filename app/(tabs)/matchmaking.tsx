@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { SoundManager } from '@/utils/sounds';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,6 +13,7 @@ import {
   Dimensions,
   Easing,
   Platform,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -69,16 +71,52 @@ export default function MatchmakingScreen() {
   const [particleAnim3] = useState(new Animated.Value(0));
   const [radarAnim] = useState(new Animated.Value(0));
   const [scanAnim] = useState(new Animated.Value(0));
+  const [gradientAnim] = useState(new Animated.Value(0));
   
   // Refs
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const searchStartTime = useRef<number>(Date.now());
   const hasStartedSearch = useRef(false);
+  const matchStartRetriesRef = useRef<number>(0);
+  const pendingRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const category = params.category as string;
   const mode = params.mode as string;
   const amount = params.amount as string;
+  const navigation = useNavigation();
+
+  // Reset matchmaking state when screen gains focus (helps when returning from a finished match)
+  useEffect(() => {
+    const onFocus = () => {
+      // clear timers and retries
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      if (pendingRetryTimeoutRef.current) {
+        clearTimeout(pendingRetryTimeoutRef.current);
+        pendingRetryTimeoutRef.current = null;
+      }
+      hasStartedSearch.current = false;
+      matchStartRetriesRef.current = 0;
+      setMatchmakingState({
+        status: 'searching',
+        timeElapsed: 0,
+        estimatedWait: 30
+      });
+      setError(null);
+    };
+
+    const unsub = navigation?.addListener?.('focus', onFocus);
+    return () => {
+      try { unsub(); } catch (err) {}
+    };
+  }, [navigation]);
 
 
 
@@ -207,6 +245,14 @@ export default function MatchmakingScreen() {
 
   // Start matchmaking - Simplified like web version
   useEffect(() => {
+    // Reset start flag to allow re-starting matchmaking after returning from a match
+    hasStartedSearch.current = false;
+    matchStartRetriesRef.current = 0;
+    if (pendingRetryTimeoutRef.current) {
+      clearTimeout(pendingRetryTimeoutRef.current);
+      pendingRetryTimeoutRef.current = null;
+    }
+
     if (!socket || !isConnected || hasStartedSearch.current) return;
 
 
@@ -483,6 +529,14 @@ export default function MatchmakingScreen() {
         easing: Easing.linear,
       })
     ).start();
+    
+    // Subtle background gradient shift
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(gradientAnim, { toValue: 1, duration: 8000, useNativeDriver: true }),
+        Animated.timing(gradientAnim, { toValue: 0, duration: 8000, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
   // 🧹 Cleanup on component unmount
   useEffect(() => {
@@ -598,7 +652,7 @@ export default function MatchmakingScreen() {
             <Ionicons 
               name={isInsufficientBalance ? "wallet-outline" : 
                     isNoOpponentError ? "people-outline" : "alert-circle"} 
-              size={80} 
+              size={56} 
               color={isInsufficientBalance ? "#ffffff" : 
                      isNoOpponentError ? "#ffffff" : "#ef4444"} 
             />
@@ -714,12 +768,24 @@ export default function MatchmakingScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={['#1e1b4b', '#312e81', '#4c1d95', '#5b21b6']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      {/* animated background gradients matching app header */}
+      <Animated.View style={[styles.animatedGradient, { opacity: gradientAnim }]}>
+        <LinearGradient
+          colors={['#070610', '#0f1230', '#1b153f', '#2b0f5a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.animatedGradientInner}
+        />
+      </Animated.View>
+      <Animated.View style={[styles.animatedGradient, { opacity: gradientAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
+        <LinearGradient
+          colors={['#070610', '#0f1230', '#1b153f', '#2b0f5a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.animatedGradientInner}
+        />
+      </Animated.View>
       
 
              {/* Animated Background Elements */}
@@ -1065,7 +1131,7 @@ export default function MatchmakingScreen() {
                       opacity: searchAnim
                     }}
                   >
-                    <Ionicons name="radio" size={16} color="#FF6B6B" />
+                    <Ionicons name="radio" size={16} color="#fff" />
                   </Animated.View>
                   <Text style={styles.searchingText}>Finding</Text>
                 </View>
@@ -1149,81 +1215,81 @@ export default function MatchmakingScreen() {
                  colors={['#10b981', '#059669', '#047857', '#065f46']}
                  style={styles.successIconGradient}
                >
-                 <Ionicons name="checkmark-circle" size={72} color="#fff" />
+                <Ionicons name="checkmark-circle" size={Platform.OS === 'android' ? 56 : 72} color="#fff" />
                </LinearGradient>
              </Animated.View>
              
              <Text style={styles.foundTitle}>Opponent Found!</Text>
              <Text style={styles.foundSubtitle}>Get ready for battle</Text>
              
-             {/* Exciting Matchup */}
-             <View style={styles.matchupContainer}>
-               {/* You */}
-               <View style={styles.playerCard}>
-                 <LinearGradient
-                   colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)']}
-                   style={styles.playerCardGradient}
-                 >
-                   <View style={styles.playerAvatar}>
-                     <LinearGradient
-                       colors={['#FF6B6B', '#FF8E53']}
-                       style={styles.playerAvatarGradient}
-                     >
-                       <Text style={styles.playerInitial}>Y</Text>
-                     </LinearGradient>
-                   </View>
-                   <Text style={styles.playerName}>You</Text>
-                   <View style={styles.readyBadge}>
-                     <LinearGradient
-                       colors={['#10B981', '#059669']}
-                       style={styles.readyBadgeGradient}
-                     >
-                       <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                       <Text style={styles.readyText}>Ready</Text>
-                     </LinearGradient>
-                   </View>
-                 </LinearGradient>
-               </View>
-               
-               {/* VS */}
-               <View style={styles.vsContainer}>
-                 <LinearGradient
-                   colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
-                   style={styles.vsGradient}
-                 >
-                   <Text style={styles.vsText}>⚔️ VS</Text>
-                 </LinearGradient>
-               </View>
-               
-               {/* Opponent */}
-               <View style={styles.playerCard}>
-                 <LinearGradient
-                   colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)']}
-                   style={styles.playerCardGradient}
-                 >
-                   <View style={styles.playerAvatar}>
-                     <LinearGradient
-                       colors={['#4ECDC4', '#44A08D']}
-                       style={styles.playerAvatarGradient}
-                     >
-                       <Text style={styles.playerInitial}>
-                         {matchmakingState.opponent.name.charAt(0).toUpperCase()}
-                       </Text>
-                     </LinearGradient>
-                   </View>
-                   <Text style={styles.playerName}>{matchmakingState.opponent.name}</Text>
-                   <View style={styles.levelBadge}>
-                     <LinearGradient
-                       colors={['#8B5CF6', '#7C3AED']}
-                       style={styles.levelBadgeGradient}
-                     >
-                       <Ionicons name="trophy" size={16} color="#fff" />
-                       <Text style={styles.levelText}>Level {matchmakingState.opponent.level}</Text>
-                     </LinearGradient>
-                   </View>
-                 </LinearGradient>
-               </View>
-             </View>
+            {/* Compact Matchup */}
+            <View style={styles.foundMatchupContainer}>
+              {/* You */}
+              <View style={styles.playerCard}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)']}
+                  style={styles.foundPlayerCardGradient}
+                >
+                  <View style={[styles.playerAvatar, styles.foundPlayerAvatar]}>
+                    <LinearGradient
+                      colors={['#FF6B6B', '#FF8E53']}
+                      style={styles.playerAvatarGradient}
+                    >
+                      <Text style={[styles.playerInitial, styles.foundPlayerInitial]}>Y</Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={[styles.playerName, styles.foundPlayerName]}>You</Text>
+                  <View style={styles.readyBadge}>
+                    <LinearGradient
+                      colors={['#10B981', '#059669']}
+                      style={styles.readyBadgeGradient}
+                    >
+                      <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                      <Text style={styles.readyText}>Ready</Text>
+                    </LinearGradient>
+                  </View>
+                </LinearGradient>
+              </View>
+              
+              {/* VS (smaller, in-flow) */}
+              <View style={styles.foundVsContainer}>
+                <LinearGradient
+                  colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
+                  style={[styles.vsGradient, styles.vsSmall]}
+                >
+                  <Text style={[styles.vsText, styles.vsSmallText]}>⚔️ VS</Text>
+                </LinearGradient>
+              </View>
+              
+              {/* Opponent */}
+              <View style={styles.playerCard}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.2)']}
+                  style={styles.foundPlayerCardGradient}
+                >
+                  <View style={[styles.playerAvatar, styles.foundPlayerAvatar]}>
+                    <LinearGradient
+                      colors={['#4ECDC4', '#44A08D']}
+                      style={styles.playerAvatarGradient}
+                    >
+                      <Text style={[styles.playerInitial, styles.foundPlayerInitial]}>
+                        {matchmakingState.opponent.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={[styles.playerName, styles.foundPlayerName]}>{matchmakingState.opponent.name}</Text>
+                  <View style={styles.foundReadyBadge}>
+                    <LinearGradient
+                      colors={['#10B981', '#059669']}
+                      style={styles.statusBadgeGradient}
+                    >
+                      <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                      <Text style={styles.readyText}>Ready</Text>
+                    </LinearGradient>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
            </View>
          )}
 
@@ -1240,7 +1306,7 @@ export default function MatchmakingScreen() {
                 colors={['#ef4444', '#dc2626', '#b91c1c', '#991b1b']}
                 style={styles.gameIconGradient}
               >
-                <Ionicons name="flash" size={64} color="#fff" />
+                <Ionicons name="flash" size={Platform.OS === 'android' ? 44 : 64} color="#fff" />
               </LinearGradient>
             </Animated.View>
             
@@ -1254,7 +1320,7 @@ export default function MatchmakingScreen() {
             
             <View style={styles.countdownCard}>
               <LinearGradient
-                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.15)', 'rgba(255,255,255,0.1)']}
+                colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.12)']}
                 style={styles.countdownGradient}
               >
                 <Text style={styles.countdownNumber}>{countdown}</Text>
@@ -1266,23 +1332,22 @@ export default function MatchmakingScreen() {
           </View>
         )}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 25,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingTop: Platform.OS === 'android' ? ((StatusBar.currentHeight ?? 28) + 18) : 30,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
     backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   backButton: {
     width: 44,
@@ -1318,14 +1383,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '900',
+    color: '#FFF8EA',
     marginBottom: 4,
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+    color: 'rgba(255, 248, 234, 0.85)',
     textAlign: 'center',
   },
   timerLabel: {
@@ -1339,25 +1404,34 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
      content: {
-     flex: 1,
-     paddingHorizontal: 20,
-     paddingTop: -20,
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-  searchingContainer: {
     flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 18 : 0,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
+   },
+  searchingContainer: {
+    flex: Platform.OS === 'android' ? 0.65 : 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Platform.OS === 'android' ? 4 : 12,
     width: '100%',
-    maxWidth: 350,
+    maxWidth: '100%',
+    paddingHorizontal: 10,
   },
   searchAnimationContainer: {
-    width: 120,
-    height: 120,
+    width: Platform.OS === 'android' ? 64 : 110,
+    height: Platform.OS === 'android' ? 64 : 110,
     position: 'relative',
-    marginBottom: 30,
+    marginBottom: Platform.OS === 'android' ? 4 : 10,
+    borderRadius: Platform.OS === 'android' ? 8 : 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: Platform.OS === 'android' ? 4 : 8 },
+    shadowOpacity: Platform.OS === 'android' ? 0.08 : 0.24,
+    shadowRadius: Platform.OS === 'android' ? 8 : 20,
+    elevation: Platform.OS === 'android' ? 4 : 10,
+    overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   userContainer: {
     position: 'absolute',
@@ -1369,39 +1443,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   userAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: Platform.OS === 'android' ? 64 : 84,
+    height: Platform.OS === 'android' ? 64 : 84,
+    borderRadius: Platform.OS === 'android' ? 32 : 42,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
   },
   userInitial: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontSize: Platform.OS === 'android' ? 22 : 28,
+    fontWeight: '900',
+    color: '#FFF8EA',
   },
   userLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.95)',
     marginTop: 8,
+    fontWeight: '700',
   },
   vsContainer: {
     position: 'absolute',
-    top: '50%',
+    top: Platform.OS === 'android' ? '44%' : '50%',
     left: '50%',
-    transform: [{ translateX: -50 }, { translateY: -18 }],
+    transform: [{ translateX: -50 }, { translateY: Platform.OS === 'android' ? -18 : -8 }],
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   vsText: {
-    fontSize: 20,
+    fontSize: Platform.OS === 'android' ? 16 : 22,
     fontWeight: '900',
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 6,
+    color: '#FFD166',
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
     letterSpacing: 1,
   },
   opponentScrollContainer: {
@@ -1432,46 +1509,50 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   errorContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
   },
   errorIconContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   errorTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
   },
   errorMessage: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 30,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    marginBottom: 18,
     textAlign: 'center',
+    lineHeight: 20,
   },
   errorButtons: {
-    flexDirection: 'row',
-    gap: 16,
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   errorButton: {
     borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 10,
+    width: 190,
   },
   errorButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   errorButtonText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#fff',
     marginLeft: 8,
   },
@@ -1489,38 +1570,38 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   suggestionsContainer: {
-    marginTop: 20,
-    marginBottom: 30,
-    paddingHorizontal: 20,
+    marginTop: 12,
+    marginBottom: 16,
+    paddingHorizontal: 12,
     width: '100%',
   },
   suggestionsTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 15,
+    marginBottom: 10,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowRadius: 1,
   },
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
   suggestionText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
-    marginLeft: 10,
+    marginLeft: 8,
     flex: 1,
     fontWeight: '500',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowColor: 'rgba(0, 0, 0, 0.18)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
   },
@@ -1603,41 +1684,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 28,
+    paddingHorizontal: 16,
   },
   successIcon: {
     marginBottom: 32,
   },
   successIconGradient: {
     borderRadius: 50,
-    padding: 20,
+    padding: Platform.OS === 'android' ? 12 : 20,
     borderWidth: 2.5,
     borderColor: 'rgba(255,255,255,0.4)',
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#10b981',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.5,
-      shadowRadius: 20,
-    } : {}),
-    elevation: Platform.OS === 'android' ? 14 : 12,
+    // flat: remove shadows/elevation
+    elevation: 0,
   },
   matchupContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 24,
-    padding: 28,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 28,
+    padding: 22,
     width: '100%',
-    maxWidth: 360,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.2)',
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.3,
-      shadowRadius: 20,
-    } : {}),
-    elevation: Platform.OS === 'android' ? 14 : 12,
+    maxWidth: 460,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    shadowColor: '#0b1220',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 30,
+    elevation: 18,
   },
   userCard: {
     flex: 1,
@@ -1673,43 +1748,37 @@ const styles = StyleSheet.create({
   },
   gameIconGradient: {
     borderRadius: 50,
-    padding: 20,
+    padding: Platform.OS === 'android' ? 12 : 20,
     borderWidth: 2.5,
     borderColor: 'rgba(255,255,255,0.4)',
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#ef4444',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.5,
-      shadowRadius: 20,
-    } : {}),
-    elevation: Platform.OS === 'android' ? 14 : 12,
+    elevation: 0,
   },
-  countdownCard: {
+    countdownCard: {
     alignItems: 'center',
-    borderRadius: 24,
-    padding: 36,
+    borderRadius: 16,
+    padding: Platform.OS === 'android' ? 12 : 16,
     width: '100%',
-    maxWidth: 240,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.3,
-      shadowRadius: 20,
-    } : {}),
-    elevation: Platform.OS === 'android' ? 14 : 12,
+    maxWidth: Platform.OS === 'android' ? 160 : 200,
+    borderWidth: 0,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    // flat look
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     overflow: 'hidden',
   },
   countdownNumber: {
-    fontSize: 72,
+    fontSize: Platform.OS === 'android' ? 48 : 64,
     fontWeight: '900',
     color: '#fff',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8,
-    letterSpacing: 2,
+    marginBottom: 6,
+    textShadowColor: 'transparent',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
+    letterSpacing: 1,
+    textAlign: 'center',
   },
   countdownText: {
     fontSize: 14,
@@ -1719,37 +1788,33 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-   cancelButton: {
-     borderRadius: 16,
-     overflow: 'hidden',
-     marginTop: 8,
-     ...(Platform.OS === 'ios' ? {
-       shadowColor: '#ef4444',
-       shadowOffset: { width: 0, height: 6 },
-       shadowOpacity: 0.4,
-       shadowRadius: 12,
-     } : {}),
-     elevation: Platform.OS === 'android' ? 10 : 8,
-   },
-   cancelButtonGradient: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'center',
-     paddingVertical: 14,
-     paddingHorizontal: 32,
-     minWidth: 200,
-   },
-   cancelButtonText: {
-     fontSize: 15,
-     fontWeight: '700',
-     color: '#fff',
-     textAlign: 'center',
-     marginLeft: 8,
-     textShadowColor: 'rgba(0,0,0,0.4)',
-     textShadowOffset: { width: 0, height: 2 },
-     textShadowRadius: 3,
-     letterSpacing: 0.5,
-   },
+  cancelButton: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: Platform.OS === 'android' ? 6 : 8,
+    elevation: 6,
+  },
+  cancelButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    minWidth: 160,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFD166',
+    textAlign: 'center',
+    marginLeft: 8,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 0.6,
+  },
   tipsContainer: {
     marginBottom: 40,
   },
@@ -1792,27 +1857,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-     matchAnimation: {
-     width: 280,
-     height: 120,
-     position: 'relative',
-     marginBottom: 10,
-     alignItems: 'center',
-     justifyContent: 'center',
-   },
+  matchAnimation: {
+    width: Platform.OS === 'android' ? 220 : 260,
+    height: Platform.OS === 'android' ? 86 : 110,
+    position: 'relative',
+    marginBottom: Platform.OS === 'android' ? 4 : 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateY: Platform.OS === 'android' ? -10 : -6 }],
+  },
   playerContainer: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 80,
+    width: Platform.OS === 'android' ? 58 : 76,
     height: '100%',
   },
   playerAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: Platform.OS === 'android' ? 48 : 60,
+    height: Platform.OS === 'android' ? 48 : 60,
+    borderRadius: Platform.OS === 'android' ? 24 : 30,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1824,10 +1890,10 @@ const styles = StyleSheet.create({
       shadowOpacity: 0.3,
       shadowRadius: 8,
     } : {}),
-    elevation: Platform.OS === 'android' ? 8 : 6,
+    elevation: Platform.OS === 'android' ? 6 : 6,
   },
   playerInitial: {
-    fontSize: 26,
+    fontSize: Platform.OS === 'android' ? 20 : 24,
     fontWeight: '900',
     color: '#fff',
     textShadowColor: 'rgba(0,0,0,0.5)',
@@ -1849,14 +1915,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
   },
      statusInfo: {
-     marginBottom: 24,
-     marginTop: 32,
+    marginBottom: Platform.OS === 'android' ? 12 : 24,
+    marginTop: Platform.OS === 'android' ? 20 : 32,
      alignItems: 'center',
      width: '100%',
      paddingHorizontal: 20,
    },
    statusTitle: {
-     fontSize: 24,
+    fontSize: Platform.OS === 'android' ? 20 : 24,
      fontWeight: '800',
      color: '#fff',
      marginBottom: 8,
@@ -1874,21 +1940,17 @@ const styles = StyleSheet.create({
      marginTop: 4,
    },
   statusBadge: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 28,
+    // Make Ready badge visually match the "Finding" pill but green
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    paddingVertical: Platform.OS === 'android' ? 6 : 8,
+    paddingHorizontal: Platform.OS === 'android' ? 14 : 22,
     marginTop: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-    minWidth: 130,
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
-    } : {}),
-    elevation: Platform.OS === 'android' ? 4 : 3,
+    minWidth: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // remove shadows for a flat pill look
+    elevation: 0,
   },
   statusText: {
     fontSize: 12,
@@ -1900,29 +1962,29 @@ const styles = StyleSheet.create({
   searchingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderRadius: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(239, 68, 68, 0.35)',
-    minWidth: 110,
+    marginTop: Platform.OS === 'android' ? 4 : 10,
+    backgroundColor: '#ef4444',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#c02626',
+    minWidth: 90,
     ...(Platform.OS === 'ios' ? {
       shadowColor: '#ef4444',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 4,
+      shadowOpacity: 0.12,
+      shadowRadius: 3,
     } : {}),
-    elevation: Platform.OS === 'android' ? 4 : 3,
+    elevation: Platform.OS === 'android' ? 2 : 3,
   },
   searchingText: {
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: Platform.OS === 'android' ? 11 : 12,
+    fontWeight: Platform.OS === 'android' ? '700' : '800',
     color: '#fff',
     marginLeft: 6,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   playerGlow: {
     position: 'absolute',
@@ -1939,18 +2001,18 @@ const styles = StyleSheet.create({
     borderRadius: 35,
   },
   vsGradient: {
-    borderRadius: 22,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 18,
+    paddingVertical: Platform.OS === 'android' ? 8 : 12,
+    paddingHorizontal: Platform.OS === 'android' ? 12 : 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.45)',
     ...(Platform.OS === 'ios' ? {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
+      shadowOpacity: 0.35,
+      shadowRadius: 10,
     } : {}),
-    elevation: Platform.OS === 'android' ? 10 : 8,
+    elevation: Platform.OS === 'android' ? 6 : 8,
   },
   readyBadge: {
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -2006,9 +2068,11 @@ const styles = StyleSheet.create({
   },
   countdownGradient: {
     borderRadius: 16,
-    padding: 15,
+    padding: Platform.OS === 'android' ? 12 : 15,
     width: '100%',
-    maxWidth: 120,
+    maxWidth: Platform.OS === 'android' ? 140 : 120,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   animatedBackground: {
     position: 'absolute',
@@ -2115,13 +2179,16 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   statusBadgeGradient: {
-    borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 14,
+    borderRadius: 16,
+    paddingVertical: Platform.OS === 'android' ? 6 : 8,
+    paddingHorizontal: Platform.OS === 'android' ? 12 : 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    // green border to match the green pill
+    borderWidth: 1,
+    borderColor: Platform.OS === 'android' ? '#047857' : 'rgba(255,255,255,0.18)',
   },
   readyBadgeGradient: {
     borderRadius: 12,
@@ -2200,47 +2267,117 @@ const styles = StyleSheet.create({
      textShadowRadius: 2,
    },
    largeTimeContainer: {
-     marginTop: 24,
-     marginBottom: 16,
+    marginTop: Platform.OS === 'android' ? 6 : 24,
+    marginBottom: Platform.OS === 'android' ? 8 : 16,
      alignItems: 'center',
    },
+  animatedGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -2,
+  },
+  animatedGradientInner: {
+    flex: 1,
+  },
+  foundVsContainer: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  foundPlayerCardGradient: {
+    borderRadius: 16,
+    padding: Platform.OS === 'android' ? 12 : 14,
+    width: '100%',
+    maxWidth: Platform.OS === 'android' ? 120 : 130,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    elevation: 0,
+  },
+  /* Found screen compact styles */
+  foundMatchupContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    borderRadius: 20,
+    padding: Platform.OS === 'android' ? 12 : 18,
+    width: '100%',
+    maxWidth: Platform.OS === 'android' ? 360 : 420,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 20,
+  },
+  foundPlayerAvatar: {
+    width: Platform.OS === 'android' ? 44 : 56,
+    height: Platform.OS === 'android' ? 44 : 56,
+    borderRadius: Platform.OS === 'android' ? 22 : 28,
+  },
+  foundPlayerInitial: {
+    fontSize: Platform.OS === 'android' ? 18 : 22,
+  },
+  foundPlayerName: {
+    fontSize: Platform.OS === 'android' ? 13 : 15,
+    marginTop: Platform.OS === 'android' ? 8 : 10,
+  },
+  vsSmall: {
+    borderRadius: 14,
+    paddingVertical: Platform.OS === 'android' ? 6 : 10,
+    paddingHorizontal: Platform.OS === 'android' ? 10 : 14,
+    borderWidth: 1,
+  },
+  vsSmallText: {
+    fontSize: Platform.OS === 'android' ? 14 : 18,
+  },
+  foundReadyBadge: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: Platform.OS === 'android' ? 8 : 10,
+  },
    largeTimeGradient: {
-     borderRadius: 24,
-     paddingVertical: 20,
-     paddingHorizontal: 32,
-     alignItems: 'center',
-     borderWidth: 1.5,
-     borderColor: 'rgba(255,255,255,0.25)',
-     ...(Platform.OS === 'ios' ? {
-       shadowColor: '#000',
-       shadowOffset: { width: 0, height: 8 },
-       shadowOpacity: 0.4,
-       shadowRadius: 16,
-     } : {}),
-     elevation: Platform.OS === 'android' ? 10 : 8,
-     minWidth: 200,
+    borderRadius: 20,
+    paddingVertical: Platform.OS === 'android' ? 10 : 18,
+    paddingHorizontal: Platform.OS === 'android' ? 16 : 28,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    overflow: 'hidden', // ensure rounded corners clip any inner visuals
+    ...(Platform.OS === 'ios' ? {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+    } : {}),
+    // Remove elevation on Android to avoid hard corner shadow artifacts
+    elevation: Platform.OS === 'android' ? 0 : 8,
+    minWidth: Platform.OS === 'android' ? 140 : 200,
    },
    timeIconContainer: {
      width: 48,
      height: 48,
      borderRadius: 24,
-     backgroundColor: 'rgba(255,255,255,0.15)',
-     justifyContent: 'center',
-     alignItems: 'center',
-     marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    // remove shadows on Android to prevent corner artifacts
+    ...(Platform.OS === 'android' ? { elevation: 0 } : {}),
    },
    largeTimeText: {
-     fontSize: 36,
-     fontWeight: '900',
-     color: '#fff',
-     marginTop: 4,
-     textShadowColor: 'rgba(0,0,0,0.6)',
-     textShadowOffset: { width: 0, height: 3 },
-     textShadowRadius: 6,
-     letterSpacing: 2,
+    fontSize: Platform.OS === 'android' ? 26 : 34,
+    fontWeight: '900',
+    color: '#fff',
+    marginTop: 4,
+    textShadowColor: Platform.OS === 'android' ? 'transparent' : 'rgba(0,0,0,0.6)',
+    textShadowOffset: Platform.OS === 'android' ? { width: 0, height: 0 } : { width: 0, height: 3 },
+    textShadowRadius: Platform.OS === 'android' ? 0 : 6,
+    letterSpacing: 2,
    },
    largeTimeLabel: {
-     fontSize: 12,
+    fontSize: Platform.OS === 'android' ? 10 : 12,
      fontWeight: '600',
      color: 'rgba(255,255,255,0.75)',
      marginTop: 6,
@@ -2248,29 +2385,21 @@ const styles = StyleSheet.create({
      letterSpacing: 1.5,
    },
     battleTitleGradient: {
-      borderRadius: 18,
-      paddingVertical: 14,
-      paddingHorizontal: 28,
-      borderWidth: 1.5,
-      borderColor: 'rgba(255,255,255,0.3)',
-      ...(Platform.OS === 'ios' ? {
-        shadowColor: '#ef4444',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
-      } : {}),
-      elevation: Platform.OS === 'android' ? 10 : 8,
-      marginBottom: 12,
+      borderRadius: 14,
+      paddingVertical: Platform.OS === 'android' ? 8 : 12,
+      paddingHorizontal: Platform.OS === 'android' ? 12 : 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.22)',
+      elevation: 0,
+      marginBottom: Platform.OS === 'android' ? 8 : 12,
     },
     battleTitleText: {
-      fontSize: 24,
+      fontSize: Platform.OS === 'android' ? 18 : 22,
       fontWeight: '900',
       color: '#fff',
       textAlign: 'center',
-      textShadowColor: 'rgba(0,0,0,0.6)',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 4,
-      letterSpacing: 0.8,
+      textShadowColor: 'transparent',
+      letterSpacing: 0.6,
     },
     statusSubtitle: {
       fontSize: 15,
@@ -2519,16 +2648,13 @@ const styles = StyleSheet.create({
          textShadowRadius: 4,
        },
        enhancedReadyBadge: {
-         borderRadius: 15,
-         paddingVertical: 6,
-         paddingHorizontal: 12,
-         borderWidth: 1,
-         borderColor: 'rgba(255,255,255,0.3)',
-         shadowColor: '#000',
-         shadowOffset: { width: 0, height: 2 },
-         shadowOpacity: 0.2,
-         shadowRadius: 4,
-         elevation: 3,
+        borderRadius: 15,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+        // remove shadows for flat look on Android/iOS
+        elevation: 0,
        },
        enhancedReadyBadgeGradient: {
          borderRadius: 15,
@@ -2539,13 +2665,10 @@ const styles = StyleSheet.create({
          justifyContent: 'center',
        },
        enhancedReadyText: {
-         fontSize: 12,
-         fontWeight: '800',
-         color: '#fff',
-         marginLeft: 4,
-         textShadowColor: 'rgba(0,0,0,0.3)',
-         textShadowOffset: { width: 0, height: 1 },
-         textShadowRadius: 2,
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#fff',
+        marginLeft: 4,
        },
        enhancedVsContainer: {
          alignItems: 'center',

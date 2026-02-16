@@ -1,7 +1,22 @@
 // WebSocket Configuration
+import { SITE_BASE_URL } from './api';
+
+const getSocketServerUrl = () => {
+  if (process.env.EXPO_PUBLIC_SOCKET_URL) {
+    return process.env.EXPO_PUBLIC_SOCKET_URL;
+  }
+  try {
+    const url = new URL(SITE_BASE_URL);
+    url.port = '3001';
+    return url.origin;
+  } catch {
+    return `${SITE_BASE_URL.replace(/\/$/, '')}:3001`;
+  }
+};
+
 export const WEBSOCKET_CONFIG = {
   // Use the same server as your API but on port 3001 for WebSocket
-  SERVER_URL: 'http://192.168.1.5:3001',
+  SERVER_URL: getSocketServerUrl(),
   
   // Connection options - matching your backend configuration
   CONNECTION_OPTIONS: {

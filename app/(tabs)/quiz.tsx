@@ -1,4 +1,5 @@
 import { apiFetchAuth } from '@/constants/api';
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -97,12 +98,12 @@ export default function QuizScreen() {
   // Initialize socket connection
   useEffect(() => {
     if (user?.token) {
-      const newSocket = io('http://192.168.1.5:3001', {
+      const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: user.token
         },
         transports: ['websocket', 'polling'],
-        path: '/api/socket'
+        path: WEBSOCKET_CONFIG.CONNECTION_OPTIONS.path
       });
 
       newSocket.on('connect', () => {
@@ -1368,157 +1369,58 @@ export default function QuizScreen() {
                    },
                  ]}
                >
-                 <LinearGradient
-                   colors={['#667eea', '#764ba2', '#4F46E5']}
-                   start={{ x: 0, y: 0 }}
-                   end={{ x: 1, y: 1 }}
-                   style={styles.modalGradientBackground}
-                 >
+              <LinearGradient
+                  colors={['#06b6d4', '#7C3AED']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalGradientBackground}
+                >
                    
-                {/* Enhanced Handle Bar */}
-                <View style={styles.enhancedHandleBar}>
-                  <View style={styles.handleBarLine} />
-                </View>
-                
-                                 {/* Enhanced Header */}
-                 <View style={styles.enhancedModalHeader}>
-                   <View style={styles.modalTitleContainer}>
-                     <Text style={styles.enhancedModalTitle}>Choose Battle Amount</Text>
-                     <Text style={styles.modalSubtitle}>{selectedCategoryName}</Text>
-                   </View>
-                   <TouchableOpacity onPress={closeAmountModal} style={styles.enhancedCloseButton}>
-                     <LinearGradient
-                       colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
-                       style={styles.closeButtonGradient}
-                     >
-                       <X size={16} color="#fff" />
-                     </LinearGradient>
-                   </TouchableOpacity>
-                 </View>
-
-                {/* Enhanced Amount Options */}
-                                 {loadingAmounts ? (
-                   <View style={styles.enhancedLoadingContainer}>
-                     <Animated.View 
-                       style={[
-                         styles.loadingIconContainer,
-                         {
-                           transform: [
-                             { rotate: iconRotateAnim.interpolate({
-                               inputRange: [0, 1],
-                               outputRange: ['0deg', '360deg'],
-                             })}
-                           ]
-                         }
-                       ]}
-                     >
-                       <Zap size={20} color="#fff" />
-                     </Animated.View>
-                     <Text style={styles.enhancedLoadingText}>✨ Loading amounts...</Text>
-                   </View>
-                ) : (
-                  <View style={styles.enhancedAmountOptionsContainer}>
-                    {battleAmounts.map((amount, index) => (
-                      <TouchableOpacity
-                        key={amount.id}
-                        style={[
-                          styles.enhancedAmountOption,
-                          selectedAmount?.id === amount.id && styles.enhancedSelectedAmountOption
-                        ]}
-                        onPress={() => handleAmountSelect(amount)}
-                        activeOpacity={0.8}
-                      >
-                        <LinearGradient
-                          colors={selectedAmount?.id === amount.id 
-                            ? ['#10B981', '#059669', '#047857']
-                            : ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']
-                          }
-                          style={styles.amountOptionGradient}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                        >
-                          <View style={styles.amountOptionContent}>
-                            <Text style={styles.currencySymbol}>₹</Text>
-                            <Text style={[
-                              styles.enhancedAmountOptionText,
-                              selectedAmount?.id === amount.id && styles.selectedAmountText
-                            ]}>
-                              {amount.amount}
-                            </Text>
-                          </View>
-                          
-                          {/* Selection Indicator */}
-                          {selectedAmount?.id === amount.id && (
-                            <View style={styles.amountSelectedIndicator}>
-                              <CheckCircle size={16} color="#fff" />
-                            </View>
-                          )}
-                          
-                          {/* Glow Effect for Selected */}
-                          {selectedAmount?.id === amount.id && (
-                            <View style={styles.amountGlowEffect} />
-                          )}
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    ))}
+                {/* Compact Card Popup (choose-amount style) */}
+                <View style={styles.compactCard}>
+                  <View style={styles.compactHeader}>
+                    <Text style={styles.compactTitle}>Choose Battle Amount</Text>
+                    <TouchableOpacity onPress={closeAmountModal} style={styles.compactClose}>
+                      <X size={16} color="#fff" />
+                    </TouchableOpacity>
                   </View>
-                )}
 
-                {/* Enhanced Play Now Button */}
-                <View style={styles.playButtonContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.enhancedPlayNowButton,
-                      !selectedAmount && styles.disabledPlayButton
-                    ]}
-                    onPress={handlePlayNow}
-                    activeOpacity={0.8}
-                    disabled={!selectedAmount}
-                  >
-                    <LinearGradient
-                      colors={selectedAmount 
-                        ? ['#FF6B35', '#F7931E', '#FFD700']
-                        : ['#9CA3AF', '#6B7280', '#4B5563']
-                      }
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.enhancedPlayNowButtonGradient}
-                    >
-                      <View style={styles.playButtonContent}>
-                        <Animated.View 
-                          style={[
-                            styles.playButtonIconContainer,
-                            {
-                              transform: [
-                                { scale: iconBounceAnim },
-                                { rotate: selectedAmount ? iconRotateAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: ['0deg', '360deg'],
-                                }) : '0deg'}
-                              ]
-                            }
-                          ]}
+                  <Text style={styles.compactSubtitle}>{selectedCategoryName}</Text>
+
+                  {loadingAmounts ? (
+                    <View style={styles.compactLoading}>
+                      <Zap size={18} color="#fff" />
+                      <Text style={styles.compactLoadingText}>Loading amounts...</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.compactGrid}>
+                      {battleAmounts.map((amount) => (
+                        <TouchableOpacity
+                          key={amount.id}
+                          style={[styles.compactTile, selectedAmount?.id === amount.id && styles.compactTileActive]}
+                          onPress={() => handleAmountSelect(amount)}
                         >
-                          <Zap size={18} color="#fff" />
-                        </Animated.View>
-                        <View style={styles.playButtonTextContainer}>
-                          <Text style={styles.enhancedPlayNowButtonText}>
-                            {selectedAmount ? 'START BATTLE' : 'SELECT AMOUNT'}
-                          </Text>
-                          {selectedAmount && (
-                            <Text style={styles.playButtonSubtext}>
-                              Entry Fee: ₹{selectedAmount.amount}
-                            </Text>
-                          )}
-                        </View>
-                        <ArrowRight size={18} color="#fff" />
-                      </View>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                          <Text style={[styles.compactAmount, selectedAmount?.id === amount.id && styles.compactAmountActive]}>₹{amount.amount}</Text>
+                          <Text style={styles.compactTier}>{amount.amount <= 25 ? 'Casual' : amount.amount <= 50 ? 'Pro' : 'Elite'}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  <View style={styles.compactFooter}>
+                    <View>
+                      <Text style={styles.compactLabel}>You’ll join with</Text>
+                      <Text style={styles.compactJoinAmount}>₹{selectedAmount ? selectedAmount.amount : '—'}</Text>
+                    </View>
+                    <TouchableOpacity style={[styles.compactCTA, !selectedAmount && styles.compactCTADisabled]} onPress={handlePlayNow} disabled={!selectedAmount}>
+                      <LinearGradient colors={['#FFD166', '#F59E0B']} style={styles.compactCTAInner}>
+                        <Text style={styles.compactCTAText}>Start Battle</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-
-                 </LinearGradient>
+               </LinearGradient>
               </Animated.View>
             </TouchableWithoutFeedback>
           </View>
@@ -1531,7 +1433,7 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F7F8FF',
     paddingBottom: 0,
   },
   scrollView: {
@@ -1539,7 +1441,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 96,
     paddingTop: 0,
     width: '100%',
   },
@@ -2602,23 +2504,25 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   battleArenaSection: {
-    marginTop: 24,
-    marginBottom: 20,
-    height: 200,
-    borderRadius: 24,
+    marginTop: 20,
+    marginBottom: 16,
+    height: 190,
+    borderRadius: 26,
     overflow: 'hidden',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#E6E8FF',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 26,
+    elevation: 14,
     width: '100%',
   },
   battleArenaGradient: {
     position: 'relative',
     width: '100%',
     height: '100%', // Use full height of parent
-    borderRadius: 16,
+    borderRadius: 26,
     overflow: 'hidden',
   },
   battleArenaContent: {
@@ -2626,8 +2530,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     height: '100%',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     width: '100%',
   },
   battleArenaLeft: {
@@ -2865,19 +2769,20 @@ const styles = StyleSheet.create({
     marginTop: 80, // Reduced from 120 to 80 to fit in compact header
     zIndex: 1,
   },
-     categorySectionBackground: {
-      borderRadius: 32,
+    categorySectionBackground: {
+      borderRadius: 26,
       padding: 0,
       marginTop: 0,
       overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: 'rgba(79, 70, 229, 0.2)',
-      shadowColor: '#4F46E5',
-      shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.25,
-      shadowRadius: 32,
-      elevation: 12,
+      borderWidth: 1,
+      borderColor: '#E6E8FF',
+      shadowColor: '#7C3AED',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.18,
+      shadowRadius: 24,
+      elevation: 8,
       width: '100%',
+      backgroundColor: '#FFFFFF',
     },
     premiumSectionHeader: {
       marginBottom: 24,
@@ -3265,6 +3170,37 @@ const styles = StyleSheet.create({
      backgroundColor: 'rgba(16, 185, 129, 0.2)',
      zIndex: -1,
    },
+  /* Compact popup styles */
+  compactCard: {
+    backgroundColor: '#0b2b45',
+    borderRadius: 12,
+    padding: 14,
+  },
+  compactHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  compactTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  compactClose: { padding: 6 },
+  compactSubtitle: { color: '#D6EEFF', marginTop: 6, marginBottom: 10 },
+  compactGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  compactTile: { width: (width - 72) / 3, paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginBottom: 8, backgroundColor: '#EAF6FF' },
+  compactTileActive: { borderWidth: 1.5, borderColor: '#FFD166', backgroundColor: '#2B1A46' },
+  compactAmount: { color: '#071428', fontWeight: '800' },
+  compactAmountActive: { color: '#FFD166' },
+  compactTier: { color: '#CDE9FF', fontSize: 11, marginTop: 6 },
+  compactFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  compactLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  compactJoinAmount: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 4 },
+  compactCTA: { width: 140 },
+  compactCTADisabled: { opacity: 0.6 },
+  compactCTAInner: { paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  compactCTAText: { color: '#071428', fontWeight: '800' },
    closeButtonGradient: {
      width: 28,
      height: 28,

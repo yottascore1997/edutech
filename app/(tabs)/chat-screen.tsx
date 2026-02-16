@@ -26,6 +26,7 @@ import {
   View,
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 
 interface User {
   id: string;
@@ -97,12 +98,12 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     if (currentUser?.token) {
       console.log('🔌 Initializing socket connection...');
       
-      const newSocket = io('http://192.168.1.5:3001', {
+      const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: currentUser.token
         },
         transports: ['polling', 'websocket'],
-        path: '/api/socket',
+        path: WEBSOCKET_CONFIG.CONNECTION_OPTIONS.path,
         timeout: 20000,
         forceNew: true
       });

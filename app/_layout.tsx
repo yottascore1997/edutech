@@ -90,13 +90,13 @@ function RootNavigator() {
                     headerTintColor: AppColors.white,
                     headerBackground: () => (
                         <LinearGradient
-                            colors={['#4F46E5', '#7C3AED']}
+                            colors={['#06b6d4', '#7C3AED']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={{ 
                                 flex: 1,
                                 borderBottomWidth: 1.5,
-                                borderBottomColor: 'rgba(255, 255, 255, 0.25)',
+                                borderBottomColor: 'rgba(255, 255, 255, 0.18)',
                             }}
                         />
                     ),
