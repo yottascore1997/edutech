@@ -371,6 +371,60 @@ export default function BattleRoomScreen() {
     });
   }, [socket]);
 
+  // Centralized return-to-quiz cleanup and navigation
+  const handleReturnToQuiz = useCallback(() => {
+    // clear timers
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (questionTimerRef.current) {
+      clearInterval(questionTimerRef.current);
+      questionTimerRef.current = null;
+    }
+
+    // clean up listeners and tell server we're leaving
+    try {
+      cleanupSocketListeners();
+    } catch (e) {
+      console.warn('cleanupSocketListeners error', e);
+    }
+
+    try {
+      if (socket && socket.connected) {
+        socket.emit('leave_match', { matchId, userId: user?.id });
+        socket.disconnect();
+      }
+    } catch (e) {
+      console.warn('leave_match emit/disconnect failed', e);
+    }
+
+    // reset refs/state
+    hasFinishedRef.current = false;
+    lastQuestionIndexRef.current = -1;
+    setBattleState({
+      status: 'preparing',
+      currentQuestion: 0,
+      totalQuestions: 5,
+      timeLeft: 10,
+      player1Score: 0,
+      player2Score: 0,
+      answers: {},
+      opponentAnswers: {}
+    });
+
+    // navigate back to quiz (fresh start)
+    try {
+      console.log('↩️ handleReturnToQuiz: navigating to quiz');
+      router.push('/(tabs)/quiz');
+      console.log('↩️ handleReturnToQuiz: router.push called');
+    } catch (e) {
+      // fallback
+      console.warn('router.push failed, trying replace', e);
+      try { router.replace('/(tabs)/quiz'); console.log('↩️ handleReturnToQuiz: router.replace called'); } catch (err) { console.warn('router.replace failed', err); }
+    }
+  }, [socket, matchId, user?.id, cleanupSocketListeners, router]);
+
   // Setup socket listeners
   const setupSocketListeners = useCallback(() => {
     if (!socket || !isConnected) {
@@ -1175,7 +1229,7 @@ const handleMatchEnded = (data: {
             <View style={styles.victoryButtonsContainer}>
               <TouchableOpacity 
                 style={styles.victoryButton}
-                onPress={() => router.back()}
+                onPress={handleReturnToQuiz}
               >
                 <LinearGradient
                   colors={["#4CAF50", "#45A049", "#2E7D32"]}
@@ -1444,7 +1498,7 @@ const handleMatchEnded = (data: {
                 </View>
               </View>
               <View style={styles.victoryButtonsContainer}>
-                <TouchableOpacity style={styles.victoryButton} onPress={() => router.push('/(tabs)/quiz')}>
+              <TouchableOpacity style={styles.victoryButton} onPress={handleReturnToQuiz}>
                   <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
                     <Text style={styles.victoryButtonText}>Back to Quiz</Text>
                   </LinearGradient>
@@ -1550,7 +1604,7 @@ const handleMatchEnded = (data: {
               <View style={styles.victoryButtonsContainer}>
                 <TouchableOpacity
                   style={styles.victoryButton}
-                  onPress={() => router.push('/(tabs)/quiz')}
+                  onPress={handleReturnToQuiz}
                 >
                   <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
                     <Ionicons name="refresh" size={18} color="#fff" />
@@ -1560,7 +1614,7 @@ const handleMatchEnded = (data: {
 
                 <TouchableOpacity
                   style={styles.victoryButton}
-                  onPress={() => router.push('/(tabs)/quiz')}
+                  onPress={handleReturnToQuiz}
                 >
                   <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.victoryButtonGradient}>
                     <Ionicons name="arrow-back" size={18} color="#fff" />

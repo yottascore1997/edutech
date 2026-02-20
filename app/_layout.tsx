@@ -83,7 +83,7 @@ function RootNavigator() {
             <Drawer
                 drawerContent={(props) => <CustomDrawerContent {...props} />}
                 screenOptions={({ navigation }) => ({
-                    headerShown: true, // Show the header
+                    headerShown: false, // Hide navigator header to avoid duplicate app header
                     headerStyle: {
                         backgroundColor: 'transparent', // Make background transparent for gradient
                     },
@@ -123,6 +123,13 @@ function RootNavigator() {
                     name="privacy-policy"
                     options={{
                       title: '', // Remove the title for privacy-policy
+                    }}
+                />
+                <Drawer.Screen
+                    name="pyq"
+                    options={{
+                      title: 'PYQ',
+                      headerShown: false, // Use app's CommonHeader instead of navigator header
                     }}
                 />
                 <Drawer.Screen

@@ -7,9 +7,9 @@ import { useRouter } from 'expo-router'
 import React, { useState } from 'react'
 import * as Haptics from 'expo-haptics'
 import { Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { apiFetch } from '@/constants/api';
 
 const Register = () => {
-    const { register } = useAuth();
     const { showError, showSuccess } = useToast();
     const router = useRouter();
     const [name, setName] = useState('');
@@ -47,16 +47,13 @@ const Register = () => {
         }
         
         try {
-
-            const userData = { name, username, email, password, phoneNumber, referralCode };
-
-            
-            await register(userData);
-
-            showSuccess('Registration successful! Please log in.');
-            setTimeout(() => {
-                router.replace('/login');
-            }, 2000);
+            const userData = { name, username, email, password, phoneNumber, referralCode, role: 'STUDENT' };
+            const res = await apiFetch('/auth/register', { method: 'POST', body: userData });
+            if (res?.ok) {
+                // Do not auto-login. Show check-email screen with the registered email.
+                router.replace({ pathname: '/check-email', params: { email } } as any);
+                return;
+            }
         } catch (error: any) {
             console.error('Registration failed:', error);
             let errorMessage = 'Registration failed. Please try again.';

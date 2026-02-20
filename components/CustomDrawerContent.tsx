@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Dimensions, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +13,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CustomDrawerContent = (props: any) => {
     const { user, logout } = useAuth();
     const { navigation } = props;
+    const router = useRouter();
     const [activeMenu, setActiveMenu] = useState('');
     const [isDarkMode] = useState(false);
 
@@ -36,6 +38,32 @@ const CustomDrawerContent = (props: any) => {
     const navigateToMyExams = () => {
         setActiveMenu('my-exams');
         navigation.navigate('(tabs)', { screen: 'my-exams' });
+        navigation.closeDrawer();
+    };
+
+    const navigateToPYQ = () => {
+        setActiveMenu('pyq');
+        // Use router.push to navigate to filesystem route, then close drawer
+        try {
+            router.push('/pyq');
+        } catch (e) {
+            // fallback to navigation.navigate if router fails
+            try {
+                navigation.navigate('pyq');
+            } catch {}
+        }
+        navigation.closeDrawer();
+    };
+    
+    const navigateToCurrentAffairs = () => {
+        setActiveMenu('current-affairs');
+        try {
+            router.push('/current-affairs');
+        } catch (e) {
+            try {
+                navigation.navigate('current-affairs');
+            } catch {}
+        }
         navigation.closeDrawer();
     };
 
@@ -175,6 +203,24 @@ const CustomDrawerContent = (props: any) => {
                                 isDarkMode={isDarkMode}
                                 iconColor="#2ED573"
                                 iconImage={require('../assets/images/icons/exam.png')}
+                            />
+                            
+                            <MenuItem 
+                                icon="book-outline" 
+                                label="PYQ" 
+                                onPress={navigateToPYQ}
+                                isActive={activeMenu === 'pyq'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#1f2937"
+                                iconImage={require('../assets/images/icons/book-shop.png')}
+                            />
+                            <MenuItem 
+                                icon="newspaper-outline"
+                                label="Current Affairs"
+                                onPress={navigateToCurrentAffairs}
+                                isActive={activeMenu === 'current-affairs'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#06B6D4"
                             />
                             <MenuItem 
                                 icon="ribbon-outline" 

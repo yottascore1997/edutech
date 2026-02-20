@@ -103,7 +103,18 @@ const Login = () => {
       const result = await auth.login(trimmedEmail, trimmedPassword);
       showSuccess('Login successful! Welcome back.');
     } catch (error: any) {
-      showError(error?.message || 'Login failed.');
+      // If backend returns 403 = email not verified, guide user to resend verification
+      const isNotVerified =
+        error?.status === 403 ||
+        (error?.data?.message && String(error.data.message).toLowerCase().includes('verify')) ||
+        (error?.message && String(error.message).toLowerCase().includes('verify'));
+      if (isNotVerified) {
+        showError('Please verify your email before signing in.');
+        // Open resend verification screen with email prefilled
+        router.push({ pathname: '/resend-verification', params: { email: trimmedEmail } } as any);
+      } else {
+        showError(error?.data?.message || error?.message || 'Login failed.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -345,8 +356,11 @@ const Login = () => {
                       )}
                     </LinearGradient>
                   </TouchableOpacity>
+                  
+                  <TouchableOpacity onPress={() => router.push({ pathname: '/forgot-password', params: { email } } as any)} style={styles.forgotLink}>
+                    <Text style={styles.forgotText}>Forgot password?</Text>
+                  </TouchableOpacity>
                 </>
-              )}
             </Animated.View>
           </TouchableOpacity>
         </ScrollView>
@@ -662,6 +676,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 6,
+  },
+  forgotLink: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  forgotText: {
+    color: '#7c3aed',
+    fontWeight: '700',
   },
 
 
