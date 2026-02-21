@@ -2,9 +2,9 @@
 // Using yottascore.com for both development and production
 import { getApiAuthHandler } from '@/utils/apiAuthHandler';
 
-// export const API_BASE_URL = 'https://www.yottascore.com/api';
+export const API_BASE_URL = 'https://www.yottascore.com/api';
 // Local backend runs on :3001 (frontend/next runs on :3000). Point API to backend.
-export const API_BASE_URL = 'http://192.168.1.2:3000/api';
+// export const API_BASE_URL = 'http://192.168.1.2:3000/api';
 export const SITE_BASE_URL = API_BASE_URL.replace('/api', '');
 
 /** Image/uploads base URL – use score.yottascore.com for images */

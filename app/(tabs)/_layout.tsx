@@ -158,6 +158,13 @@ function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="current-affairs"
+        options={{
+          title: 'Current Affairs',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="book-details"
         options={{
           title: 'Book Details',

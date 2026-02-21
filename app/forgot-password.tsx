@@ -1,12 +1,22 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, KeyboardAvoidingView } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { Stack } from 'expo-router';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+  StatusBar,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter, Stack } from 'expo-router';
 import { useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useToast } from '@/context/ToastContext';
 import { API_BASE_URL } from '@/constants/api';
+import { AppColors } from '@/constants/Colors';
 
 const FORGOT_PASSWORD_TIMEOUT_MS = 15000;
 
@@ -20,7 +30,6 @@ export default function ForgotPassword() {
   const sendingRef = useRef(false);
 
   const trimmedEmail = useMemo(() => (email || '').trim(), [email]);
-
   const validateEmail = (e: string) => !!e && e.includes('@');
 
   const handleSend = async () => {
@@ -70,194 +79,202 @@ export default function ForgotPassword() {
   };
 
   return (
-    <LinearGradient
-      colors={['#2A0756', '#4C1D95', '#7C3AED']}
-      style={styles.container}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.bgDecor} pointerEvents="none">
-        <LinearGradient
-          colors={['rgba(255,221,230,0.22)', 'rgba(124,58,237,0.06)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.bgBlob, { top: -60, left: -90, width: 260, height: 260 }]}
-        />
-        <LinearGradient
-          colors={['rgba(124,58,237,0.22)', 'rgba(255,221,230,0.05)']}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={[styles.bgBlob, { top: 170, right: -110, width: 300, height: 300 }]}
-        />
-        <LinearGradient
-          colors={['rgba(245,158,11,0.12)', 'transparent']}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.bgBlob, { bottom: 80, left: 30, width: 200, height: 200 }]}
-        />
+      <StatusBar barStyle="light-content" backgroundColor={AppColors.primary} />
+
+      {/* Top – same as Login/Register: primary header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="arrow-back" size={24} color={AppColors.white} />
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-        <LinearGradient colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.12)']} style={styles.backPill}>
-          <Ionicons name="arrow-back" size={20} color="#fff" />
-        </LinearGradient>
-      </TouchableOpacity>
-
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
-        <View style={styles.card}>
-          <View style={styles.hero}>
-            <LinearGradient colors={['rgba(245,158,11,0.22)', 'rgba(255,255,255,0.06)']} style={styles.heroIcon}>
-              <Ionicons name="key-outline" size={22} color="#FFE8B5" />
-            </LinearGradient>
-            <Text style={styles.title}>Forgot password</Text>
-            <Text style={styles.subtitle}>
-              Enter your email and we’ll send a secure reset link.
-            </Text>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
-            <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused]}>
-              <Ionicons
-                name="mail-outline"
-                size={18}
-                color={emailFocused ? '#7C3AED' : '#9CA3AF'}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor="#9CA3AF"
-                style={styles.input}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onFocus={() => setEmailFocused(true)}
-                onBlur={() => setEmailFocused(false)}
-                editable={!loading}
-                returnKeyType="send"
-                onSubmitEditing={handleSend}
-              />
-            </View>
-            <Text style={styles.helper}>We’ll never share your email.</Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.sendButton}
-            onPress={handleSend}
-            disabled={loading || !trimmedEmail}
-            activeOpacity={0.9}
+      {/* Bottom – white card */}
+      <View style={styles.bottomSection}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.keyboardView}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <LinearGradient
-              colors={loading ? ['#C8CBD2', '#B9BCC4'] : ['#F59E0B', '#F97316']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sendGradient}
-            >
-              <Text style={styles.sendText}>{loading ? 'Sending…' : 'Send reset link'}</Text>
-              {!loading && <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 8 }} />}
-            </LinearGradient>
-          </TouchableOpacity>
+            <View style={styles.formBlock}>
+            <View style={styles.lockIconWrap}>
+              <Ionicons name="lock-closed" size={36} color={AppColors.darkGrey} />
+            </View>
+            <Text style={styles.cardTitle}>Forgot Password?</Text>
+            <Text style={styles.subtitle}>
+              No worries, we'll send you reset instructions.
+            </Text>
 
-          <TouchableOpacity onPress={() => router.push('/login')} style={styles.backToLogin} activeOpacity={0.8}>
-            <Text style={styles.backText}>Back to sign in</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    </LinearGradient>
+            <View style={styles.inputContainer}>
+              <View style={[styles.inputWrapper, emailFocused && styles.inputWrapperFocused]}>
+                <Ionicons
+                  name="mail-outline"
+                  size={20}
+                  color={emailFocused ? AppColors.primary : AppColors.grey}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="Email Address"
+                  placeholderTextColor={AppColors.grey}
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                  editable={!loading}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSend}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={handleSend}
+              disabled={loading || !trimmedEmail}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={AppColors.white} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Reset Password</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push('/login')}
+              style={styles.backToLogin}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="person-outline" size={18} color={AppColors.primary} style={{ marginRight: 6 }} />
+              <Text style={styles.backToLoginText}>Back to Login</Text>
+            </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  bgDecor: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  bgBlob: {
-    position: 'absolute',
-    borderRadius: 999,
-  },
-  back: { position: 'absolute', left: 16, top: Platform.OS === 'ios' ? 64 : 42, zIndex: 10 },
-  backPill: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  content: {
+  screen: {
     flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 92 : 74,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
+    backgroundColor: AppColors.primary,
   },
-  card: {
-    width: '100%',
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(17,24,39,0.08)',
-    ...(Platform.OS === 'android'
-      ? { elevation: 0 }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: 0.12,
-          shadowRadius: 18,
-        }),
+  header: {
+    backgroundColor: AppColors.primary,
+    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    minHeight: 200,
   },
-  hero: { alignItems: 'center', marginBottom: 14 },
-  heroIcon: {
+  backButton: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 56 : 40,
+    left: 20,
+    zIndex: 10,
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.25)',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  title: { fontSize: 22, fontWeight: '900', color: '#0b1220', letterSpacing: 0.2, marginBottom: 6, textAlign: 'center' },
-  subtitle: { fontSize: 13.5, color: 'rgba(11,18,32,0.72)', textAlign: 'center', lineHeight: 19 },
-  field: { marginTop: 10 },
-  label: { fontSize: 13, fontWeight: '800', color: '#111827', marginBottom: 8 },
-  helper: { fontSize: 11.5, color: '#6b7280', marginTop: 6 },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: AppColors.white,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+    paddingBottom: Platform.OS === 'ios' ? 28 : 24,
+  },
+  keyboardView: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 16,
+  },
+  formBlock: {
+    flex: 0,
+  },
+  lockIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: AppColors.lightGrey,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 14,
+    opacity: 0.9,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: AppColors.darkGrey,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: AppColors.grey,
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  inputContainer: { marginBottom: 20 },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.98)',
+    backgroundColor: AppColors.white,
     borderRadius: 14,
-    borderWidth: 1.25,
-    borderColor: 'rgba(17,24,39,0.10)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: AppColors.lightGrey,
     height: 52,
   },
   inputWrapperFocused: {
-    borderColor: 'rgba(124,58,237,0.55)',
-    backgroundColor: '#FAF8FF',
+    borderColor: AppColors.primary,
   },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, color: '#0b1220', fontSize: 15, fontWeight: '700' },
-  sendButton: { marginTop: 14 },
-  sendGradient: {
-    paddingVertical: 14,
+  input: {
+    flex: 1,
+    color: AppColors.darkGrey,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  inputIcon: { marginRight: 12 },
+  primaryBtn: {
+    backgroundColor: AppColors.primary,
+    paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    marginBottom: 16,
   },
-  sendText: { color: '#fff', fontWeight: '900', fontSize: 15, letterSpacing: 0.3 },
-  backToLogin: { marginTop: 12, alignItems: 'center', paddingVertical: 6 },
-  backText: { color: '#5B21B6', fontWeight: '900' },
+  primaryBtnText: {
+    color: AppColors.white,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  backToLogin: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  backToLoginText: {
+    color: AppColors.primary,
+    fontWeight: '700',
+    fontSize: 15,
+  },
 });
-

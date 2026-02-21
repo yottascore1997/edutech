@@ -16,6 +16,11 @@ import PracticeCategoriesPreview from '../../components/PracticeCategoriesPrevie
 import QuestionOfTheDayPreview from '../../components/QuestionOfTheDayPreview';
 import StudentSuccessStories from '../../components/StudentSuccessStories';
 import TopPerformersSection from '../../components/TopPerformersSection';
+import HomeFeatureGrid from '../../components/HomeFeatureGrid';
+import StudentsSelectedBanner from '../../components/StudentsSelectedBanner';
+import PreviousYearPapersPreview from '../../components/PreviousYearPapersPreview';
+import HomeFixedBanner from '../../components/HomeFixedBanner';
+import CurrentAffairsPreview from '../../components/CurrentAffairsPreview';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -228,8 +233,8 @@ export default function HomeScreen() {
         <CustomBannerSlider onBannerPress={(banner) => {
                         // Handle banner press - navigate to different screens based on banner
                         switch (banner.action) {
-                            case 'practice-exam':
-                                router.push('/(tabs)/practice-exam');
+                        case 'practice-exam':
+                                router.push('/(tabs)/practice-exam' as any);
                                 break;
                             case 'exam':
                                 router.push('/(tabs)/exam');
@@ -348,6 +353,12 @@ export default function HomeScreen() {
 
             {/* Student Success Stories Section */}
             <StudentSuccessStories />
+            
+            {/* Feature Grid Section (Study notes, PYPs, Practice, etc.) */}
+            <HomeFeatureGrid />
+
+            {/* Students selected banner */}
+            <StudentsSelectedBanner />
 
             {/* Job Competition Banner */}
             {/* <JobCompetitionBanner onPress={() => {
@@ -361,6 +372,15 @@ export default function HomeScreen() {
                     // router.push('/leaderboard'); // Example navigation
                 }}
             />
+
+            {/* Previous Year Papers Preview */}
+            <PreviousYearPapersPreview />
+
+            {/* Fixed banner below PYP */}
+            <HomeFixedBanner />
+
+            {/* Current Affairs Section */}
+            <CurrentAffairsPreview />
 
             {/* Exam Notifications Section */}
             <ExamNotificationsSection />

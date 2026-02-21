@@ -58,10 +58,10 @@ const CustomDrawerContent = (props: any) => {
     const navigateToCurrentAffairs = () => {
         setActiveMenu('current-affairs');
         try {
-            router.push('/current-affairs');
+            router.push('/(tabs)/current-affairs');
         } catch (e) {
             try {
-                navigation.navigate('current-affairs');
+                navigation.navigate('(tabs)', { screen: 'current-affairs' });
             } catch {}
         }
         navigation.closeDrawer();
@@ -212,7 +212,7 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'pyq'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#1f2937"
-                                iconImage={require('../assets/images/icons/book-shop.png')}
+                                iconImage={require('../assets/images/icons/question-mark.png')}
                             />
                             <MenuItem 
                                 icon="newspaper-outline"
