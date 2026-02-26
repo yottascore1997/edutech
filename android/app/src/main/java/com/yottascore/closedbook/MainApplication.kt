@@ -1,4 +1,4 @@
-package com.yottascore.exambook
+package com.yottascore.closedbook
 
 import android.app.Application
 import android.content.res.Configuration

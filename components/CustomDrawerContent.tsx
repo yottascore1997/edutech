@@ -126,6 +126,20 @@ const CustomDrawerContent = (props: any) => {
         navigation.navigate('(tabs)', { screen: 'my-listings' });
         navigation.closeDrawer();
     };
+    
+    const navigateToAddListing = () => {
+        setActiveMenu('add-listing');
+        try {
+            // Open Book Store and instruct it to open the listing modal
+            router.push('/(tabs)/book-store?openCreate=1');
+        } catch (e) {
+            // Fallback to navigation
+            try {
+                navigation.navigate('(tabs)', { screen: 'book-store' });
+            } catch {}
+        }
+        navigation.closeDrawer();
+    };
 
     const handleSettingsPress = () => {
         setActiveMenu('settings');
@@ -256,6 +270,15 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'my-listings'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#F59E0B"
+                            />
+                            
+                            <MenuItem 
+                                icon="add-circle-outline"
+                                label="Add Listing"
+                                onPress={navigateToAddListing}
+                                isActive={activeMenu === 'add-listing'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#10B981"
                             />
                             
                             <MenuItem 

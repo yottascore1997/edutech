@@ -5,7 +5,7 @@ import { ShadowUtils } from '@/utils/shadowUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,6 +58,7 @@ const CATEGORIES = [
 const BookStoreScreen = () => {
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams() as { openCreate?: string };
   const insets = useSafeAreaInsets();
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +96,10 @@ const BookStoreScreen = () => {
     requestLocationPermission();
     fetchCartCount();
     fetchBooks();
+    // If route param asks to open create modal, open it
+    if (params?.openCreate === '1') {
+      setShowCreateModal(true);
+    }
   }, []);
 
   // Fetch books when location dependencies change (not category)

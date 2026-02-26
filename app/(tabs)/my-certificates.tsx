@@ -5,8 +5,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+// removed file download libs as download button removed
 import {
   ActivityIndicator,
   RefreshControl,
@@ -17,7 +16,7 @@ import {
   View,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface CertificateItem {
   participantId: string;
@@ -33,6 +32,7 @@ interface CertificateItem {
 export default function MyCertificatesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,29 +91,7 @@ export default function MyCertificatesScreen() {
     });
   };
 
-  const downloadCertificate = async (item: CertificateItem) => {
-    try {
-      if (!user?.token) {
-        Alert.alert('Login required', 'You must be logged in to download certificates.');
-        return;
-      }
-      const urlPath = item.certificateUrl || `/student/live-exams/${item.examId}/certificate`;
-      const fullUrl = urlPath.startsWith('http') ? urlPath : `${SITE_BASE_URL}${urlPath}`;
-      const filename = `certificate_${item.examId}.pdf`;
-      const dest = FileSystem.documentDirectory + filename;
-      const downloadRes = await FileSystem.downloadAsync(fullUrl, dest, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadRes.uri);
-      } else {
-        Alert.alert('Downloaded', `Saved to ${downloadRes.uri}`);
-      }
-    } catch (e: any) {
-      console.error('Download error', e);
-      Alert.alert('Download failed', e?.message || 'Could not download certificate.');
-    }
-  };
+  // download removed — certificates are view-only from the list
 
   const browseLiveExams = () => {
     router.push('/(tabs)/exam' as any);
@@ -122,7 +100,7 @@ export default function MyCertificatesScreen() {
 
   if (loading && certificates.length === 0) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#aa35ce" />
           <Text style={styles.loadingText}>Loading certificates...</Text>
@@ -132,9 +110,9 @@ export default function MyCertificatesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#aa35ce']} />
         }
@@ -179,12 +157,8 @@ export default function MyCertificatesScreen() {
                 </View>
 
                 <View style={styles.cardActions}>
-                  <TouchableOpacity style={styles.viewButton} onPress={() => openCertificate(item.examId)} activeOpacity={0.85}>
-                    <Text style={styles.viewButtonText}>View Certificate</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.downloadButton} onPress={() => downloadCertificate(item)} activeOpacity={0.85}>
-                    <Ionicons name="download" size={16} color="#fff" />
-                    <Text style={styles.downloadButtonText}>Download</Text>
+                  <TouchableOpacity style={styles.viewButtonFull} onPress={() => openCertificate(item.examId)} activeOpacity={0.85}>
+                    <Text style={styles.viewButtonTextFull}>View Certificate</Text>
                   </TouchableOpacity>
                 </View>
               </LinearGradient>
@@ -346,7 +320,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   viewButton: {
-    flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#aa35ce',
@@ -374,5 +347,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
     marginLeft: 6,
+  },
+  // Full-width green view button for certificate list
+  viewButtonFull: {
+    width: '100%',
+    backgroundColor: '#10B981',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewButtonTextFull: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });

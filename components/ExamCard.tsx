@@ -299,6 +299,9 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
     const progress = exam.spots > 0 ? ((exam.spots - exam.spotsLeft) / exam.spots) * 100 : 0;
 
     const handleCardPress = () => {
+        // If already on the exam details page, don't navigate again.
+        if (isDetailsPage) return;
+
         router.push({
             pathname: "/exam/[id]",
             params: { id: exam.id }

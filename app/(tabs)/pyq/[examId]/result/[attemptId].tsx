@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Animated, Dimensions, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,7 @@ export default function PYQResultScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [result, setResult] = useState<ResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'detailed'>('overview');
@@ -43,11 +44,12 @@ export default function PYQResultScreen() {
 
   useEffect(() => {
     if (!examId || !attemptId || !user?.token) return;
-    loadResult();
+    loadResult({ refresh: false });
   }, [examId, attemptId, user?.token]);
 
-  async function loadResult() {
-    setLoading(true);
+  async function loadResult({ refresh }: { refresh: boolean }) {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const [resData, examData] = await Promise.all([
@@ -103,6 +105,7 @@ export default function PYQResultScreen() {
       setError(e?.message || 'Failed to load result');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -137,6 +140,7 @@ export default function PYQResultScreen() {
     return (
       <LinearGradient colors={getBackgroundGradient()} style={styles.loadingContainer}>
         <Text style={styles.errorText}>{error || 'No result data.'}</Text>
+        <Text style={styles.helper}>Pull down to refresh</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
@@ -151,7 +155,18 @@ export default function PYQResultScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <LinearGradient colors={getBackgroundGradient()} style={styles.container}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadResult({ refresh: true })}
+              tintColor="#667eea"
+            />
+          }
+        >
           <Animated.View style={[styles.resultContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             {/* Header - same as Practice */}
             <View style={styles.ultraHeaderSection}>
@@ -403,6 +418,7 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#1F2937', fontWeight: '500', marginTop: 12 },
   errorText: { color: '#DC2626', textAlign: 'center', marginBottom: 12 },
+  helper: { textAlign: 'center', marginBottom: 12, color: '#94A3B8', fontWeight: '600' },
   backBtn: { backgroundColor: '#667eea', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10 },
   backBtnText: { color: '#fff', fontWeight: '800' },
   content: { flex: 1 },
@@ -496,3 +512,4 @@ const styles = StyleSheet.create({
   doneBtn: { marginHorizontal: 20, marginTop: 8, marginBottom: 24, backgroundColor: '#7C3AED', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   doneBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });
+

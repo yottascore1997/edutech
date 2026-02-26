@@ -82,6 +82,13 @@ function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="exam-notification"
+        options={{
+          title: 'Exam Notification',
+          href: null, // Hide from tab bar (detail stack)
+        }}
+      />
+      <Tabs.Screen
         name="practice-exam"
         options={{
           title: 'Practice Exam',

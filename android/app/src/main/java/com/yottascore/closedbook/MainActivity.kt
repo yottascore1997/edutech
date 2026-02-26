@@ -1,4 +1,4 @@
-package com.yottascore.exambook
+package com.yottascore.closedbook
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

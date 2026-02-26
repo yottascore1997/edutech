@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Animated,
@@ -14,7 +15,6 @@ import {
   Linking,
   Platform,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -23,6 +23,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const TAB_BAR_PADDING = 88;
 
 interface ExamNotification {
   id: string;
@@ -40,6 +42,7 @@ interface ExamNotification {
 export default function ExamNotificationsScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { selectedCategory: globalCategory } = useCategory();
   const [notifications, setNotifications] = useState<ExamNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,7 +50,6 @@ export default function ExamNotificationsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
 
   const categories = ['All', 'SSC', 'UPSC', 'Railway', 'Banking', 'State Exams', 'Others'];
 
@@ -147,7 +149,6 @@ export default function ExamNotificationsScreen() {
       const statusInfo = getStatusInfo(daysLeft);
       const isExpired = daysLeft < 0;
       const isUrgent = daysLeft <= 7 && daysLeft >= 0;
-      const isExpanded = expandedCard === item.id;
 
       const flashAnim = new Animated.Value(1);
       const startFlash = () => {
@@ -178,7 +179,7 @@ export default function ExamNotificationsScreen() {
                 borderLeftColor: isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : '#10B981',
               },
             ]}
-            onPress={() => setExpandedCard(isExpanded ? null : item.id)}
+            onPress={() => handleNotificationPress(item)}
             activeOpacity={0.7}
           >
             <View style={styles.cardContent}>
@@ -190,7 +191,7 @@ export default function ExamNotificationsScreen() {
                         <Ionicons name="alert-circle" size={14} color="#FFF" />
                       </View>
                     )}
-                    <Text style={styles.examTitle} numberOfLines={isExpanded ? undefined : 2}>
+                    <Text style={styles.examTitle} numberOfLines={2}>
                       {item.title}
                     </Text>
                   </View>
@@ -200,11 +201,11 @@ export default function ExamNotificationsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.examDescription} numberOfLines={isExpanded ? undefined : 2}>
+              <Text style={styles.examDescription} numberOfLines={2}>
                 {item.description}
               </Text>
 
-              {isUrgent && !isExpanded && (
+              {isUrgent && (
                 <View style={styles.countdownContainer}>
                   <Ionicons name="time-outline" size={16} color="#EF4444" />
                   <Animated.Text style={[styles.countdownText, { transform: [{ scale: pulseAnim }] }]}>
@@ -219,34 +220,6 @@ export default function ExamNotificationsScreen() {
                   <Text style={styles.infoText}>Last Date: {formatDate(item.applyLastDate)}</Text>
                 </View>
               </View>
-
-              {isExpanded && (
-                <View style={styles.expandedSection}>
-                  <View style={styles.divider} />
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="document-text-outline" size={18} color="#6366F1" />
-                    <Text style={styles.detailLabel}>Notification ID:</Text>
-                    <Text style={styles.detailValue}>{item.id.substring(0, 8)}...</Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Ionicons name="calendar-outline" size={18} color="#10B981" />
-                    <Text style={styles.detailLabel}>Posted On:</Text>
-                    <Text style={styles.detailValue}>{formatDate(item.createdAt)}</Text>
-                  </View>
-
-                  {!isExpired && (
-                    <View style={styles.detailRow}>
-                      <Ionicons name="hourglass-outline" size={18} color="#F59E0B" />
-                      <Text style={styles.detailLabel}>Days Remaining:</Text>
-                      <Text style={[styles.detailValue, { color: isUrgent ? '#EF4444' : '#10B981', fontWeight: '700' }]}>
-                        {daysLeft} {daysLeft === 1 ? 'Day' : 'Days'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
 
               {item.applyLink && (
                 <TouchableOpacity
@@ -268,12 +241,12 @@ export default function ExamNotificationsScreen() {
                 </TouchableOpacity>
               )}
             </View>
-            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={20} color="#6B7280" style={styles.chevronIcon} />
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" style={styles.chevronIcon} />
           </TouchableOpacity>
         </Animated.View>
       );
     },
-    [expandedCard]
+    [handleNotificationPress]
   );
 
   const renderEmptyState = () => (
@@ -354,7 +327,10 @@ export default function ExamNotificationsScreen() {
         ListEmptyComponent={renderEmptyState}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6366F1']} tintColor="#6366F1" />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingBottom: TAB_BAR_PADDING + insets.bottom + 16 },
+        ]}
         removeClippedSubviews
       />
     </SafeAreaView>
@@ -448,8 +424,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContainer: {
+    flexGrow: 1,
     padding: 16,
-    paddingBottom: 24,
   },
   notificationCard: {
     flexDirection: 'row',

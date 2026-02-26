@@ -4,8 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+// Removed file-download imports as download button was removed
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface CertificateData {
   userName: string;
@@ -35,6 +35,7 @@ export default function LiveExamCertificateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<CertificateData | null>(null);
@@ -78,54 +79,36 @@ export default function LiveExamCertificateScreen() {
     }
   };
 
-  const downloadCertificate = async () => {
-    try {
-      if (!id || !user?.token) return;
-      const urlPath = `/student/live-exams/${id}/certificate`;
-      const fullUrl = `${SITE_BASE_URL}${urlPath}`;
-      const filename = `certificate_${id}.pdf`;
-      const dest = FileSystem.documentDirectory + filename;
-      const downloadRes = await FileSystem.downloadAsync(fullUrl, dest, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadRes.uri);
-      } else {
-        Alert.alert('Downloaded', `Saved to ${downloadRes.uri}`);
-      }
-    } catch (e) {
-      console.error('Download error', e);
-      Alert.alert('Download failed', 'Could not download certificate.');
-    }
-  };
+  // Download removed — download button was removed from UI
 
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={['top', 'bottom']}>
         <ActivityIndicator size="large" color={YOTTASCORE_PURPLE} />
         <Text style={styles.loadingText}>Loading certificate...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !data) {
     return (
-      <View style={styles.centered}>
+      <SafeAreaView style={styles.centered} edges={['top', 'bottom']}>
         <Ionicons name="alert-circle" size={48} color="#94a3b8" />
         <Text style={styles.errorText}>{error || 'Certificate not found'}</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backBtnText}>Go back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.card}>
         <LinearGradient
           colors={['#faf5ff', '#f3e8ff', '#ede9fe']}
@@ -168,16 +151,12 @@ export default function LiveExamCertificateScreen() {
         </LinearGradient>
       </View>
 
-      <TouchableOpacity style={styles.downloadBtnBottom} onPress={downloadCertificate}>
-        <Ionicons name="download" size={20} color="#fff" />
-        <Text style={styles.downloadBtnBottomText}>Download Certificate</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.backBtnBottom} onPress={() => router.back()}>
+      <TouchableOpacity style={[styles.backBtnBottom, { marginBottom: insets.bottom + 12 }]} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={20} color="#fff" />
         <Text style={styles.backBtnBottomText}>Back to result</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

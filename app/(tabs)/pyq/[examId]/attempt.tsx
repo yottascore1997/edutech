@@ -590,3 +590,4 @@ const styles = StyleSheet.create({
   submitConfirmButton: { backgroundColor: 'transparent', borderRadius: 12, flex: 1, overflow: 'hidden', elevation: 4 },
   submitConfirmButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
+

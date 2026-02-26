@@ -189,6 +189,7 @@ export default function HomeScreen() {
     <>
       <ScrollView 
         style={styles.container}
+        contentContainerStyle={{ paddingBottom: 96 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -206,7 +207,7 @@ export default function HomeScreen() {
               { id: '1', name: 'Live Exam', icon: 'flash', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'], route: '/(tabs)/exam', image: require('../../assets/images/icons/exam.png') },
               { id: '2', name: 'Practice', icon: 'school', color: '#8B5CF6', gradient: ['#8B5CF6', '#A78BFA'], route: '/(tabs)/practice-categories', image: require('../../assets/images/icons/exam-time.png') },
               { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', gradient: ['#10B981', '#34D399'], route: '/(tabs)/quiz', image: require('../../assets/images/icons/quiz.png') },
-              { id: '4', name: 'Social', icon: 'people', color: '#EC4899', gradient: ['#EC4899', '#F472B6'], route: '/(tabs)/social', image: require('../../assets/images/icons/social-media.png') },
+              { id: '4', name: 'PYQ', icon: 'book', color: '#7C3AED', gradient: ['#7C3AED', '#9F7AEA'], route: '/(tabs)/pyq', image: require('../../assets/images/icons/question-mark.png') },
               { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable', image: require('../../assets/images/icons/study-time.png') },
               { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store', image: require('../../assets/images/icons/book-shop.png') },
             ].map((item) => (

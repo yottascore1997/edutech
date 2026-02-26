@@ -1,8 +1,8 @@
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { AppColors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -18,6 +18,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const LOGIN = {
+  dark: '#030047',
+  darkSoft: '#0d0d5c',
+  accent: '#FFCC3E',
+  bg: '#E1E5F4',
+  card: '#F8FBFF',
+  inputBg: '#F0F3F9',
+  textMuted: '#5c5c7a',
+  white: '#FFFFFF',
+};
 
 const Login = () => {
   const auth = useAuth();
@@ -92,39 +103,46 @@ const Login = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={AppColors.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={LOGIN.dark} />
 
-      {/* Top section – primary background, logo + brand */}
-      <View style={styles.header}>
+      <LinearGradient colors={[LOGIN.dark, LOGIN.darkSoft]} style={styles.cover}>
+        {/* Decorative shapes */}
+        <View style={styles.shape1} />
+        <View style={styles.shape2} />
+        <View style={styles.shape3} />
+
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backButton}
-          activeOpacity={0.8}
+          style={styles.backBtn}
+          activeOpacity={0.85}
         >
-          <Ionicons name="arrow-back" size={24} color={AppColors.white} />
+          <Ionicons name="arrow-back" size={22} color={LOGIN.dark} />
         </TouchableOpacity>
 
         <Animated.View
           style={[
-            styles.headerContent,
+            styles.coverContent,
             {
               opacity: fadeAnim,
               transform: [{ translateY: slideAnim }],
             },
           ]}
         >
-          <View style={styles.logoCircle}>
-            <Ionicons name="school" size={40} color={AppColors.primary} />
+          <View style={styles.coverIconWrap}>
+            <Ionicons name="document-text" size={42} color={LOGIN.dark} />
           </View>
-          <Text style={styles.brandName}>Yottascore</Text>
-          <Text style={styles.tagline}>SMART LEARNING PLATFORM</Text>
+          <View style={styles.badge}>
+            <Ionicons name="school" size={14} color={LOGIN.white} style={styles.badgeIcon} />
+            <Text style={styles.badgeText}>Exam Platform</Text>
+          </View>
+          <Text style={styles.coverTitle}>WELCOME BACK</Text>
+          <Text style={styles.coverSubtitle}>SIGN IN</Text>
         </Animated.View>
-      </View>
+      </LinearGradient>
 
-      {/* Bottom section – white card with form */}
-      <View style={styles.bottomSection}>
+      <View style={styles.main}>
         <ScrollView
-          style={styles.scrollView}
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -137,29 +155,24 @@ const Login = () => {
               Keyboard.dismiss();
             }}
           >
-            <Animated.View
-              style={[styles.card, { opacity: fadeAnim }]}
-            >
-              {/* Email or Phone */}
-              <View style={styles.inputContainer}>
+            <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
+              <View style={styles.inputRow}>
                 <View
                   style={[
-                    styles.inputWrapper,
-                    emailFocused && styles.inputWrapperFocused,
+                    styles.inputWrap,
+                    emailFocused && styles.inputWrapFocused,
                   ]}
                 >
                   <Ionicons
                     name="person-outline"
                     size={20}
-                    color={
-                      emailFocused ? AppColors.primary : AppColors.grey
-                    }
+                    color={emailFocused ? LOGIN.dark : LOGIN.textMuted}
                     style={styles.inputIcon}
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="Email or Phone"
-                    placeholderTextColor={AppColors.grey}
+                    placeholder="Email or Username"
+                    placeholderTextColor={LOGIN.textMuted}
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
@@ -170,26 +183,23 @@ const Login = () => {
                 </View>
               </View>
 
-              {/* Password */}
-              <View style={styles.inputContainer}>
+              <View style={styles.inputRow}>
                 <View
                   style={[
-                    styles.inputWrapper,
-                    passwordFocused && styles.inputWrapperFocused,
+                    styles.inputWrap,
+                    passwordFocused && styles.inputWrapFocused,
                   ]}
                 >
                   <Ionicons
                     name="lock-closed-outline"
                     size={20}
-                    color={
-                      passwordFocused ? AppColors.primary : AppColors.grey
-                    }
+                    color={passwordFocused ? LOGIN.dark : LOGIN.textMuted}
                     style={styles.inputIcon}
                   />
                   <TextInput
                     style={styles.input}
                     placeholder="Password"
-                    placeholderTextColor={AppColors.grey}
+                    placeholderTextColor={LOGIN.textMuted}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={secureTextEntry}
@@ -198,16 +208,12 @@ const Login = () => {
                   />
                   <TouchableOpacity
                     onPress={() => setSecureTextEntry(!secureTextEntry)}
-                    style={styles.eyeIcon}
+                    style={styles.eyeBtn}
                   >
                     <Ionicons
-                      name={
-                        secureTextEntry ? 'eye-outline' : 'eye-off-outline'
-                      }
+                      name={secureTextEntry ? 'eye-outline' : 'eye-off-outline'}
                       size={20}
-                      color={
-                        passwordFocused ? AppColors.primary : AppColors.grey
-                      }
+                      color={passwordFocused ? LOGIN.dark : LOGIN.textMuted}
                     />
                   </TouchableOpacity>
                 </View>
@@ -222,36 +228,34 @@ const Login = () => {
                 }
                 style={styles.forgotWrap}
               >
-                <Text style={styles.forgotText}>Forgot Password?</Text>
+                <Text style={styles.forgotText}>Forgot?</Text>
               </TouchableOpacity>
+            </Animated.View>
 
+            <View style={styles.footer}>
               <TouchableOpacity
                 onPress={handleLogin}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
                 disabled={isSubmitting || !email.trim() || !password.trim()}
-                style={styles.primaryBtn}
+                style={styles.ctaPrimary}
               >
                 {isSubmitting ? (
-                  <ActivityIndicator size="small" color={AppColors.white} />
+                  <ActivityIndicator size="small" color={LOGIN.dark} />
                 ) : (
-                  <Text style={styles.primaryBtnText}>Login</Text>
+                  <Text style={styles.ctaPrimaryText}>SIGN IN</Text>
                 )}
               </TouchableOpacity>
 
-              <View style={styles.dividerWrap}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or</Text>
-                <View style={styles.dividerLine} />
+              <View style={styles.signUpRow}>
+                <Text style={styles.signUpLabel}>Don't have an account? </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/register')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.signUpLink}>Create one Now!</Text>
+                </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                onPress={() => router.push('/register')}
-                style={styles.ghostBtn}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.ghostBtnText}>Create an account</Text>
-              </TouchableOpacity>
-            </Animated.View>
+            </View>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -262,148 +266,202 @@ const Login = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: AppColors.primary,
+    backgroundColor: LOGIN.bg,
   },
-  header: {
-    backgroundColor: AppColors.primary,
-    paddingTop: Platform.OS === 'ios' ? 56 : 40,
+  cover: {
+    paddingTop: Platform.OS === 'ios' ? 56 : 44,
     paddingHorizontal: 24,
-    paddingBottom: 28,
+    paddingBottom: 32,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
   },
-  backButton: {
+  shape1: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 56 : 40,
-    left: 20,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    top: 50,
+    right: -24,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,204,62,0.18)',
   },
-  headerContent: {
-    alignItems: 'center',
-    paddingTop: 24,
+  shape2: {
+    position: 'absolute',
+    top: 100,
+    right: 60,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,204,62,0.35)',
+    transform: [{ rotate: '15deg' }],
   },
-  logoCircle: {
+  shape3: {
+    position: 'absolute',
+    bottom: 20,
+    left: -20,
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: AppColors.white,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: LOGIN.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  brandName: {
-    fontSize: 32,
+  coverContent: {
+    alignItems: 'center',
+  },
+  coverIconWrap: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: LOGIN.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  badgeIcon: {
+    marginRight: 6,
+  },
+  badgeText: {
+    color: LOGIN.white,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  coverTitle: {
+    color: LOGIN.white,
+    fontSize: 28,
     fontWeight: '900',
-    color: AppColors.accent,
     letterSpacing: 0.5,
   },
-  tagline: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.95)',
-    marginTop: 6,
+  coverSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
     fontWeight: '600',
-    letterSpacing: 1.2,
+    marginTop: 4,
   },
-  bottomSection: {
+  main: {
     flex: 1,
-    backgroundColor: AppColors.white,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
+    backgroundColor: LOGIN.bg,
   },
-  scrollView: {
+  scroll: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 32,
+    paddingTop: 24,
+    paddingBottom: 40,
   },
   card: {
-    paddingBottom: 8,
+    backgroundColor: LOGIN.card,
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    marginBottom: 20,
+    shadowColor: LOGIN.dark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  inputContainer: {
+  inputRow: {
     marginBottom: 14,
   },
-  inputWrapper: {
+  inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: AppColors.white,
-    borderRadius: 14,
+    backgroundColor: LOGIN.inputBg,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: AppColors.lightGrey,
-    height: 52,
+    height: 54,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  inputWrapperFocused: {
-    borderColor: AppColors.primary,
-    backgroundColor: AppColors.white,
+  inputWrapFocused: {
+    borderColor: LOGIN.dark,
+    backgroundColor: LOGIN.white,
   },
   input: {
     flex: 1,
-    color: AppColors.darkGrey,
-    fontSize: 15,
-    fontWeight: '600',
+    color: LOGIN.dark,
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 12,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
-  eyeIcon: {
-    padding: 6,
+  inputIcon: {},
+  eyeBtn: {
+    padding: 8,
   },
   forgotWrap: {
     alignSelf: 'flex-end',
-    marginBottom: 18,
+    marginTop: 4,
   },
   forgotText: {
-    color: AppColors.primary,
+    color: LOGIN.dark,
     fontSize: 14,
-    fontWeight: '700',
-  },
-  primaryBtn: {
-    backgroundColor: AppColors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  primaryBtnText: {
-    color: AppColors.white,
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  dividerWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: AppColors.lightGrey,
-  },
-  dividerText: {
-    marginHorizontal: 14,
-    fontSize: 13,
-    color: AppColors.grey,
     fontWeight: '600',
   },
-  ghostBtn: {
-    backgroundColor: AppColors.white,
-    borderWidth: 2,
-    borderColor: AppColors.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
+  footer: {
+    backgroundColor: LOGIN.dark,
+    marginHorizontal: -24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     alignItems: 'center',
   },
-  ghostBtnText: {
-    color: AppColors.primary,
+  ctaPrimary: {
+    backgroundColor: LOGIN.accent,
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 54,
+  },
+  ctaPrimaryText: {
+    color: LOGIN.dark,
     fontWeight: '800',
-    fontSize: 16,
+    fontSize: 17,
+    letterSpacing: 0.5,
+  },
+  signUpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+    flexWrap: 'wrap',
+  },
+  signUpLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  signUpLink: {
+    color: LOGIN.accent,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
 

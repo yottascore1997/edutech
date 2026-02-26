@@ -368,6 +368,7 @@ const MyExamsScreen = () => {
                         tintColor="#7C3AED"
                     />
                 }
+                contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
             >
                 {/* Overview Stats */}
                 {totalExams > 0 && (
@@ -474,7 +475,7 @@ const MyExamsScreen = () => {
                     )}
                 </View>
 
-                <View style={{ height: 30 }} />
+                <View style={{ height: insets.bottom + 16 }} />
             </ScrollView>
 
             {/* Details Modal */}

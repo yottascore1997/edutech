@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import BookListingForm from '@/components/BookListingForm';
 
 interface Book {
   id: string;
@@ -56,6 +57,7 @@ const MyListingsScreen = () => {
     rented: 0,
     inactive: 0
   });
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     fetchMyListings();
@@ -81,6 +83,16 @@ const MyListingsScreen = () => {
     setRefreshing(true);
     await fetchMyListings();
     setRefreshing(false);
+  };
+
+  const handleCreateListing = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleFormSuccess = () => {
+    setShowCreateModal(false);
+    fetchMyListings();
+    // optional: show success toast/alert
   };
 
   const getListingTypeColor = (type: string) => {
@@ -234,6 +246,19 @@ const MyListingsScreen = () => {
           ))
         )}
       </ScrollView>
+      
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={handleCreateListing}
+      >
+        <Ionicons name="add" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      <BookListingForm
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={handleFormSuccess}
+      />
     </View>
   );
 };
@@ -500,6 +525,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FF8C00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });
 
