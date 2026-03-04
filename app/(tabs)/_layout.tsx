@@ -178,6 +178,20 @@ function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="live-quiz-categories"
+        options={{
+          title: 'Live Quiz Categories',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="live-quiz-play"
+        options={{
+          title: 'Live Quiz Play',
+          href: null,
+        }}
+      />
       </Tabs>
     </View>
   );

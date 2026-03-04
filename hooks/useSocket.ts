@@ -26,7 +26,12 @@ let socketInstance: Socket<ServerToClientEvents, ClientToServerEvents> | null = 
 // For React Native development, use your computer's IP address instead of localhost
 const SOCKET_SERVER_URL = WEBSOCKET_CONFIG.SERVER_URL;
 
-export const useSocket = () => {
+type UseSocketOptions = {
+  token?: string | null;
+  userId?: string | null;
+};
+
+export const useSocket = (options: UseSocketOptions = {}) => {
   const [socket, setSocket] = useState<typeof socketInstance>(null);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -34,37 +39,48 @@ export const useSocket = () => {
     if (!socketInstance) {
       console.log('🔌 Initializing socket connection to:', SOCKET_SERVER_URL);
       socketInstance = io(SOCKET_SERVER_URL, {
-        transports: ['websocket', 'polling'],
+        ...(WEBSOCKET_CONFIG.CONNECTION_OPTIONS as object),
+        auth: options.token
+          ? { token: options.token, ...(options.userId ? { userId: options.userId } : {}) }
+          : undefined,
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         timeout: 20000,
-      });
+      } as any);
+    } else if (options.token && (socketInstance as any).auth?.token !== options.token) {
+      (socketInstance as any).auth = {
+        token: options.token,
+        ...(options.userId ? { userId: options.userId } : {}),
+      };
+      if (!socketInstance.connected) socketInstance.connect();
     }
 
     setSocket(socketInstance);
 
-    socketInstance.on('connect', () => {
-      console.log('✅ Socket connected to:', SOCKET_SERVER_URL);
+    const onConnect = () => {
       setIsConnected(true);
-    });
-
-    socketInstance.on('disconnect', () => {
-      console.log('❌ Socket disconnected from:', SOCKET_SERVER_URL);
+    };
+    const onDisconnect = () => {
       setIsConnected(false);
-    });
-
-    socketInstance.on('connect_error', (error) => {
-      // Silently handle connection errors - no console logging
-      // console.error('🔌 Socket connection error:', error);
+    };
+    const onError = () => {
       setIsConnected(false);
-    });
+    };
+
+    socketInstance.on('connect', onConnect);
+    socketInstance.on('disconnect', onDisconnect);
+    socketInstance.on('connect_error', onError);
 
     return () => {
-      // Don't disconnect here as we want to keep the connection alive
-      // socketInstance?.disconnect();
+      if (socketInstance) {
+        socketInstance.off('connect', onConnect);
+        socketInstance.off('disconnect', onDisconnect);
+        socketInstance.off('connect_error', onError);
+      }
     };
-  }, []);
+  }, [options.token, options.userId]);
 
   return { socket, isConnected };
 };

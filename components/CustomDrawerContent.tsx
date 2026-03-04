@@ -91,6 +91,18 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
     };
 
+    const navigateToLiveQuiz = () => {
+        setActiveMenu('live-quiz');
+        try {
+            navigation.navigate('(tabs)', { screen: 'live-quiz-categories' });
+        } catch {
+            try {
+                router.push('/(tabs)/live-quiz-categories');
+            } catch {}
+        }
+        navigation.closeDrawer();
+    };
+
     const navigateToMessages = () => {
         setActiveMenu('messages');
         navigation.navigate('(tabs)', { screen: 'messages' });
@@ -299,6 +311,15 @@ const CustomDrawerContent = (props: any) => {
                                 isDarkMode={isDarkMode}
                                 iconColor="#96CEB4"
                                 iconImage={require('../assets/images/icons/quiz.png')}
+                            />
+
+                            <MenuItem 
+                                icon="flash-outline" 
+                                label="Khelo Quiz (Live)" 
+                                onPress={navigateToLiveQuiz}
+                                isActive={activeMenu === 'live-quiz'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#F97316"
                             />
                             
                             {/* My Profile - Temporarily hidden */}

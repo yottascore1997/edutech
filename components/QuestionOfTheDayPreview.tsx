@@ -654,7 +654,8 @@ const QuestionOfTheDayPreview = () => {
 
 const styles = StyleSheet.create({
     previewContainer: {
-        margin: 12,
+        marginVertical: 12,
+        marginHorizontal: 6,
         borderRadius: 24,
         shadowColor: '#EA580C',
         shadowOffset: {

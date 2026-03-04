@@ -1,4 +1,5 @@
 import { apiFetchAuth } from '@/constants/api';
+import QuestionOfTheDayPreview from '@/components/QuestionOfTheDayPreview';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +9,9 @@ import {
     Brain,
     CheckCircle,
     Clock,
+    Crown,
     Map,
+    MoreVertical,
     TestTube,
     Trophy,
     Users,
@@ -652,26 +655,28 @@ export default function QuizScreen() {
   if (loading) {
     return (
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={['#1e1b4b', '#312e81', '#4c1d95']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.loadingContainer}
       >
         <StatusBar barStyle="light-content" />
         <View style={styles.loadingContent}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.loadingIcon,
-              { 
+              {
                 transform: [
                   { scale: pulseAnim },
                   { translateY: floatingAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0, -5],
+                    outputRange: [0, -6],
                   })}
                 ]
               }
             ]}
           >
-            <Zap size={48} color="#fff" />
+            <Zap size={52} color="#C4B5FD" />
           </Animated.View>
           <Text style={styles.loadingText}>Loading Battle Arena...</Text>
         </View>
@@ -681,7 +686,7 @@ export default function QuizScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       
       <ScrollView
         style={styles.scrollView}
@@ -690,8 +695,8 @@ export default function QuizScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor="#4F46E5"
-            colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
+            tintColor="#5B21B6"
+            colors={['#5B21B6', '#7C3AED']}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -713,571 +718,157 @@ export default function QuizScreen() {
             }
           ]}
         >
-                     {/* Enhanced Battle Arena Section with Header Background */}
-           <View style={styles.battleArenaSection}>
-                           <LinearGradient
-                colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.battleArenaGradient}
-              >
-               {/* Animated Background Pattern */}
-               <View style={styles.backgroundPattern}>
-                 <Animated.View 
-                   style={[
-                     styles.patternCircle1,
-                     {
-                       transform: [
-                         { scale: pulseAnim },
-                         { translateX: floatingAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [0, 10],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-                 <Animated.View 
-                   style={[
-                     styles.patternCircle2,
-                     {
-                       transform: [
-                         { scale: pulseAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [1, 1.1],
-                         })},
-                         { translateY: floatingAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [0, -15],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-                 <Animated.View 
-                   style={[
-                     styles.patternCircle3,
-                     {
-                       transform: [
-                         { rotate: iconRotateAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: ['0deg', '360deg'],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-                 <View style={styles.patternDots} />
-                 
-                 {/* Animated Sparkles */}
-                 <Animated.View 
-                   style={[
-                     styles.sparkle1,
-                     {
-                       opacity: sparkleAnim,
-                       transform: [
-                         { scale: sparkleAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [0.5, 1.2],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-                 <Animated.View 
-                   style={[
-                     styles.sparkle2,
-                     {
-                       opacity: sparkleAnim.interpolate({
-                         inputRange: [0, 1],
-                         outputRange: [0.3, 0.8],
-                       }),
-                       transform: [
-                         { scale: sparkleAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [0.8, 1.5],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-                 <Animated.View 
-                   style={[
-                     styles.sparkle3,
-                     {
-                       opacity: sparkleAnim.interpolate({
-                         inputRange: [0, 1],
-                         outputRange: [0.5, 1],
-                       }),
-                       transform: [
-                         { scale: sparkleAnim.interpolate({
-                           inputRange: [0, 1],
-                           outputRange: [1, 0.7],
-                         })}
-                       ]
-                     }
-                   ]} 
-                 />
-               </View>
-               
-               <View style={styles.battleArenaContent}>
-                 <View style={styles.battleArenaLeft}>
-                   <Animated.View 
-                     style={[
-                       styles.titleContainer,
-                       {
-                         transform: [
-                           { translateY: slideAnim.interpolate({
-                             inputRange: [0, 1],
-                             outputRange: [20, 0],
-                           })}
-                         ]
-                       }
-                     ]}
-                   >
-                     <Text style={styles.battleArenaTitle} numberOfLines={1}>BATTLE ARENA</Text>
-                     <Text style={styles.battleArenaSubtitle} numberOfLines={2}>Challenge other players in real-time battle</Text>
-                   </Animated.View>
-                 </View>
-                 
-                 <View style={styles.battleArenaRight}>
-                   <Animated.View 
-                     style={[
-                       styles.imageContainer,
-                       {
-                         transform: [
-                           { scale: cardScaleAnim },
-                           { translateY: floatingAnim.interpolate({
-                             inputRange: [0, 1],
-                             outputRange: [0, -8],
-                           })}
-                         ]
-                       }
-                     ]}
-                   >
-                     <Image
-                       source={require('../../assets/images/icons/p-bat-bg1.png')}
-                       style={styles.battleArenaImage}
-                       resizeMode="contain"
-                     />
-                     
-                     {/* Glow Effect */}
-                     <Animated.View 
-                       style={[
-                         styles.imageGlow,
-                         {
-                           opacity: glowAnim,
-                           transform: [
-                             { scale: glowAnim.interpolate({
-                               inputRange: [0, 1],
-                               outputRange: [0.8, 1.2],
-                             })}
-                           ]
-                         }
-                       ]} 
-                     />
-                   </Animated.View>
-                 </View>
-               </View>
-             </LinearGradient>
-                       </View>
-
-           {/* Enhanced Category Selection */}
-          <View style={styles.section}>
+          {/* Daily Task style card - reference design */}
+          <View style={styles.dailyTaskCard}>
             <LinearGradient
-              colors={['#FFFFFF', '#F8FAFF', '#F0F4FF']}
+              colors={['#F9A8D4', '#FBCFE8']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.categorySectionBackground}
+              style={styles.dailyTaskGradient}
             >
-              {/* Premium Header */}
-              <View style={styles.premiumSectionHeader}>
-                <LinearGradient
-                  colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.premiumHeaderGradient}
+              <View style={styles.dailyTaskLeft}>
+                <View style={styles.dailyTaskIconWrap}>
+                  <Trophy size={36} color="#1A1A32" />
+                </View>
+              </View>
+              <View style={styles.dailyTaskCenter}>
+                <Text style={styles.dailyTaskTitle}>Battle Quiz</Text>
+                <View style={styles.progressRow}>
+                  <Text style={styles.progressLabel}>Progress</Text>
+                  <Text style={styles.progressCount}>
+                    {selectedCategory ? '1' : '0'}/{questionCategories.length || 5}
+                  </Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${Math.min(100, ((selectedCategory ? 1 : 0) / Math.max(1, questionCategories.length)) * 100)}%` }]} />
+                </View>
+              </View>
+              <TouchableOpacity style={styles.dailyTaskMenu} onPress={() => {}}>
+                <MoreVertical size={20} color="#1A1A32" />
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+
+          {/* Quiz section - horizontal category circles */}
+          <View style={styles.section}>
+            <View style={styles.sectionRow}>
+              <Text style={styles.refSectionTitle}>Quiz</Text>
+              <TouchableOpacity onPress={() => {}}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quizScrollContent}
+            >
+              {questionCategories.slice(0, 5).map((category, index) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.quizCircleWrap, selectedCategory === category.id && styles.quizCircleWrapActive]}
+                  onPress={() => handleCategoryPress(category)}
+                  activeOpacity={0.8}
                 >
-                  <View style={styles.premiumIconWrapper}>
-                    <Trophy size={20} color="#FFD700" />
+                  <View style={styles.quizCircle}>
+                    {renderCategoryIcon(category.name, 28, '#7C3AED', index)}
                   </View>
-                  <View style={styles.premiumHeaderText}>
-                    <Text style={styles.premiumSectionTitle}>Select Your Battle Category</Text>
+                  <Text style={styles.quizCircleLabel} numberOfLines={1}>{category.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* More Games - two white cards */}
+          <View style={styles.section}>
+            <View style={styles.sectionRow}>
+              <Text style={styles.refSectionTitle}>More Games</Text>
+              <TouchableOpacity onPress={() => {}}>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.moreGamesRow}>
+              <TouchableOpacity
+                style={styles.moreGameCard}
+                onPress={handleQuickMatch}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#FF9F00', '#FFC107']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.moreGameCardInner}
+                >
+                  <View style={styles.moreGameIconWrap}>
+                    <Trophy size={32} color="#1F2937" />
+                  </View>
+                  <Text style={styles.moreGameTitle}>Battle Quiz</Text>
+                  <View style={styles.moreGameStats}>
+                    <View style={styles.moreGameStat}>
+                      <Crown size={16} color="#F59E0B" />
+                      <Text style={styles.moreGameStatText}>1.2K</Text>
+                    </View>
+                    <View style={styles.moreGameStat}>
+                      <Zap size={16} color="#F59E0B" />
+                      <View style={styles.energyBarBg}>
+                        <View style={styles.energyBarFill} />
+                      </View>
+                    </View>
                   </View>
                 </LinearGradient>
-              </View>
-              
-              <View style={styles.premiumCategoryContent}>
-              <View style={styles.categoryGrid}>
-                {/* Large Category Card - Left Side */}
-                <View style={styles.largeCategoryContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.largeCategoryCard,
-                      selectedCategory === questionCategories[0]?.id && styles.selectedCategoryCard
-                    ]}
-                    onPress={() => questionCategories[0] && handleCategoryPress(questionCategories[0])}
-                    activeOpacity={0.7}
-                  >
-                    <LinearGradient
-                      colors={getGradientColors(questionCategories[0]?.color || '#6366F1')}
-                      style={[
-                        styles.largeCategoryContent,
-                        selectedCategory === questionCategories[0]?.id && styles.selectedCategoryContent
-                      ]}
-                    >
-                                             <Animated.View 
-                         style={[
-                           styles.largeCategoryIcon,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim }
-                             ]
-                           }
-                         ]}
-                       >
-                        {renderCategoryIcon(questionCategories[0]?.name || '', 40, '#fff', 0)}
-                      </Animated.View>
-                      <Text style={[
-                        styles.largeCategoryName,
-                        selectedCategory === questionCategories[0]?.id && styles.selectedCategoryText
-                      ]}>
-                        {questionCategories[0]?.name || 'Any Category'}
-                      </Text>
-                      <Text style={styles.largeCategoryDescription}>
-                        {questionCategories[0]?.questionCount || 0} questions
-                      </Text>
-                    </LinearGradient>
-                    {selectedCategory === questionCategories[0]?.id && (
-                      <View style={styles.selectedIndicator}>
-                        <CheckCircle size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.moreGameCard}
+                onPress={() => router.push('/(tabs)/live-quiz-categories' as any)}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#29B6F6', '#4FC3F7']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.moreGameCardInner}
+                >
+                  <View style={styles.moreGameIconWrap}>
+                    <Map size={32} color="#0B1120" />
+                  </View>
+                  <Text style={styles.moreGameTitle}>Live Quiz</Text>
+                  <View style={styles.moreGameStats}>
+                    <View style={styles.moreGameStat}>
+                      <Crown size={16} color="#F59E0B" />
+                      <Text style={styles.moreGameStatText}>12.5K</Text>
+                    </View>
+                    <View style={styles.moreGameStat}>
+                      <Zap size={16} color="#F59E0B" />
+                      <View style={styles.energyBarBg}>
+                        <View style={styles.energyBarFill} />
                       </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                {/* Small Category Cards - Right Side */}
-                <View style={styles.smallCategoriesContainer}>
-                  {/* Top Row - 2 Cards */}
-                  <View style={styles.smallCategoriesRow}>
-                    {questionCategories.slice(1, 3).map((category, index) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={[
-                          styles.smallCategoryCard,
-                          selectedCategory === category.id && styles.selectedCategoryCard
-                        ]}
-                        onPress={() => handleCategoryPress(category)}
-                        activeOpacity={0.7}
-                      >
-                        <LinearGradient
-                          colors={getGradientColors(category.color)}
-                          style={[
-                            styles.smallCategoryContent,
-                            selectedCategory === category.id && styles.selectedCategoryContent
-                          ]}
-                        >
-                          <Animated.View 
-                            style={[
-                              styles.smallCategoryIcon,
-                              {
-                                transform: [
-                                  { scale: iconBounceAnim }
-                                ]
-                              }
-                            ]}
-                          >
-                            {renderCategoryIcon(category.name, 24, '#fff', index + 1)}
-                          </Animated.View>
-                          <Text style={[
-                            styles.smallCategoryName,
-                            selectedCategory === category.id && styles.selectedCategoryText
-                          ]}>
-                            {category.name}
-                          </Text>
-                        </LinearGradient>
-                        {selectedCategory === category.id && (
-                          <View style={styles.selectedIndicator}>
-                            <CheckCircle size={16} color="#fff" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                    </View>
                   </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
 
-                  {/* Bottom Row - 2 Cards */}
-                  <View style={styles.smallCategoriesRow}>
-                    {questionCategories.slice(3, 5).map((category, index) => (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={[
-                          styles.smallCategoryCard,
-                          selectedCategory === category.id && styles.selectedCategoryCard
-                        ]}
-                        onPress={() => handleCategoryPress(category)}
-                        activeOpacity={0.7}
-                      >
-                        <LinearGradient
-                          colors={getGradientColors(category.color)}
-                          style={[
-                            styles.smallCategoryContent,
-                            selectedCategory === category.id && styles.selectedCategoryContent
-                          ]}
-                        >
-                          <Animated.View 
-                            style={[
-                              styles.smallCategoryIcon,
-                              {
-                                transform: [
-                                  { scale: iconBounceAnim }
-                                ]
-                              }
-                            ]}
-                          >
-                            {renderCategoryIcon(category.name, 24, '#fff', index + 3)}
-                          </Animated.View>
-                          <Text style={[
-                            styles.smallCategoryName,
-                            selectedCategory === category.id && styles.selectedCategoryText
-                          ]}>
-                            {category.name}
-                          </Text>
-                        </LinearGradient>
-                        {selectedCategory === category.id && (
-                          <View style={styles.selectedIndicator}>
-                            <CheckCircle size={16} color="#fff" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </View>
-              </View>
+          {/* Question of the Day - below More Games */}
+          <QuestionOfTheDayPreview />
 
-                             {/* Main Action Button */}
-               <Animated.View 
-                 style={[
-                   styles.mainActionButton,
-                   {
-                     transform: [
-                       { scale: buttonPulseAnim },
-                       { translateY: floatingAnim.interpolate({
-                         inputRange: [0, 1],
-                         outputRange: [0, -2],
-                       })}
-                     ]
-                   }
-                 ]}
-               >
-                 <TouchableOpacity
-                   onPress={handleQuickMatch}
-                   activeOpacity={0.8}
-                 >
-                   <LinearGradient
-                     colors={['#4F46E5', '#7C3AED', '#8B5CF6']}
-                     start={{ x: 0, y: 0 }}
-                     end={{ x: 1, y: 1 }}
-                     style={styles.mainActionButtonGradient}
-                   >
-                     {/* Animated Glow Effect */}
-                     <Animated.View 
-                       style={[
-                         styles.buttonGlow,
-                         {
-                           opacity: glowAnim,
-                           transform: [
-                             { scale: glowAnim.interpolate({
-                               inputRange: [0, 1],
-                               outputRange: [0.8, 1.2],
-                             })}
-                           ]
-                         }
-                       ]} 
-                     />
-                     
-                     {/* Animated Sparkles */}
-                     <Animated.View 
-                       style={[
-                         styles.buttonSparkle1,
-                         {
-                           opacity: sparkleAnim,
-                           transform: [
-                             { scale: sparkleAnim.interpolate({
-                               inputRange: [0, 1],
-                               outputRange: [0.5, 1.2],
-                             })}
-                           ]
-                         }
-                       ]} 
-                     />
-                     <Animated.View 
-                       style={[
-                         styles.buttonSparkle2,
-                         {
-                           opacity: sparkleAnim.interpolate({
-                             inputRange: [0, 1],
-                             outputRange: [0.3, 0.8],
-                           }),
-                           transform: [
-                             { scale: sparkleAnim.interpolate({
-                               inputRange: [0, 1],
-                               outputRange: [0.8, 1.5],
-                             })}
-                           ]
-                         }
-                       ]} 
-                     />
-                     
-                     {/* Main Content */}
-                     <View style={styles.buttonContent}>
-                       <Animated.View 
-                         style={[
-                           styles.buttonIconContainer,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim },
-                               { rotate: iconRotateAnim.interpolate({
-                                 inputRange: [0, 1],
-                                 outputRange: ['0deg', '360deg'],
-                               })}
-                             ]
-                           }
-                         ]}
-                       >
-                         <Zap size={24} color="#fff" />
-                       </Animated.View>
-                       <Text style={styles.mainActionButtonText}>Start Battle</Text>
-                       <Animated.View 
-                         style={[
-                           styles.buttonArrowContainer,
-                           {
-                             transform: [
-                               { scale: iconBounceAnim },
-                               { translateX: floatingAnim.interpolate({
-                                 inputRange: [0, 1],
-                                 outputRange: [0, 5],
-                               })}
-                             ]
-                           }
-                         ]}
-                       >
-                         <ArrowRight size={24} color="#fff" />
-                       </Animated.View>
-                     </View>
-                   </LinearGradient>
-                 </TouchableOpacity>
-               </Animated.View>
+          {/* Start Battle CTA - keep for quick access */}
+          <TouchableOpacity
+            style={styles.startBattleCta}
+            onPress={handleQuickMatch}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#7C3AED', '#5B21B6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.startBattleCtaGradient}
+            >
+              <Zap size={22} color="#fff" />
+              <Text style={styles.startBattleCtaText}>Start Battle</Text>
+              <ArrowRight size={20} color="#fff" />
             </LinearGradient>
-
-            {/* Premium Info Cards Section */}
-            <View style={styles.section}>
-              <View style={styles.infoCardsContainer}>
-                <View style={styles.infoCard}>
-                  <LinearGradient
-                    colors={['#EEF2FF', '#E0E7FF']}
-                    style={styles.infoCardGradient}
-                  >
-                    <View style={styles.infoCardIconWrapper}>
-                      <Trophy size={24} color="#4F46E5" />
-                    </View>
-                    <Text style={styles.infoCardTitle}>Win Big</Text>
-                    <Text style={styles.infoCardDescription}>Compete and earn rewards up to ₹10,000</Text>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.infoCard}>
-                  <LinearGradient
-                    colors={['#F0FDF4', '#DCFCE7']}
-                    style={styles.infoCardGradient}
-                  >
-                    <View style={styles.infoCardIconWrapper}>
-                      <Zap size={24} color="#10B981" />
-                    </View>
-                    <Text style={styles.infoCardTitle}>Quick Match</Text>
-                    <Text style={styles.infoCardDescription}>Find opponents in just 30 seconds</Text>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.infoCard}>
-                  <LinearGradient
-                    colors={['#FEF3C7', '#FDE68A']}
-                    style={styles.infoCardGradient}
-                  >
-                    <View style={styles.infoCardIconWrapper}>
-                      <Users size={24} color="#F59E0B" />
-                    </View>
-                    <Text style={styles.infoCardTitle}>Live Players</Text>
-                    <Text style={styles.infoCardDescription}>Join 1.2k+ active players now</Text>
-                  </LinearGradient>
-                </View>
-              </View>
-            </View>
-
-                       {/* Enhanced Stats Section */}
-            <View style={styles.section}>
-              <View style={styles.enhancedStatsRow}>
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(255, 107, 107, 0.1)', 'rgba(255, 107, 107, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                    <View style={styles.enhancedStatIconContainer}>
-                      <LinearGradient
-                        colors={['rgba(255, 107, 107, 0.2)', 'rgba(255, 107, 107, 0.1)']}
-                        style={styles.enhancedStatIconGradient}
-                      >
-                        <Clock size={20} color="#FF6B6B" />
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>~30s</Text>
-                      <Text style={styles.enhancedStatLabel}>Wait Time</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(78, 205, 196, 0.1)', 'rgba(78, 205, 196, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                    <View style={styles.enhancedStatIconContainer}>
-                      <LinearGradient
-                        colors={['rgba(78, 205, 196, 0.2)', 'rgba(78, 205, 196, 0.1)']}
-                        style={styles.enhancedStatIconGradient}
-                      >
-                        <Users size={20} color="#4ECDC4" />
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>1.2k</Text>
-                      <Text style={styles.enhancedStatLabel}>Online</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-                
-                <View style={styles.enhancedStatCard}>
-                  <LinearGradient
-                    colors={['rgba(255, 217, 61, 0.1)', 'rgba(255, 217, 61, 0.05)']}
-                    style={styles.enhancedStatGradient}
-                  >
-                    <View style={styles.enhancedStatIconContainer}>
-                      <LinearGradient
-                        colors={['rgba(255, 217, 61, 0.2)', 'rgba(255, 217, 61, 0.1)']}
-                        style={styles.enhancedStatIconGradient}
-                      >
-                        <Trophy size={20} color="#FFD93D" />
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.enhancedStatContent}>
-                      <Text style={styles.enhancedStatValue}>50</Text>
-                      <Text style={styles.enhancedStatLabel}>High Rewards</Text>
-                    </View>
-                  </LinearGradient>
-                </View>
-              </View>
-            </View>
+          </TouchableOpacity>
 
             {/* TEMPORARILY COMMENTED OUT - Private Room and Join Section 
             <View style={styles.section}>
@@ -1347,7 +938,6 @@ export default function QuizScreen() {
               </LinearGradient>
             </View>
             */}
-          </View>
         </Animated.View>
       </ScrollView>
 
@@ -1370,7 +960,7 @@ export default function QuizScreen() {
                  ]}
                >
               <LinearGradient
-                  colors={['#06b6d4', '#7C3AED']}
+                  colors={['#1e1b4b', '#4c1d95', '#5b21b6']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modalGradientBackground}
@@ -1381,7 +971,7 @@ export default function QuizScreen() {
                   <View style={styles.compactHeader}>
                     <Text style={styles.compactTitle}>Choose Battle Amount</Text>
                     <TouchableOpacity onPress={closeAmountModal} style={styles.compactClose}>
-                      <X size={16} color="#fff" />
+                      <X size={20} color="rgba(255,255,255,0.9)" />
                     </TouchableOpacity>
                   </View>
 
@@ -1389,7 +979,7 @@ export default function QuizScreen() {
 
                   {loadingAmounts ? (
                     <View style={styles.compactLoading}>
-                      <Zap size={18} color="#fff" />
+                      <Zap size={20} color="#C4B5FD" />
                       <Text style={styles.compactLoadingText}>Loading amounts...</Text>
                     </View>
                   ) : (
@@ -1413,7 +1003,7 @@ export default function QuizScreen() {
                       <Text style={styles.compactJoinAmount}>₹{selectedAmount ? selectedAmount.amount : '—'}</Text>
                     </View>
                     <TouchableOpacity style={[styles.compactCTA, !selectedAmount && styles.compactCTADisabled]} onPress={handlePlayNow} disabled={!selectedAmount}>
-                      <LinearGradient colors={['#FFD166', '#F59E0B']} style={styles.compactCTAInner}>
+                      <LinearGradient colors={['#F59E0B', '#D97706']} style={styles.compactCTAInner}>
                         <Text style={styles.compactCTAText}>Start Battle</Text>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -1433,16 +1023,16 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F8FF',
+    backgroundColor: '#EDE9FE',
     paddingBottom: 0,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 96,
-    paddingTop: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+    paddingTop: 16,
     width: '100%',
   },
   content: {
@@ -1450,8 +1040,226 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 24,
     width: '100%',
+  },
+  // Reference design - Daily Task & Quiz & More Games
+  dailyTaskCard: {
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  dailyTaskGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 18,
+    minHeight: 120,
+  },
+  dailyTaskLeft: {
+    marginRight: 16,
+  },
+  dailyTaskIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  dailyTaskCenter: {
+    flex: 1,
+  },
+  dailyTaskTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  dailyTaskSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  progressCount: {
+    fontSize: 12,
+    color: '#1F2937',
+    fontWeight: '700',
+  },
+  progressBarBg: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(124, 58, 237, 0.35)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
+  },
+  dailyTaskMenu: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  refSectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1F2937',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  quizScrollContent: {
+    paddingRight: 20,
+    gap: 16,
+    flexDirection: 'row',
+  },
+  quizCircleWrap: {
+    alignItems: 'center',
+    width: 72,
+  },
+  quizCircleWrapActive: {
+    opacity: 1,
+  },
+  quizCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: '#8B5CF6',
+    borderWidth: 2,
+    borderColor: '#A78BFA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  quizCircleLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+  },
+  moreGamesRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  moreGameCard: {
+    flex: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 5,
+    borderWidth: 0,
+  },
+  moreGameCardInner: {
+    flex: 1,
+    padding: 16,
+  },
+  moreGameIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  moreGameTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  moreGameSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  moreGameStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  moreGameStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  moreGameStatText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#374151',
+  },
+  energyBarBg: {
+    width: 40,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FED7AA',
+    overflow: 'hidden',
+  },
+  energyBarFill: {
+    width: '60%',
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: '#F59E0B',
+  },
+  startBattleCta: {
+    marginTop: 24,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#5B21B6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  startBattleCtaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  startBattleCtaText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   sectionHeader: {
     marginBottom: 24,
@@ -1534,7 +1342,7 @@ const styles = StyleSheet.create({
   categoryGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 14,
     marginTop: 0,
     width: '100%',
     alignSelf: 'stretch',
@@ -1563,14 +1371,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   selectedCategoryCard: {
-    borderColor: '#FFD700',
-    borderWidth: 4,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    elevation: 16,
-    transform: [{ scale: 1.05 }],
+    borderColor: '#FBBF24',
+    borderWidth: 3,
+    shadowColor: '#FBBF24',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 14,
+    transform: [{ scale: 1.02 }],
   },
   categoryContent: {
     padding: 16,
@@ -1632,37 +1440,36 @@ const styles = StyleSheet.create({
   mainActionButton: {
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 28,
-    elevation: 16,
+    borderWidth: 0,
+    shadowColor: '#5B21B6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
     marginTop: 24,
     position: 'relative',
   },
-     mainActionButtonGradient: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'center',
-     paddingVertical: 20,
-     paddingHorizontal: 32,
-     minHeight: 70,
-     position: 'relative',
-     borderWidth: 2,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
-     borderRadius: 24,
-   },
+  mainActionButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 36,
+    minHeight: 68,
+    position: 'relative',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 24,
+  },
   mainActionButtonText: {
     color: '#fff',
     fontSize: 20,
     fontWeight: '900',
-    marginHorizontal: 14,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 6,
-    letterSpacing: 1,
+    marginHorizontal: 16,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+    letterSpacing: 1.2,
   },
   privateRoomContainer: {
     borderRadius: 16,
@@ -1849,16 +1656,15 @@ const styles = StyleSheet.create({
   infoCard: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 6,
+    borderRadius: 18,
+    padding: 20,
+    marginHorizontal: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 0,
   },
   infoCardIcon: {
     width: 56,
@@ -1882,14 +1688,13 @@ const styles = StyleSheet.create({
   },
   largeCategoryContainer: {
     width: '48%',
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 0,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
     position: 'relative',
@@ -1897,17 +1702,17 @@ const styles = StyleSheet.create({
   },
   largeCategoryCard: {
     width: '100%',
-    height: 220,
+    height: 228,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    borderRadius: 28,
+    borderRadius: 26,
     overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#4F46E5',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -1918,97 +1723,101 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 28,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 26,
   },
-     largeCategoryIcon: {
-     width: 100,
-     height: 100,
-     borderRadius: 50,
-     justifyContent: 'center',
-     alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.35)',
-     marginBottom: 18,
-     borderWidth: 4,
-     borderColor: 'rgba(255, 255, 255, 0.8)',
-     overflow: 'hidden',
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 8 },
-     shadowOpacity: 0.4,
-     shadowRadius: 16,
-     elevation: 12,
-   },
+  largeCategoryIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    marginBottom: 14,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.75)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+  },
   largeCategoryName: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '900',
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 3 },
+    marginBottom: 6,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
+  },
+  largeCategoryDescription: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.82)',
+    textAlign: 'center',
   },
   smallCategoriesContainer: {
     width: '48%',
-    gap: 10,
+    gap: 12,
     flexShrink: 0,
   },
   smallCategoriesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   smallCategoryCard: {
     width: '48%',
-    borderRadius: 24,
+    borderRadius: 18,
     overflow: 'hidden',
     marginBottom: 0,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
     position: 'relative',
   },
   smallCategoryContent: {
     width: '100%',
-    height: 110,
+    height: 106,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 24,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 22,
   },
-     smallCategoryIcon: {
-     width: 56,
-     height: 56,
-     borderRadius: 28,
-     justifyContent: 'center',
-     alignItems: 'center',
-     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-     marginBottom: 10,
-     borderWidth: 3,
-     borderColor: 'rgba(255, 255, 255, 0.7)',
-     overflow: 'hidden',
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 4 },
-     shadowOpacity: 0.3,
-     shadowRadius: 8,
-     elevation: 6,
-   },
+  smallCategoryIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.65)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   smallCategoryName: {
-    fontSize: 16,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#fff',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowColor: 'rgba(0, 0, 0, 0.35)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   buttonGlow: {
     position: 'absolute',
@@ -2069,16 +1878,16 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
      modalOverlay: {
-     position: 'absolute',
-     top: 0,
-     left: 0,
-     right: 0,
-     bottom: 0,
-     backgroundColor: 'rgba(0,0,0,0.7)',
-     justifyContent: 'center',
-     alignItems: 'center',
-     zIndex: 10,
-   },
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 8, 20, 0.82)',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 10,
+  },
   bottomSheet: {
     backgroundColor: '#8B5CF6',
     borderTopLeftRadius: 25,
@@ -2276,14 +2085,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
     letterSpacing: 0.5,
   },
-  // New styles for enhanced UI
-  battleArenaGradient: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
+  // New styles for enhanced UI (battleArenaGradient defined in battleArenaSection below)
   backgroundPattern: {
     position: 'absolute',
     top: 0,
@@ -2337,45 +2139,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: -1,
   },
-  quizGameHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quizGameBadge: {
-    backgroundColor: '#FF4444',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginLeft: 10,
-  },
-  quizGameBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  vsContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-  },
-  vsText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  largeCategoryDescription: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-  },
+  // quizGameHeader, quizGameBadge, vsContainer, vsText, statsRow defined below in quizGameSection
   privateRoomIconGradient: {
     width: 44,
     height: 44,
@@ -2504,25 +2268,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   battleArenaSection: {
-    marginTop: 20,
-    marginBottom: 16,
-    height: 190,
-    borderRadius: 26,
+    marginTop: 4,
+    marginBottom: 20,
+    height: 200,
+    borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E6E8FF',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 26,
-    elevation: 14,
+    borderWidth: 0,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
     width: '100%',
   },
   battleArenaGradient: {
     position: 'relative',
     width: '100%',
-    height: '100%', // Use full height of parent
-    borderRadius: 26,
+    height: '100%',
+    borderRadius: 28,
     overflow: 'hidden',
   },
   battleArenaContent: {
@@ -2530,18 +2293,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     height: '100%',
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     width: '100%',
   },
   battleArenaLeft: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 16,
     justifyContent: 'center',
     minWidth: 0,
   },
   battleArenaRight: {
-    width: 100,
+    width: 110,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2553,24 +2316,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   battleArenaTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
     color: '#fff',
     textAlign: 'left',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    letterSpacing: 0.3,
+    textShadowRadius: 6,
+    letterSpacing: 0.8,
     flexWrap: 'wrap',
   },
   battleArenaSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.95)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.92)',
     textAlign: 'left',
     marginBottom: 0,
-    fontWeight: '500',
-    letterSpacing: 0.2,
+    fontWeight: '600',
+    letterSpacing: 0.25,
+    lineHeight: 20,
     flexWrap: 'wrap',
   },
   quizGameSection: {
@@ -2637,13 +2401,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14, // Reduced font size to prevent cutting
     fontWeight: 'bold',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    marginTop: 8, // Reduced margin
-    flexWrap: 'wrap', // Allow wrapping if needed
   },
   statItem: {
     alignItems: 'center',
@@ -2770,71 +2527,70 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
     categorySectionBackground: {
-      borderRadius: 26,
+      borderRadius: 24,
       padding: 0,
       marginTop: 0,
       overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: '#E6E8FF',
-      shadowColor: '#7C3AED',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.18,
-      shadowRadius: 24,
-      elevation: 8,
+      borderWidth: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.06,
+      shadowRadius: 16,
+      elevation: 4,
       width: '100%',
       backgroundColor: '#FFFFFF',
     },
     premiumSectionHeader: {
-      marginBottom: 24,
+      marginBottom: 0,
       borderRadius: 0,
       overflow: 'hidden',
     },
     premiumHeaderGradient: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 14,
-      paddingVertical: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+      borderBottomColor: 'rgba(255, 255, 255, 0.15)',
     },
     premiumIconWrapper: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255, 215, 0, 0.2)',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(251, 191, 36, 0.25)',
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 14,
       borderWidth: 2,
-      borderColor: 'rgba(255, 215, 0, 0.4)',
-      shadowColor: '#FFD700',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
+      borderColor: 'rgba(251, 191, 36, 0.5)',
+      shadowColor: '#FBBF24',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
       elevation: 6,
     },
     premiumHeaderText: {
       flex: 1,
     },
     premiumSectionTitle: {
-      fontSize: 18,
+      fontSize: 19,
       fontWeight: '900',
       color: '#FFFFFF',
-      marginBottom: 0,
-      textShadowColor: 'rgba(0, 0, 0, 0.3)',
+      marginBottom: 2,
+      textShadowColor: 'rgba(0, 0, 0, 0.2)',
       textShadowOffset: { width: 0, height: 2 },
       textShadowRadius: 4,
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
     },
     premiumSectionSubtitle: {
-      fontSize: 14,
-      color: 'rgba(255, 255, 255, 0.9)',
+      fontSize: 13,
+      color: 'rgba(255, 255, 255, 0.88)',
       fontWeight: '600',
-      letterSpacing: 0.3,
+      letterSpacing: 0.2,
     },
     premiumCategoryContent: {
-      padding: 24,
-      paddingTop: 20,
+      padding: 20,
+      paddingTop: 22,
     },
    
    // Enhanced Battle Arena Styles
@@ -2911,101 +2667,87 @@ const styles = StyleSheet.create({
     
     // Enhanced Stats Styles
             enhancedStatsRow: {
-     flexDirection: 'row',
-     justifyContent: 'space-between',
-     marginBottom: 0,
-     gap: 10,
-     marginTop: 0,
-   },
-    enhancedStatCard: {
-      flex: 1,
-      borderRadius: 16,
-      overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      elevation: 2,
-      borderWidth: 1,
-      borderColor: '#E5E7EB',
-      backgroundColor: '#FFFFFF',
-    },
-         enhancedStatGradient: {
-       padding: 12,
-       alignItems: 'center',
-       minHeight: 70,
-     },
-         enhancedStatIconContainer: {
-       width: 40,
-       height: 40,
-       borderRadius: 20,
-       backgroundColor: '#F9FAFB',
-       justifyContent: 'center',
-       alignItems: 'center',
-       marginBottom: 8,
-       borderWidth: 1,
-       borderColor: '#E5E7EB',
-     },
-    enhancedStatContent: {
-      alignItems: 'center',
-    },
-         enhancedStatValue: {
-       fontSize: 18,
-       fontWeight: '800',
-       color: '#1E293B',
-       marginBottom: 3,
-       letterSpacing: 0.2,
-     },
-     enhancedStatLabel: {
-       fontSize: 11,
-       color: '#64748B',
-       fontWeight: '600',
-       textAlign: 'center',
-       letterSpacing: 0.2,
-     },
-        enhancedStatIconGradient: {
-     width: 48,
-     height: 48,
-     borderRadius: 24,
-     justifyContent: 'center',
-     alignItems: 'center',
-     borderWidth: 2,
-     borderColor: 'rgba(255, 255, 255, 0.3)',
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.1,
-     shadowRadius: 4,
-     elevation: 3,
-   },
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 0,
+    gap: 12,
+    marginTop: 0,
+  },
+  enhancedStatCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 0,
+    backgroundColor: '#FFFFFF',
+  },
+  enhancedStatGradient: {
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 78,
+    justifyContent: 'center',
+  },
+  enhancedStatIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  enhancedStatContent: {
+    alignItems: 'center',
+  },
+  enhancedStatValue: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginBottom: 4,
+    letterSpacing: 0.2,
+  },
+  enhancedStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
    
           // Enhanced Modal Styles
-   enhancedBottomSheet: {
-     borderTopLeftRadius: 25,
-     borderTopRightRadius: 25,
-     width: '100%',
-     maxWidth: 450,
-     alignSelf: 'center',
-     position: 'absolute',
-     bottom: 0,
-     left: 0,
-     right: 0,
-     shadowColor: '#667eea',
-     shadowOffset: { width: 0, height: -10 },
-     shadowOpacity: 0.3,
-     shadowRadius: 25,
-     elevation: 15,
-     overflow: 'hidden',
-     borderWidth: 2,
-     borderColor: 'rgba(255, 255, 255, 0.15)',
-   },
-       modalGradientBackground: {
-     padding: 18,
-     paddingTop: 6,
-     paddingBottom: 20,
-     borderTopLeftRadius: 25,
-     borderTopRightRadius: 25,
-     minHeight: 'auto',
-   },
+  enhancedBottomSheet: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    width: '100%',
+    maxWidth: 450,
+    alignSelf: 'center',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    shadowColor: '#1e1b4b',
+    shadowOffset: { width: 0, height: -12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 28,
+    elevation: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  modalGradientBackground: {
+    padding: 20,
+    paddingTop: 12,
+    paddingBottom: 28,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    minHeight: 'auto',
+  },
    enhancedHandleBar: {
      alignItems: 'center',
      marginBottom: 8,
@@ -3138,10 +2880,6 @@ const styles = StyleSheet.create({
      color: 'rgba(255,255,255,0.8)',
      marginBottom: 1,
    },
-   amountOptionContent: {
-     alignItems: 'center',
-     justifyContent: 'center',
-   },
    amountSelectedIndicator: {
      position: 'absolute',
      top: -6,
@@ -3172,35 +2910,112 @@ const styles = StyleSheet.create({
    },
   /* Compact popup styles */
   compactCard: {
-    backgroundColor: '#0b2b45',
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   compactHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4,
   },
   compactTitle: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  compactClose: { padding: 6 },
-  compactSubtitle: { color: '#D6EEFF', marginTop: 6, marginBottom: 10 },
-  compactGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  compactTile: { width: (width - 72) / 3, paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginBottom: 8, backgroundColor: '#EAF6FF' },
-  compactTileActive: { borderWidth: 1.5, borderColor: '#FFD166', backgroundColor: '#2B1A46' },
-  compactAmount: { color: '#071428', fontWeight: '800' },
-  compactAmountActive: { color: '#FFD166' },
-  compactTier: { color: '#CDE9FF', fontSize: 11, marginTop: 6 },
-  compactFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  compactLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-  compactJoinAmount: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', marginTop: 4 },
-  compactCTA: { width: 140 },
+  compactClose: { padding: 8 },
+  compactSubtitle: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 8,
+    marginBottom: 14,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  compactGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  compactTile: {
+    width: (width - 88) / 3,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  compactTileActive: {
+    borderWidth: 2,
+    borderColor: '#FBBF24',
+    backgroundColor: 'rgba(251, 191, 36, 0.2)',
+  },
+  compactAmount: {
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  compactAmountActive: { color: '#FBBF24' },
+  compactTier: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11,
+    marginTop: 6,
+    fontWeight: '600',
+  },
+  compactFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  compactLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  compactJoinAmount: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
+    marginTop: 4,
+    letterSpacing: 0.3,
+  },
+  compactCTA: { width: 150 },
   compactCTADisabled: { opacity: 0.6 },
-  compactCTAInner: { paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
-  compactCTAText: { color: '#071428', fontWeight: '800' },
+  compactCTAInner: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  compactCTAText: {
+    color: '#1E293B',
+    fontWeight: '800',
+    fontSize: 15,
+    letterSpacing: 0.5,
+  },
+  compactLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 24,
+  },
+  compactLoadingText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
    closeButtonGradient: {
      width: 28,
      height: 28,
@@ -3241,32 +3056,20 @@ const styles = StyleSheet.create({
      textShadowColor: 'rgba(0,0,0,0.4)',
      textShadowOffset: { width: 0, height: 2 },
      textShadowRadius: 3,
-   },
-   selectedIndicator: {
-     position: 'absolute',
-     top: 8,
-     right: 8,
-     backgroundColor: '#10B981',
-     borderRadius: 14,
-     padding: 2,
-     borderWidth: 3,
-     borderColor: '#FFFFFF',
-     shadowColor: '#10B981',
-     shadowOffset: { width: 0, height: 3 },
-     shadowOpacity: 0.5,
-     shadowRadius: 6,
-     elevation: 5,
-     zIndex: 10,
-   },
-   loadingContainer: {
-     padding: 20,
-     alignItems: 'center',
-   },
-   loadingText: {
-     fontSize: 14,
-     color: '#666',
-     marginTop: 8,
-   },
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 12,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
        enhancedPlayNowButton: {
      borderRadius: 14,
      overflow: 'hidden',
@@ -3337,14 +3140,7 @@ const styles = StyleSheet.create({
        fontWeight: 'bold',
      },
      
-     // Modal Background Styles
-     modalGradientBackground: {
-       position: 'relative',
-       width: '100%',
-       height: '100%',
-       borderRadius: 20,
-       overflow: 'hidden',
-     },
+     // Modal Background Styles (pattern only - modalGradientBackground defined above)
      modalBackgroundPattern: {
        position: 'absolute',
        top: 0,
@@ -3415,50 +3211,35 @@ const styles = StyleSheet.create({
   infoCardsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 10,
-  },
-  infoCard: {
-    flex: 1,
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    gap: 12,
   },
   infoCardGradient: {
-    padding: 14,
+    padding: 16,
     alignItems: 'center',
-    minHeight: 110,
+    minHeight: 118,
     justifyContent: 'center',
   },
   infoCardIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 1)',
-  },
-  infoCardTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 5,
-    textAlign: 'center',
-    letterSpacing: 0.2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   infoCardDescription: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 14,
+    lineHeight: 15,
   },
 }); 
