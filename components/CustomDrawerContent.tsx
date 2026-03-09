@@ -5,7 +5,7 @@ import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Dimensions, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -121,6 +121,17 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
     };
 
+    const handleLogoutPress = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                { text: 'Logout', onPress: () => { navigation.closeDrawer(); logout(); } },
+                { text: 'Cancel', style: 'destructive', onPress: () => navigation.closeDrawer() },
+            ]
+        );
+    };
+
     const navigateToMembership = () => {
         setActiveMenu('membership');
         navigation.navigate('membership');
@@ -136,20 +147,6 @@ const CustomDrawerContent = (props: any) => {
     const navigateToMyListings = () => {
         setActiveMenu('my-listings');
         navigation.navigate('(tabs)', { screen: 'my-listings' });
-        navigation.closeDrawer();
-    };
-    
-    const navigateToAddListing = () => {
-        setActiveMenu('add-listing');
-        try {
-            // Open Book Store and instruct it to open the listing modal
-            router.push('/(tabs)/book-store?openCreate=1');
-        } catch (e) {
-            // Fallback to navigation
-            try {
-                navigation.navigate('(tabs)', { screen: 'book-store' });
-            } catch {}
-        }
         navigation.closeDrawer();
     };
 
@@ -282,15 +279,6 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'my-listings'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#F59E0B"
-                            />
-                            
-                            <MenuItem 
-                                icon="add-circle-outline"
-                                label="Add Listing"
-                                onPress={navigateToAddListing}
-                                isActive={activeMenu === 'add-listing'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#10B981"
                             />
                             
                             <MenuItem 
@@ -452,7 +440,7 @@ const CustomDrawerContent = (props: any) => {
 
                     {/* Logout */}
                     <View style={styles.logoutSection}>
-                        <TouchableOpacity style={styles.logoutButton} onPress={logout} activeOpacity={0.85}>
+                        <TouchableOpacity style={styles.logoutButton} onPress={handleLogoutPress} activeOpacity={0.85}>
                             <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
                             <Text style={styles.logoutButtonText}>Log out</Text>
                         </TouchableOpacity>

@@ -16,6 +16,7 @@ import { CategoryProvider } from '../context/CategoryContext';
 import { LiveExamProvider } from '../context/LiveExamContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { RefreshProvider } from '../context/RefreshContext';
+import { StudyPartnerProvider } from '../context/StudyPartnerContext';
 import { ToastProvider } from '../context/ToastContext';
 import { WalletProvider, useWallet } from '../context/WalletContext';
 import { WebSocketProvider } from '../context/WebSocketContext';
@@ -286,9 +287,11 @@ function RootLayout() {
             <RefreshProvider>
               <ToastProvider>
                 <LiveExamProvider>
-                  <ErrorBoundary>
+                  <StudyPartnerProvider>
+                    <ErrorBoundary>
                     <RootNavigator />
-                  </ErrorBoundary>
+                    </ErrorBoundary>
+                  </StudyPartnerProvider>
                 </LiveExamProvider>
               </ToastProvider>
             </RefreshProvider>

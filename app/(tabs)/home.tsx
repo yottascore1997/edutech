@@ -24,6 +24,85 @@ import CurrentAffairsPreview from '../../components/CurrentAffairsPreview';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+const STUDY_PARTNER_SLIDER_IMAGES = [
+  require('@/assets/images/icons/images.png'),
+  require('@/assets/images/icons/student1.png'),
+  require('@/assets/images/icons/student2.png'),
+  require('@/assets/images/icons/homebuddy.png'),
+];
+
+type GreetingInfo = {
+  label: 'Morning' | 'Afternoon' | 'Evening' | 'Good night';
+  title: string;
+  subtitle: string;
+  colors: [string, string];
+  pillColor: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconBg: string;
+  iconColor: string;
+  isDark?: boolean; // true = use white text (for night mode)
+  image?: number; // require() for sunrise, ocean, full-moon
+};
+
+function getGreetingInfo(): GreetingInfo {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) {
+    return {
+      label: 'Morning',
+      title: "Let's start your day",
+      subtitle: 'Begin with a mindful morning reflection.',
+      colors: ['#FDE68A', '#FBBF24'],
+      pillColor: '#FCD34D',
+      icon: 'sunny',
+      iconBg: '#FFFBEB',
+      iconColor: '#F97316',
+      image: require('../../assets/images/icons/sunrise.png'),
+    };
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return {
+      label: 'Afternoon',
+      title: 'Keep your momentum going',
+      subtitle: 'Pick a quick session to stay on track.',
+      colors: ['#BAE6FD', '#38BDF8'],
+      pillColor: '#0EA5E9',
+      icon: 'sunny-outline',
+      iconBg: '#E0F2FE',
+      iconColor: '#0284C7',
+      image: require('../../assets/images/icons/ocean.png'),
+    };
+  }
+
+  if (hour >= 17 && hour < 21) {
+    return {
+      label: 'Evening',
+      title: 'Unwind with a quick quiz',
+      subtitle: 'Light revision to close your day well.',
+      colors: ['#F9A8D4', '#FB7185'],
+      pillColor: '#EC4899',
+      icon: 'partly-sunny',
+      iconBg: '#FEF2F2',
+      iconColor: '#FB923C',
+      image: require('../../assets/images/icons/full-moon.png'),
+    };
+  }
+
+  return {
+    label: 'Good night',
+    title: 'Great job today',
+    subtitle: 'Review a few concepts before you sleep.',
+    colors: ['#1E3A8A', '#111827'],
+    pillColor: '#1F2937',
+    icon: 'moon',
+    iconBg: '#020617',
+    iconColor: '#E5E7EB',
+    isDark: true,
+    image: require('../../assets/images/icons/full-moon.png'),
+  };
+}
+
 
 export default function HomeScreen() {
     const { user } = useAuth();
@@ -58,6 +137,9 @@ export default function HomeScreen() {
     const examSliderRef = useRef<FlatList<any>>(null);
     const [currentExamIndex, setCurrentExamIndex] = useState(0);
     const autoScrollInterval = useRef<ReturnType<typeof setInterval>>(null);
+
+    const studyPartnerSliderRef = useRef<FlatList<any>>(null);
+    const [studyPartnerImageIndex, setStudyPartnerImageIndex] = useState(0);
 
     // Auto scroll function
     const startAutoScroll = () => {
@@ -161,6 +243,24 @@ export default function HomeScreen() {
         }
     }, [user, featuredExams.length]);
 
+    // Study Partner card: auto-slide images every 5 sec
+    useEffect(() => {
+        const id = setInterval(() => {
+            setStudyPartnerImageIndex((prev) => {
+                const next = (prev + 1) % STUDY_PARTNER_SLIDER_IMAGES.length;
+                setTimeout(() => {
+                    studyPartnerSliderRef.current?.scrollToIndex({
+                        index: next,
+                        animated: true,
+                        viewPosition: 0,
+                    });
+                }, 0);
+                return next;
+            });
+        }, 5000);
+        return () => clearInterval(id);
+    }, []);
+
     // Auto-refresh every 1 hour when screen is active
     useEffect(() => {
         const interval = setInterval(() => {
@@ -185,6 +285,8 @@ export default function HomeScreen() {
     
 
 
+  const greeting = getGreetingInfo();
+
   return (
     <>
       <ScrollView 
@@ -200,6 +302,38 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        {/* Time-based greeting card */}
+        <View style={styles.greetingSection}>
+          <View style={styles.greetingRow}>
+            <LinearGradient
+              colors={greeting.colors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.greetingCard}
+            >
+              <View style={styles.greetingSunWrapper}>
+                <View style={[styles.greetingSun, { backgroundColor: greeting.iconBg }]}>
+                  {greeting.image ? (
+                    <Image source={greeting.image} style={styles.greetingImage} resizeMode="contain" />
+                  ) : (
+                    <Ionicons name={greeting.icon} size={28} color={greeting.iconColor} />
+                  )}
+                </View>
+              </View>
+              <View style={styles.greetingTextWrapper}>
+                <Text style={[styles.greetingTitle, greeting.isDark && styles.greetingTitleDark]}>{greeting.title}</Text>
+                <Text style={[styles.greetingSubtitle, greeting.isDark && styles.greetingSubtitleDark]} numberOfLines={2}>
+                  {greeting.subtitle}
+                </Text>
+              </View>
+            </LinearGradient>
+
+            <View style={[styles.greetingSidePill, { backgroundColor: greeting.pillColor }]}>
+              <Text style={[styles.greetingSideText, greeting.isDark && styles.greetingSideTextDark]}>{greeting.label}</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Categories - clean premium grid, no boxes */}
         <View style={styles.categoriesSection}>
           <View style={styles.categoriesGrid}>
@@ -207,9 +341,9 @@ export default function HomeScreen() {
               { id: '1', name: 'Live Exam', icon: 'flash', color: '#6366F1', gradient: ['#6366F1', '#8B5CF6'], route: '/(tabs)/exam', image: require('../../assets/images/icons/exam.png') },
               { id: '2', name: 'Practice', icon: 'school', color: '#8B5CF6', gradient: ['#8B5CF6', '#A78BFA'], route: '/(tabs)/practice-categories', image: require('../../assets/images/icons/exam-time.png') },
               { id: '3', name: 'Quiz', icon: 'help-circle', color: '#10B981', gradient: ['#10B981', '#34D399'], route: '/(tabs)/quiz', image: require('../../assets/images/icons/quiz.png') },
-              { id: '4', name: 'PYQ', icon: 'book', color: '#7C3AED', gradient: ['#7C3AED', '#9F7AEA'], route: '/(tabs)/pyq', image: require('../../assets/images/icons/question-mark.png') },
-              { id: '5', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable', image: require('../../assets/images/icons/study-time.png') },
-              { id: '6', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store', image: require('../../assets/images/icons/book-shop.png') },
+              { id: '4', name: 'Timetable', icon: 'calendar', color: '#F59E0B', gradient: ['#F59E0B', '#FBBF24'], route: '/(tabs)/timetable', image: require('../../assets/images/icons/study-time.png') },
+              { id: '5', name: 'Books', icon: 'book', color: '#06B6D4', gradient: ['#06B6D4', '#22D3EE'], route: '/(tabs)/book-store', image: require('../../assets/images/icons/book-shop.png') },
+              { id: '6', name: 'Study Partner', icon: 'people', color: '#EC4899', gradient: ['#EC4899', '#F472B6'], route: '/(tabs)/study-partner', image: require('../../assets/images/icons/online-dating.png') },
             ].map((item) => (
               <TouchableOpacity
                 key={item.id}
@@ -346,11 +480,142 @@ export default function HomeScreen() {
                         </LinearGradient>
                     </View>
             
+            {/* Study Partner Card - above Question of the Day */}
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => router.push('/(tabs)/study-partner' as any)}
+              style={styles.studyPartnerCardWrap}
+            >
+              <LinearGradient
+                colors={['#EDE9FE', '#F5F3FF', '#FCE7F3', '#FDF2F8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.studyPartnerCard}
+              >
+                <View style={styles.studyPartnerCardRow}>
+                  <View style={styles.studyPartnerCardText}>
+                    <View style={styles.studyPartnerCardLabelRow}>
+                      <Ionicons name="heart" size={16} color="#7C3AED" />
+                      <Text style={styles.studyPartnerCardLabel}>Study Partner</Text>
+                    </View>
+                    <Text style={styles.studyPartnerCardTitle}>Find your Study Buddy</Text>
+                    <Text style={styles.studyPartnerCardSubtitle} numberOfLines={2}>
+                      Match with like-minded students, study together & never feel alone.
+                    </Text>
+                    <LinearGradient
+                      colors={['#FB923C', '#F97316', '#EA580C']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.studyPartnerCardCta}
+                    >
+                      <Text style={styles.studyPartnerCardCtaText}>Find a buddy</Text>
+                      <Ionicons name="heart-outline" size={14} color="#FFF" />
+                    </LinearGradient>
+                  </View>
+                  <View style={styles.studyPartnerCardImageWrap}>
+                    <FlatList
+                      ref={studyPartnerSliderRef}
+                      data={STUDY_PARTNER_SLIDER_IMAGES}
+                      horizontal
+                      pagingEnabled
+                      scrollEventThrottle={16}
+                      showsHorizontalScrollIndicator={false}
+                      keyExtractor={(_, i) => `study-partner-img-${i}`}
+                      onMomentumScrollEnd={(e) => {
+                        const i = Math.round(e.nativeEvent.contentOffset.x / 160);
+                        setStudyPartnerImageIndex(Math.min(i, STUDY_PARTNER_SLIDER_IMAGES.length - 1));
+                      }}
+                      getItemLayout={(_, index) => ({ length: 160, offset: 160 * index, index })}
+                      snapToInterval={160}
+                      snapToAlignment="start"
+                      decelerationRate="fast"
+                      renderItem={({ item, index }) => (
+                        <View style={[styles.studyPartnerSlideItem, index === 1 && styles.studyPartnerSlideItemTopAlign]}>
+                          <Image
+                            source={item}
+                            style={styles.studyPartnerCardImage}
+                            resizeMode="contain"
+                          />
+                        </View>
+                      )}
+                    />
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+
             {/* Question of the Day Section */}
             <QuestionOfTheDayPreview />
 
             {/* Practice Categories Preview Section */}
             <PracticeCategoriesPreview />
+
+            {/* Quiz promo - single card with banner (above Stories that inspire) */}
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => router.push('/(tabs)/quiz' as any)}
+              style={styles.quizBannerCardWrap}
+            >
+              <Image
+                source={require('../../assets/images/icons/quizbanner.png')}
+                style={styles.quizBannerImage}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['#EEF2FF', '#E0E7FF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quizBannerTextBlock}
+              >
+                <Text style={styles.quizBannerTitle}>Quiz</Text>
+                <Text style={styles.quizBannerSubtitle} numberOfLines={2}>
+                  Battle & live quizzes — challenge others and win coins.
+                </Text>
+                <LinearGradient
+                  colors={['#059669', '#047857', '#065F46']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.quizBannerCta}
+                >
+                  <Text style={styles.quizBannerCtaText}>Play now</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
+                </LinearGradient>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* PYQ promo card */}
+            <View style={styles.quizPromoSection}>
+              <View style={styles.quizPromoStack}>
+                {/* Previous Year Questions */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => router.push('/(tabs)/pyq' as any)}
+                  style={styles.quizPromoCardWrapper}
+                >
+                  <LinearGradient
+                    colors={['#FFEDD5', '#FDBA74']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.quizPromoCard}
+                  >
+                    <View style={styles.quizPromoLeft}>
+                      <View style={[styles.quizPromoIconCircle, { backgroundColor: '#FFF7ED' }]}>
+                        <Ionicons name="document-text" size={26} color="#C2410C" />
+                      </View>
+                      <View style={styles.quizPromoTextBlock}>
+                        <Text style={styles.quizPromoTitle}>Previous Year Questions</Text>
+                        <Text style={styles.quizPromoSubtitle} numberOfLines={2}>
+                          Practice real exam questions and boost your score.
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.quizPromoCtaPill}>
+                      <Text style={styles.quizPromoCtaText}>Solve now</Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             {/* Student Success Stories Section */}
             <StudentSuccessStories />
@@ -394,6 +659,285 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F8F9FA',
+    },
+    greetingSection: {
+        marginTop: 12,
+        marginHorizontal: 14,
+        marginBottom: 8,
+    },
+    greetingRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    greetingCard: {
+        flex: 1,
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        marginRight: 8,
+        backgroundColor: '#FDE68A',
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        elevation: 3,
+        flexDirection: 'row',
+    },
+    greetingSunWrapper: {
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    greetingSun: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#FFFBEB',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    greetingImage: {
+        width: 32,
+        height: 32,
+    },
+    greetingTextWrapper: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    greetingTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#1F2937',
+        marginBottom: 4,
+    },
+    greetingSubtitle: {
+        fontSize: 12,
+        color: '#4B5563',
+    },
+    greetingTitleDark: {
+        color: '#FFFFFF',
+    },
+    greetingSubtitleDark: {
+        color: '#E5E7EB',
+    },
+    greetingSidePill: {
+        width: 56,
+        borderRadius: 18,
+        backgroundColor: '#E5E7EB',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+    },
+    greetingSideText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#374151',
+        transform: [{ rotate: '-90deg' }],
+    },
+    greetingSideTextDark: {
+        color: '#FFFFFF',
+    },
+    studyPartnerCardWrap: {
+        marginHorizontal: 16,
+        marginTop: 20,
+        marginBottom: 16,
+        borderRadius: 20,
+        overflow: 'hidden',
+        shadowColor: '#7C3AED',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 14,
+        elevation: 6,
+    },
+    studyPartnerCard: {
+        borderRadius: 20,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(124, 58, 237, 0.15)',
+    },
+    studyPartnerCardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    studyPartnerCardText: {
+        flex: 1,
+        minWidth: 0,
+        paddingRight: 14,
+    },
+    studyPartnerCardLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 6,
+    },
+    studyPartnerCardLabel: {
+        fontSize: 12,
+        fontWeight: '800',
+        color: '#7C3AED',
+        letterSpacing: 0.5,
+    },
+    studyPartnerCardTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#4C1D95',
+        marginBottom: 4,
+        lineHeight: 22,
+    },
+    studyPartnerCardSubtitle: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#5B21B6',
+        lineHeight: 17,
+        marginBottom: 10,
+    },
+    studyPartnerCardCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 6,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        borderRadius: 999,
+    },
+    studyPartnerCardCtaText: {
+        fontSize: 13,
+        fontWeight: '800',
+        color: '#FFFFFF',
+    },
+    studyPartnerCardImageWrap: {
+        width: 160,
+        height: 160,
+        overflow: 'hidden',
+    },
+    studyPartnerSlideItem: {
+        width: 160,
+        height: 160,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    studyPartnerSlideItemTopAlign: {
+        justifyContent: 'flex-start',
+    },
+    studyPartnerCardImage: {
+        width: 240,
+        height: 240,
+    },
+    quizBannerCardWrap: {
+        marginHorizontal: 16,
+        marginTop: 8,
+        marginBottom: 4,
+        borderRadius: 20,
+        overflow: 'hidden',
+        backgroundColor: '#FFF',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 5,
+    },
+    quizBannerImage: {
+        width: '100%',
+        height: 140,
+        backgroundColor: '#E5E7EB',
+    },
+    quizBannerTextBlock: {
+        paddingHorizontal: 16,
+        paddingTop: 14,
+        paddingBottom: 16,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        backgroundColor: '#E0E7FF',
+    },
+    quizBannerTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#111827',
+        letterSpacing: 0.3,
+        marginBottom: 6,
+    },
+    quizBannerSubtitle: {
+        fontSize: 13,
+        color: '#6B7280',
+        lineHeight: 18,
+        marginBottom: 12,
+    },
+    quizBannerCta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
+        shadowColor: '#047857',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    quizBannerCtaText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFFFFF',
+    },
+    quizPromoSection: {
+        marginHorizontal: 14,
+        marginTop: 4,
+        marginBottom: 12,
+    },
+    quizPromoStack: {
+        gap: 10,
+    },
+    quizPromoCardWrapper: {
+        borderRadius: 18,
+        overflow: 'hidden',
+    },
+    quizPromoCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        borderRadius: 18,
+    },
+    quizPromoLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 10,
+    },
+    quizPromoIconCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    quizPromoTextBlock: {
+        flex: 1,
+    },
+    quizPromoTitle: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#111827',
+        marginBottom: 2,
+    },
+    quizPromoSubtitle: {
+        fontSize: 12,
+        color: '#4B5563',
+    },
+    quizPromoCtaPill: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#000000',
+    },
+    quizPromoCtaText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#FFFFFF',
     },
     
     // Categories - open, no boxes, professional

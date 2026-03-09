@@ -128,12 +128,13 @@ export async function uploadFile(fileUri: string, token: string): Promise<string
     type: 'image/jpeg',
   } as any);
 
-  const response = await fetch(`${SITE_BASE_URL}/upload`, {
+  const response = await fetch(`${API_BASE_URL}/upload`, {
     method: 'POST',
     body: formData,
     headers: {
-      'Content-Type': 'multipart/form-data',
+      ...AUTH_HEADERS,
       Authorization: `Bearer ${token}`,
+      // Let browser set Content-Type for FormData (multipart boundary)
     },
   });
 

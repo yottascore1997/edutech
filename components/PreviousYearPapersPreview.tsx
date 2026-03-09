@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors } from '@/constants/Colors';
@@ -83,6 +83,11 @@ export default function PreviousYearPapersPreview() {
             onPress={() => router.push('/pyq')}
           >
             <LinearGradient colors={colors[idx % colors.length]} style={styles.cardTop}>
+              <Image
+                source={require('../assets/images/icons/calendar.png')}
+                style={styles.cardCalendarIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.cardYear}>{item.year}</Text>
             </LinearGradient>
             <View style={styles.cardBottom}>
@@ -127,12 +132,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: '#CBD5E1',
   },
   cardTop: {
     height: 100,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  cardCalendarIcon: {
+    width: 44,
+    height: 44,
+    marginBottom: 2,
   },
   cardYear: {
     fontSize: 20,

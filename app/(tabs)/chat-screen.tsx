@@ -1,11 +1,11 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -73,20 +73,57 @@ interface ChatScreenProps {
 
 const ChatScreen = ({ route }: ChatScreenProps) => {
   const navigation = useNavigation();
+  const router = useRouter();
   const params = useLocalSearchParams();
   const userId = params.userId as string || '';
   const userName = params.userName as string || 'User';
-  const userProfilePhoto = params.userProfilePhoto as string || '';
+  const userProfilePhotoParam = params.userProfilePhoto as string || '';
   const isFollowing = params.isFollowing === 'true';
-  
-  // Debug: Log received parameters
 
-
-
-
-  
-  // Context hooks
   const { user: currentUser } = useAuth();
+
+  const [fetchedOpponentPhoto, setFetchedOpponentPhoto] = useState<string | null>(null);
+  const displayPhoto = (userProfilePhotoParam || fetchedOpponentPhoto || '').trim();
+  const displayPhotoUrl = displayPhoto
+    ? (displayPhoto.startsWith('http://') || displayPhoto.startsWith('https://') ? displayPhoto : getImageUrl(displayPhoto))
+    : '';
+
+  useEffect(() => {
+    if (!userId || !currentUser?.token || displayPhoto) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // 1) Same source as Profile screen: study-partner profile (4 photos)
+        const spRes = await apiFetchAuth(
+          `/student/study-partner/profile?userId=${userId}`,
+          currentUser.token,
+        );
+        if (!cancelled && spRes?.ok) {
+          const spData = spRes.data || spRes;
+          const photos = Array.isArray(spData.photos) ? spData.photos : [];
+          const firstPhoto = photos[0];
+          if (firstPhoto && typeof firstPhoto === 'string') {
+            setFetchedOpponentPhoto(firstPhoto);
+            return;
+          }
+        }
+      } catch (_) {}
+
+      try {
+        // 2) Fallback: general profile (profilePhoto / profilePicture / photos[0])
+        const res = await apiFetchAuth(`/student/profile?userId=${userId}`, currentUser.token);
+        if (!res?.ok || cancelled) return;
+        const data = res.data || res;
+        const photo =
+          data.profilePhoto ??
+          data.profilePicture ??
+          (Array.isArray(data.photos) && data.photos[0]) ??
+          null;
+        if (photo && !cancelled) setFetchedOpponentPhoto(typeof photo === 'string' ? photo : photo.url || photo);
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [userId, currentUser?.token, displayPhoto]);
   
   // Socket connection state (like matchmaking screen)
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -264,6 +301,24 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // For date separator: "SAT 10:21 AM"
+  const formatDateSeparator = (dateString: string) => {
+    const d = new Date(dateString);
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${days[d.getDay()]} ${time}`;
+  };
+
+  const formatSeenDate = (dateString: string) => {
+    const d = new Date(dateString);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (msgDay.getTime() === today.getTime()) return 'Seen just now';
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return `Seen on ${days[d.getDay()]}`;
   };
 
   // Common emojis list
@@ -467,18 +522,13 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     };
   }, [messages]);
 
-  // Fetch messages when component mounts or userId changes
+  // Fetch messages only when screen opens or userId changes (not on every lastRefreshTime change)
   useEffect(() => {
-    if (userId) {
-      const now = Date.now();
-      // Prevent refresh if last refresh was less than 2 seconds ago
-      if (now - lastRefreshTime > 2000) {
-        setLastRefreshTime(now);
-        fetchMessages(userId);
-        fetchMessageRequests();
-      }
-    }
-  }, [userId, lastRefreshTime]);
+    if (!userId) return;
+    setLastRefreshTime(Date.now());
+    fetchMessages(userId);
+    fetchMessageRequests();
+  }, [userId]);
 
   // Socket event listeners for real-time messaging
   useEffect(() => {
@@ -486,77 +536,65 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       return;
     }
 
-    // Listen for new messages
-    const handleNewMessage = (message: Message) => {
-      console.log('📨 New message received:', message);
-      
-      // Check if this message is for the current chat
+    // Helper: add message to list if for current chat and not duplicate
+    const addMessageIfForCurrentChat = (message: Message) => {
       const isForCurrentChat = (
-        (message.sender.id === userId && message.receiver.id === currentUser?.id) ||
-        (message.sender.id === currentUser?.id && message.receiver.id === userId)
+        (String(message.sender?.id) === String(userId) && String(message.receiver?.id) === String(currentUser?.id)) ||
+        (String(message.sender?.id) === String(currentUser?.id) && String(message.receiver?.id) === String(userId))
       );
+      if (!isForCurrentChat) return;
+      setMessages(prev => {
+        const messageExists = prev.some(msg => msg.id === message.id);
+        if (!messageExists) return [...prev, message];
+        return prev;
+      });
+    };
 
-      if (isForCurrentChat) {
-        setMessages(prev => {
-          const messageExists = prev.some(msg => msg.id === message.id);
-          if (!messageExists) {
-            return [...prev, message];
-          }
-          return prev;
-        });
+    // Room mein jo log hain unhe server bhejta hai: new_message (sirf message object)
+    const handleNewMessage = (message: Message) => {
+      addMessageIfForCurrentChat(message);
+    };
+
+    // Receiver online but room mein nahi (e.g. list pe): server bhejta hai message_notification
+    const handleMessageNotification = (data: { type?: string; message?: Message; unreadCount?: number }) => {
+      if (data.type === 'new_message' && data.message) {
+        addMessageIfForCurrentChat(data.message);
       }
     };
 
-    // Listen for message sent confirmation
-    const handleMessageSent = (message: Message) => {
-      console.log('✅ Message sent confirmation:', message);
-      setMessages(prev => prev.map(msg => 
-        msg.id.startsWith('temp-') && msg.content === message.content 
-          ? message 
-          : msg
-      ));
-    };
-
-    // Listen for messages read
-    const handleMessagesRead = ({ readerId }: { readerId: string }) => {
-      console.log('👁️ Messages read:', readerId);
+    // Server bhejta hai: messages_were_read (plural) with { readerId }
+    const handleMessagesWereRead = ({ readerId }: { readerId: string }) => {
       if (userId && userId === readerId) {
         setMessages(prev =>
-          prev.map(msg => 
-            msg.sender.id === currentUser?.id ? { ...msg, isRead: true } : msg
+          prev.map(msg =>
+            String(msg.sender?.id) === String(currentUser?.id) ? { ...msg, isRead: true } : msg
           )
         );
       }
     };
 
-    // Listen for typing indicators
-    const handleUserTyping = (typingUserId: string, isTyping: boolean) => {
-      console.log('⌨️ Typing indicator:', { typingUserId, isTyping });
-      if (typingUserId === userId) {
-        setIsTyping(isTyping);
-      }
-    };
+    // Server sunta hai: start_typing / stop_typing. Bhejta hai: user_typing / user_stopped_typing
+    const handleUserTyping = () => setIsTyping(true);
+    const handleUserStoppedTyping = () => setIsTyping(false);
 
-    // Set up event listeners with correct event names
     socket.on('new_message', handleNewMessage);
-    socket.on('message_sent', handleMessageSent);
-    socket.on('messages_read', handleMessagesRead);
+    socket.on('message_notification', handleMessageNotification);
+    socket.on('messages_were_read', handleMessagesWereRead);
     socket.on('user_typing', handleUserTyping);
+    socket.on('user_stopped_typing', handleUserStoppedTyping);
 
-    // Join chat room
+    // Chat open hote hi room join — tabhi receiver ko new_message milega
     if (userId && currentUser?.id) {
       const chatId = [currentUser.id, userId].sort().join('-');
-      console.log('🚪 Joining chat room:', chatId);
       socket.emit('join_chat', chatId);
-      socket.emit('join_typing_room', chatId);
     }
 
-    // Cleanup event listeners
     return () => {
       socket.off('new_message', handleNewMessage);
-      socket.off('message_sent', handleMessageSent);
-      socket.off('messages_read', handleMessagesRead);
+      socket.off('message_notification', handleMessageNotification);
+      socket.off('messages_were_read', handleMessagesWereRead);
       socket.off('user_typing', handleUserTyping);
+      socket.off('user_stopped_typing', handleUserStoppedTyping);
     };
   }, [socket, isConnected, userId, currentUser]);
 
@@ -564,7 +602,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
   useEffect(() => {
     if (isConnected && userId && currentUser) {
       const unreadMessages = messages.filter(
-        (msg) => msg.receiver.id === currentUser.id && !msg.isRead
+        (msg) => String(msg.receiver?.id) === String(currentUser.id) && !msg.isRead
       );
 
       if (unreadMessages.length > 0) {
@@ -572,24 +610,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       }
     }
   }, [userId, messages, isConnected, currentUser]);
-
-     // Polling fallback for real-time messages (when WebSocket is not working)
-   useEffect(() => {
-     if (!isConnected && userId) {
-       const pollInterval = setInterval(() => {
-         const now = Date.now();
-         // Only poll if last refresh was more than 3 seconds ago
-         if (now - lastRefreshTime > 3000) {
-           setLastRefreshTime(now);
-           fetchMessages(userId, true);
-         }
-       }, 5000); // Poll every 5 seconds (increased from 3)
-
-       return () => {
-         clearInterval(pollInterval);
-       };
-     }
-   }, [isConnected, userId, lastRefreshTime]);
 
   // Fetch messages from API
   const fetchMessages = async (targetUserId: string, isRefresh = false) => {
@@ -691,14 +711,13 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       // Update messages locally
       setMessages(prev => 
         prev.map(msg => 
-          msg.receiver.id === currentUser.id ? { ...msg, isRead: true } : msg
+          String(msg.receiver?.id) === String(currentUser.id) ? { ...msg, isRead: true } : msg
         )
       );
 
-      // Emit socket event for real-time read status
+      // Server sunta hai: notify_messages_read with { readerId, otherUserId }
       if (socket && isConnected) {
-        console.log('👁️ Emitting messages read:', { readerId: currentUser.id, otherUserId: userId });
-        socket.emit('messages_read', { readerId: currentUser.id, otherUserId: userId });
+        socket.emit('notify_messages_read', { readerId: currentUser.id, otherUserId: userId });
       }
 
     } catch (error) {
@@ -830,6 +849,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     setSending(true);
     const content = sanitizeMessage(newMessage.trim());
     setNewMessage('');
+    emitStopTyping();
 
     // Create optimistic message for immediate display
     const optimisticMessage: Message = {
@@ -847,7 +867,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       receiver: {
         id: userId,
         name: userName,
-        profilePhoto: userProfilePhoto,
+        profilePhoto: displayPhoto || undefined,
       },
     };
 
@@ -883,30 +903,17 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         const result = response.data;
 
         if (result.type === 'direct') {
-          // Replace optimistic message with real message from server
+          // Replace optimistic message with real message from server (no message_sent from server)
           if (result.message) {
             setMessages(prev => prev.map(msg => 
               msg.id === optimisticMessage.id ? result.message : msg
             ));
           }
           
-          // Emit socket event for real-time delivery
-          if (socket && isConnected) {
-            const chatId = [currentUser.id, userId].sort().join('-');
-            console.log('📤 Sending message via socket:', {
-              chatId,
-              message: result.message,
-              receiverId: userId
-            });
-            socket.emit('send_message', {
-              chatId: chatId,
-              message: result.message,
-              receiverId: userId
-            });
+          // Server sunta hai: private_message. send_message kabhi emit mat karo.
+          if (socket && isConnected && result.message) {
+            socket.emit('private_message', { message: result.message });
           }
-          
-
-           
         } else if (result.type === 'request') {
           // Remove optimistic message since it was sent as request
           setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
@@ -935,28 +942,27 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     }
   };
 
-  // Handle typing indicator
+  // Handle typing: server sunta hai start_typing / stop_typing with { chatId }
   const handleTypingChange = (text: string) => {
-
     setNewMessage(text);
-
-    // Send typing indicator via Socket
     if (socket && isConnected && userId && currentUser) {
       const chatId = [currentUser.id, userId].sort().join('-');
-      
-      // Clear previous timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      // Send typing indicator
-      socket.emit('typing', { chatId, isTyping: true });
-
-      // Set new timeout to stop typing indicator
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      socket.emit('start_typing', { chatId });
       typingTimeoutRef.current = setTimeout(() => {
-        // Stop typing indicator after 2 seconds
-        socket.emit('typing', { chatId, isTyping: false });
+        socket.emit('stop_typing', { chatId });
       }, 2000);
+    }
+  };
+
+  const emitStopTyping = () => {
+    if (socket && isConnected && userId && currentUser) {
+      const chatId = [currentUser.id, userId].sort().join('-');
+      socket.emit('stop_typing', { chatId });
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
   };
 
@@ -971,14 +977,12 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
     // Render date separator
     const renderDateSeparator = (date: string) => (
       <View style={styles.dateSeparator}>
-        <View style={styles.dateSeparatorLine} />
-        <Text style={styles.dateSeparatorText}>{formatMessageTime(date)}</Text>
-        <View style={styles.dateSeparatorLine} />
+        <Text style={styles.dateSeparatorText}>{formatDateSeparator(date)}</Text>
       </View>
     );
 
     const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    const isMyMessage = item.sender.id === currentUser?.id;
+    const isMyMessage = String(item.sender?.id || '') === String(currentUser?.id || '');
     
     // Check if we need to show date separator
     const showDateSeparator = index === 0 || (
@@ -995,8 +999,8 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         {/* Avatar for other person's messages */}
         {!isMyMessage && (
           <View style={styles.messageAvatar}>
-            {userProfilePhoto ? (
-              <Image source={{ uri: userProfilePhoto }} style={styles.avatarImage} />
+            {displayPhotoUrl ? (
+              <Image source={{ uri: displayPhotoUrl }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarInitials}>
@@ -1008,55 +1012,37 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         )}
         
         <View style={{ flex: 1 }}>
-          {/* Message Bubble */}
+          {/* Message Bubble - grey left (their) / purple right (mine) */}
           <TouchableOpacity
             onLongPress={() => handleDeleteMessage(item)}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={isMyMessage ? ['#4F46E5', '#7C3AED'] : ['#f8f9fa', '#e9ecef']}
+            <View
               style={[
-                styles.enhancedMessageBubble,
-                isMyMessage ? styles.myMessageBubble : styles.theirMessageBubble
+                styles.messageBubble,
+                isMyMessage ? styles.myBubble : styles.theirBubble,
               ]}
             >
-            {/* File/Image Message */}
-            {item.fileUrl && item.messageType === 'IMAGE' ? (
-              <Image 
-                source={{ uri: item.fileUrl }} 
-                style={styles.messageImage}
-                resizeMode="cover"
-              />
-            ) : item.fileUrl ? (
-              <View style={styles.fileMessage}>
-                <Ionicons name="document" size={20} color={isMyMessage ? "#fff" : "#1877f2"} />
-                <Text style={[
-                  styles.fileText,
-                  isMyMessage ? styles.myMessageText : styles.theirMessageText
-                ]}>
+              {item.fileUrl && item.messageType === 'IMAGE' ? (
+                <Image source={{ uri: item.fileUrl }} style={styles.messageImage} resizeMode="cover" />
+              ) : item.fileUrl ? (
+                <View style={styles.fileMessage}>
+                  <Ionicons name="document" size={20} color={isMyMessage ? '#fff' : '#374151'} />
+                  <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.theirMessageText]}>
+                    {item.content}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.messageText, isMyMessage ? styles.myMessageText : styles.theirMessageText]}>
                   {item.content}
                 </Text>
-              </View>
-            ) : (
-              <Text style={[
-                styles.messageText,
-                isMyMessage ? styles.myMessageText : styles.theirMessageText
-              ]}>
-                {item.content}
-              </Text>
-            )}
-            
-            {/* Read Status for my messages */}
-            {isMyMessage && (
-              <View style={styles.readStatus}>
-                <Ionicons 
-                  name={item.isRead ? "checkmark-done" : "checkmark"} 
-                  size={14} 
-                  color={item.isRead ? "#4CAF50" : "#999"} 
-                />
-              </View>
-            )}
-          </LinearGradient>
+              )}
+              {isMyMessage && (
+                <View style={styles.readStatus}>
+                  <Ionicons name={item.isRead ? 'checkmark-done' : 'checkmark'} size={14} color={item.isRead ? '#22C55E' : '#9CA3AF'} />
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
 
           {/* Accept/Reject buttons for message requests */}
@@ -1084,86 +1070,91 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       
-      {/* Enhanced Professional Header */}
+      {/* Header: back | avatar + name + status | actions */}
       <LinearGradient
-        colors={['#4F46E5', '#7C3AED']}
-        style={styles.enhancedHeader}
+        colors={['#FFFFFF', '#F8FAFC']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.chatHeader}
       >
-        <View style={styles.headerContent}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+        <TouchableOpacity style={styles.headerBackBtn} onPress={() => router.replace('/(tabs)/messages' as any)} activeOpacity={0.7}>
+          <View style={styles.headerBackBtnInner}>
+            <Ionicons name="arrow-back" size={22} color="#374151" />
+          </View>
         </TouchableOpacity>
-        
-        <View style={styles.userInfo}>
-            <View style={styles.avatarContainer}>
-            {userProfilePhoto ? (
-                <Image 
-                  source={{ uri: userProfilePhoto }} 
-                  style={styles.enhancedAvatar}
-                />
+        <TouchableOpacity
+          style={styles.headerUserRow}
+          activeOpacity={0.7}
+          onPress={() => {
+            router.push({
+              pathname: '/(tabs)/study-partner-liked-user',
+              params: {
+                userId,
+                name: userName,
+                profilePhoto: displayPhotoUrl || displayPhoto || '',
+              },
+            } as any);
+          }}
+        >
+          <View style={styles.headerAvatarWrap}>
+            {displayPhotoUrl ? (
+              <Image source={{ uri: displayPhotoUrl }} style={styles.headerAvatar} />
             ) : (
-                <View style={styles.enhancedAvatarPlaceholder}>
-                  <Text style={styles.enhancedAvatarInitials}>
+              <View style={styles.headerAvatarPlaceholder}>
+                <Text style={styles.headerAvatarInitials}>
                   {userName && userName.length > 0 ? userName.charAt(0).toUpperCase() : 'U'}
                 </Text>
               </View>
             )}
-              {isConnected && <View style={styles.onlineIndicator} />}
+            <View style={styles.headerOnlineDot} />
           </View>
-            
-                   <View style={styles.userDetails}>
-              <Text style={styles.enhancedUserName}>{userName}</Text>
-              <Text style={styles.enhancedUserStatus}>
-                {isConnected ? 'Online' : 'Offline'}
-           </Text>
-         </View>
-        </View>
-        
-          <View style={styles.headerActions}>
-                 <TouchableOpacity 
-              style={styles.headerAction}
-           onPress={() => {
-             const now = Date.now();
-             if (now - lastRefreshTime > 1000) {
-               setLastRefreshTime(now);
-               fetchMessages(userId, true);
-             }
-           }}
-         >
-              <Ionicons name="refresh" size={22} color="#fff" />
-         </TouchableOpacity>
-      </View>
-        </View>
+          <View style={styles.headerNameWrap}>
+            <Text style={styles.headerName} numberOfLines={1}>{userName}</Text>
+            <Text style={styles.headerUsername} numberOfLines={1}>
+              {userName ? userName.replace(/\s+/g, '_').toLowerCase() + ' • Study Buddy' : 'Study Buddy'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </TouchableOpacity>
       </LinearGradient>
-
-
+      {/* Typing indicator */}
+      {isTyping && (
+        <View style={styles.typingIndicatorHeader}>
+          <View style={styles.typingDots}>
+            <View style={[styles.typingDot, { opacity: 0.4 }]} />
+            <View style={[styles.typingDot, { opacity: 0.7 }]} />
+            <View style={[styles.typingDot, { opacity: 1 }]} />
+          </View>
+          <Text style={styles.typingTextHeader}>{userName} is typing...</Text>
+        </View>
+      )}
+      
        {/* Messages */}
        <View style={styles.messagesContainer}>
         {loadingMessages ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1877f2" />
+            <ActivityIndicator size="large" color="#6366F1" />
             <Text style={styles.loadingText}>Loading messages...</Text>
           </View>
         ) : messages.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="chatbubble-outline" size={80} color="#bdc3c7" />
+              <Ionicons name="chatbubbles-outline" size={64} color="#6366F1" />
             </View>
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptySubtitle}>
-              {isFollowing 
-                ? 'Start a conversation with this user!' 
+              {isFollowing
+                ? 'Start a conversation with this study buddy!'
                 : 'Send a message request to start chatting'
               }
             </Text>
-            <TouchableOpacity style={styles.startConversationButton}>
+            <TouchableOpacity style={styles.startConversationButton} activeOpacity={0.85}>
               <LinearGradient
-                colors={['#1877f2', '#42a5f5']}
+                colors={['#6366F1', '#8B5CF6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.buttonGradient}
               >
                 <Text style={styles.buttonText}>
@@ -1195,10 +1186,19 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
                <RefreshControl
                  refreshing={refreshing}
                  onRefresh={onRefresh}
-                 colors={['#1877f2']}
-                 tintColor="#1877f2"
+                 colors={['#6366F1']}
+                 tintColor="#6366F1"
                />
              }
+             ListFooterComponent={() => {
+               const last = messages[messages.length - 1];
+               if (!last || String(last.sender?.id) !== String(currentUser?.id) || !last.isRead) return null;
+               return (
+                 <View style={styles.seenRow}>
+                   <Text style={styles.seenText}>{formatSeenDate(last.createdAt)}</Text>
+                 </View>
+               );
+             }}
            />
         )}
       </View>
@@ -1239,72 +1239,57 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
           </View>
         )}
 
-        <View style={styles.enhancedInputWrapper}>
-          <View style={styles.enhancedInputRow}>
-            {/* Emoji Button */}
-            <TouchableOpacity
-              style={styles.emojiPickerButton}
-              onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+        <View style={styles.inputBar}>
+          <TouchableOpacity style={styles.cameraBtn} onPress={() => setShowFileOptions(true)} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#6366F1', '#8B5CF6']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.cameraBtnCircle}
             >
-              <Text style={styles.emojiPickerButtonText}>😊</Text>
-            </TouchableOpacity>
-            
-            <View style={styles.enhancedTextInputWrapper}>
-              <TextInput
-                ref={textInputRef}
-                style={styles.enhancedMessageInput}
-                placeholder="Send message..."
-                placeholderTextColor="#999"
-                multiline
-                value={newMessage}
-                onChangeText={handleTypingChange}
-                onKeyPress={handleKeyPress}
-                editable={!sending}
-                maxLength={1000}
-              />
-              {newMessage.length > 800 && (
-                <Text style={styles.characterCounter}>
-                  {newMessage.length}/1000
-                </Text>
-              )}
-            </View>
-
-            {/* Attach Button */}
-            <TouchableOpacity 
-              style={styles.enhancedAttachButton}
-              onPress={() => setShowFileOptions(true)}
-              disabled={isUploading}
-            >
-              <LinearGradient
-                colors={['#4F46E5', '#7C3AED']}
-                style={styles.attachButtonGradient}
-              >
-                {isUploading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="attach" size={24} color="#fff" />
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* Send Button */}
+              <Ionicons name="camera-outline" size={22} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+          <TextInput
+            ref={textInputRef}
+            style={styles.messageInput}
+            placeholder="Message..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            value={newMessage}
+            onChangeText={handleTypingChange}
+            onBlur={emitStopTyping}
+            onKeyPress={handleKeyPress}
+            editable={!sending}
+            maxLength={1000}
+          />
+          {!newMessage.trim() && !selectedFile?.uploadedUrl ? (
+            <>
+              <TouchableOpacity style={styles.inputIconBtn} onPress={() => setShowFileOptions(true)} disabled={isUploading}>
+                <Ionicons name="image-outline" size={24} color="#374151" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.inputIconBtn} onPress={() => setShowEmojiPicker(!showEmojiPicker)}>
+                <Text style={styles.emojiBtnText}>😊</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity
-              style={[
-                styles.enhancedSendButton, 
-                (!newMessage.trim() && !selectedFile?.uploadedUrl || sending) && styles.enhancedSendButtonDisabled
-              ]}
+              style={styles.sendBtnWrap}
               onPress={() => {
                 if (selectedFile?.uploadedUrl) {
                   sendFileMessage();
-                } else if (newMessage.trim()) {
+                } else {
                   sendMessage();
                 }
               }}
-              disabled={!newMessage.trim() && !selectedFile?.uploadedUrl || sending}
+              disabled={sending}
+              activeOpacity={0.85}
             >
               <LinearGradient
-                colors={(!newMessage.trim() && !selectedFile?.uploadedUrl || sending) ? ['#ccc', '#999'] : ['#4F46E5', '#7C3AED']}
-                style={styles.sendButtonGradient}
+                colors={['#059669', '#047857']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sendBtn}
               >
                 {sending ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -1313,7 +1298,8 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
                 )}
               </LinearGradient>
             </TouchableOpacity>
-          </View>
+          )}
+        </View>
 
           {/* File Options Modal */}
           {showFileOptions && (
@@ -1361,21 +1347,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
               </TouchableOpacity>
             </View>
           )}
-        </View>
-        
-
-         {/* Typing Indicator */}
-         {isTyping && (
-           <View style={styles.typingIndicator}>
-             <View style={styles.typingDots}>
-               <View style={[styles.typingDot, { animationDelay: '0ms' }]} />
-               <View style={[styles.typingDot, { animationDelay: '100ms' }]} />
-               <View style={[styles.typingDot, { animationDelay: '200ms' }]} />
-             </View>
-             <Text style={styles.typingText}>{userName} is typing...</Text>
-           </View>
-         )}
-
          {/* Delete Message Modal */}
          <Modal
            visible={deleteModalVisible}
@@ -1447,7 +1418,190 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F1F5F9',
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: Platform.OS === 'ios' ? 12 : 8,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerBackBtn: {
+    marginRight: 4,
+  },
+  headerBackBtnInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerUserRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerAvatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  headerAvatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#6366F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarInitials: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  headerOnlineDot: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  headerNameWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  headerUsername: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  headerIconBtn: {},
+  headerIconBtnCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageBubble: {
+    maxWidth: '78%',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 18,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  myBubble: {
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 6,
+    backgroundColor: '#6366F1',
+    marginLeft: 48,
+  },
+  theirBubble: {
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 6,
+    backgroundColor: '#FFFFFF',
+    marginRight: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
+  },
+  seenRow: {
+    alignItems: 'flex-end',
+    paddingVertical: 6,
+    paddingRight: 16,
+  },
+  seenText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cameraBtn: {},
+  cameraBtnCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messageInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1E293B',
+    maxHeight: 100,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  inputIconBtn: {
+    padding: 10,
+  },
+  emojiBtnText: {
+    fontSize: 22,
+  },
+  sendBtnWrap: {
+    overflow: 'hidden',
+    borderRadius: 23,
+  },
+  sendBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   enhancedHeader: {
     paddingTop: Platform.OS === 'ios' ? 44 : 20,
@@ -1462,10 +1616,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   headerAction: {
     padding: 8,
@@ -1570,7 +1720,7 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
@@ -1579,53 +1729,56 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#64748B',
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 40,
   },
   emptyIcon: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 40,
+    backgroundColor: '#EEF2FF',
+    padding: 24,
+    borderRadius: 48,
     marginBottom: 24,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
   },
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#64748B',
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
+    lineHeight: 22,
+    marginBottom: 28,
   },
   startConversationButton: {
-    borderRadius: 25,
+    borderRadius: 14,
     overflow: 'hidden',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonGradient: {
-    paddingHorizontal: 32,
+    paddingHorizontal: 28,
     paddingVertical: 16,
-    borderRadius: 25,
+    borderRadius: 14,
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
      messagesList: {
@@ -1708,9 +1861,9 @@ const styles = StyleSheet.create({
   },
      inputContainer: {
     position: 'relative',
-     backgroundColor: '#fff',
-     borderTopWidth: 1,
-     borderTopColor: '#f0f0f0',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
     paddingBottom: Platform.OS === 'ios' ? 60 : 50,
     marginBottom: Platform.OS === 'ios' ? 60 : 90,
     zIndex: 1,
@@ -1811,33 +1964,40 @@ const styles = StyleSheet.create({
      lineHeight: 22,
      marginLeft: 8,
    },
-   requestButtons: {
-     flexDirection: 'row',
-     marginTop: 12,
-     gap: 8,
-   },
-   acceptButton: {
-     backgroundColor: '#4CAF50',
-     paddingHorizontal: 16,
-     paddingVertical: 8,
-     borderRadius: 16,
-   },
-   acceptButtonText: {
-     color: '#fff',
-     fontSize: 14,
-     fontWeight: '600',
-   },
-   rejectButton: {
-     backgroundColor: '#f44336',
-     paddingHorizontal: 16,
-     paddingVertical: 8,
-     borderRadius: 16,
-   },
-   rejectButtonText: {
-     color: '#fff',
-     fontSize: 14,
-     fontWeight: '600',
-   },
+  requestButtons: {
+    flexDirection: 'row',
+    marginTop: 14,
+    gap: 10,
+  },
+  acceptButton: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  acceptButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  rejectButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  rejectButtonText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
+  },
    typingIndicator: {
      flexDirection: 'row',
      alignItems: 'center',
@@ -1845,21 +2005,32 @@ const styles = StyleSheet.create({
      paddingTop: 8,
      paddingBottom: 4,
    },
-   typingDots: {
-     flexDirection: 'row',
-     marginRight: 8,
-   },
-   typingDot: {
-     width: 8,
-     height: 8,
-     borderRadius: 4,
-     backgroundColor: '#999',
-     marginRight: 4,
-   },
-   typingText: {
-     fontSize: 14,
-     color: '#666',
-   },
+  typingIndicatorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E2E8F0',
+  },
+  typingDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+    gap: 4,
+  },
+  typingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366F1',
+  },
+  typingTextHeader: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
    websocketStatus: {
      flexDirection: 'row',
      alignItems: 'center',
@@ -1876,22 +2047,20 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   dateSeparator: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 16,
+    marginVertical: 20,
     paddingHorizontal: 16,
-  },
-  dateSeparatorLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e0e0e0',
   },
   dateSeparatorText: {
     fontSize: 12,
-    color: '#666',
-    marginHorizontal: 12,
+    color: '#64748B',
     fontWeight: '600',
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
     emojiPickerContainer: {
       backgroundColor: '#fff',
@@ -1946,30 +2115,37 @@ const styles = StyleSheet.create({
     fileOptionsContainer: {
       position: 'absolute',
       bottom: '100%',
-      right: 48,
-      backgroundColor: '#fff',
-      borderRadius: 12,
-      padding: 8,
-      marginBottom: 8,
+      left: 14,
+      right: 14,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      marginBottom: 10,
       flexDirection: 'row',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 8,
       borderWidth: 1,
-      borderColor: '#e0e0e0',
+      borderColor: '#E2E8F0',
     },
     fileOption: {
+      flex: 1,
       flexDirection: 'column',
       alignItems: 'center',
-      padding: 12,
-      marginHorizontal: 4,
+      justifyContent: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: '#F8FAFC',
     },
     fileOptionText: {
-      fontSize: 12,
+      fontSize: 13,
       color: '#4F46E5',
-      marginTop: 4,
+      marginTop: 6,
+      fontWeight: '600',
     },
     filePreviewContainer: {
       position: 'absolute',

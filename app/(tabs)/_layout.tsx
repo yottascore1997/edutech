@@ -192,6 +192,55 @@ function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="study-partner"
+        options={{
+          title: 'Study Partner',
+          href: null, // Navigate via home screen card
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-profile"
+        options={{
+          title: 'Study Partner Profile',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-discover"
+        options={{
+          title: 'Study Partner Discover',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-matches"
+        options={{
+          title: 'Study Partner Matches',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-who-liked-you"
+        options={{
+          title: 'Who Liked You',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-liked-user"
+        options={{
+          title: 'Liked User',
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="study-partner-match"
+        options={{
+          title: 'Match',
+          href: null,
+        }}
+      />
       </Tabs>
     </View>
   );

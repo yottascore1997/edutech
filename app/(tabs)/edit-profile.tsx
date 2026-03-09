@@ -17,14 +17,16 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiFetchAuth, uploadFile } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function EditProfileScreen() {
   const navigation = useNavigation();
   const { user, updateUser } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -258,7 +260,18 @@ export default function EditProfileScreen() {
       .toUpperCase();
   };
 
-    if (fetchingProfile) {
+  const filledCount = [
+    profileData.name.trim(),
+    profileData.username.trim(),
+    profileData.bio.trim(),
+    profileData.course.trim(),
+    profileData.year.trim(),
+    profileData.profilePhoto,
+  ].filter(Boolean).length;
+  const totalFields = 6;
+  const progressPercent = Math.round((filledCount / totalFields) * 100);
+
+  if (fetchingProfile) {
       return (
         <View style={styles.container}>
           <View style={styles.loadingContainer}>
@@ -274,10 +287,30 @@ export default function EditProfileScreen() {
       <ScrollView 
         style={styles.enhancedContent} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100, paddingTop: 50 }}
+        contentContainerStyle={{ paddingBottom: 100, paddingTop: 0 }}
       >
-        {/* Profile Photo Section */}
-        <View style={styles.compactPhotoSection}>
+        {/* Attractive gradient header */}
+        <LinearGradient
+          colors={['#6366F1', '#8B5CF6', '#A855F7']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
+        >
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.headerBack, { top: insets.top + 8 }]}>
+            <Ionicons name="arrow-back" size={24} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerSubtitle}>Stand out with a complete profile ✨</Text>
+          <View style={styles.progressRow}>
+            <View style={styles.progressBarBg}>
+              <Animated.View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+            </View>
+            <Text style={styles.progressText}>{filledCount} of {totalFields} filled</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Profile Photo Section - Hero */}
+        <View style={styles.photoSectionCard}>
           <View style={styles.compactAvatarContainer}>
             {uploadingPhoto ? (
               <View style={styles.compactAvatarLoading}>
@@ -304,10 +337,17 @@ export default function EditProfileScreen() {
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
+          <Text style={styles.photoHint}>Tap to add a photo — first thing people notice!</Text>
         </View>
 
-        {/* Form Fields */}
-        <View style={styles.enhancedFormSection}>
+        {/* Form Fields - Section: Basic Info */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionIconWrap}>
+              <Ionicons name="person-circle" size={22} color="#6366F1" />
+            </View>
+            <Text style={styles.sectionTitle}>Basic Info</Text>
+          </View>
           {/* Enhanced Name Field */}
           <View style={styles.enhancedInputGroup}>
             <View style={styles.enhancedInputLabelContainer}>
@@ -327,7 +367,7 @@ export default function EditProfileScreen() {
                 style={styles.enhancedInput}
                 value={profileData.name}
                 onChangeText={(text) => setProfileData(prev => ({ ...prev, name: text }))}
-                placeholder="Enter your full name"
+                placeholder="How do you want to be called?"
                 placeholderTextColor="#94a3b8"
               />
             </LinearGradient>
@@ -352,13 +392,20 @@ export default function EditProfileScreen() {
                 style={styles.enhancedInput}
                 value={profileData.username}
                 onChangeText={(text) => setProfileData(prev => ({ ...prev, username: text }))}
-                placeholder="Enter your username"
+                placeholder="Unique handle — e.g. rahul_study"
                 placeholderTextColor="#94a3b8"
                 autoCapitalize="none"
               />
             </LinearGradient>
           </View>
 
+          {/* About You section */}
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="chatbubble-ellipses" size={22} color="#059669" />
+            </View>
+            <Text style={styles.sectionTitle}>About You</Text>
+          </View>
           {/* Enhanced Bio Field */}
           <View style={styles.enhancedInputGroup}>
             <View style={styles.enhancedInputLabelContainer}>
@@ -378,7 +425,7 @@ export default function EditProfileScreen() {
                 style={[styles.enhancedInput, styles.enhancedTextArea]}
                 value={profileData.bio}
                 onChangeText={(text) => setProfileData(prev => ({ ...prev, bio: text }))}
-                placeholder="Tell us about yourself..."
+                placeholder="Tell us about yourself... What do you love studying?"
                 placeholderTextColor="#94a3b8"
                 multiline
                 numberOfLines={2}
@@ -387,6 +434,13 @@ export default function EditProfileScreen() {
             </LinearGradient>
           </View>
 
+          {/* Study Details section */}
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: '#E0E7FF' }]}>
+              <Ionicons name="school" size={22} color="#4F46E5" />
+            </View>
+            <Text style={styles.sectionTitle}>Study Details</Text>
+          </View>
           {/* Enhanced Course and Year Row */}
           <View style={styles.enhancedRow}>
             <View style={[styles.enhancedInputGroup, styles.enhancedHalfWidth]}>
@@ -407,7 +461,7 @@ export default function EditProfileScreen() {
                   style={styles.enhancedInput}
                   value={profileData.course}
                   onChangeText={(text) => setProfileData(prev => ({ ...prev, course: text }))}
-                  placeholder="e.g., Computer Science"
+                  placeholder="e.g. B.Tech, SSC CGL"
                   placeholderTextColor="#94a3b8"
                 />
               </LinearGradient>
@@ -431,7 +485,7 @@ export default function EditProfileScreen() {
                   style={styles.enhancedInput}
                   value={profileData.year}
                   onChangeText={(text) => setProfileData(prev => ({ ...prev, year: text }))}
-                  placeholder="e.g., 2025"
+                  placeholder="e.g. 2025 or 2nd year"
                   placeholderTextColor="#94a3b8"
                   keyboardType="numeric"
                 />
@@ -439,6 +493,13 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
+          {/* Privacy section */}
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="lock-closed" size={22} color="#DC2626" />
+            </View>
+            <Text style={styles.sectionTitle}>Privacy</Text>
+          </View>
           {/* Enhanced Privacy Switch */}
           <LinearGradient
             colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
@@ -466,8 +527,12 @@ export default function EditProfileScreen() {
               />
             </View>
           </LinearGradient>
+        </View>
 
           {/* Save Button */}
+          {progressPercent < 100 && (
+            <Text style={styles.almostThere}>You’re almost there! Fill the rest to stand out.</Text>
+          )}
           <View style={styles.enhancedSaveButtonContainer}>
             <TouchableOpacity
               onPress={handleSave}
@@ -496,7 +561,6 @@ export default function EditProfileScreen() {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </View>
        </ScrollView>
     </View>
    );
@@ -505,8 +569,121 @@ export default function EditProfileScreen() {
  const styles = StyleSheet.create({
    container: {
      flex: 1,
-     backgroundColor: '#f8f9fa',
+     backgroundColor: '#f0f4ff',
    },
+   
+   // Header
+   headerGradient: {
+     paddingTop: 52,
+     paddingBottom: 24,
+     paddingHorizontal: 20,
+     borderBottomLeftRadius: 24,
+     borderBottomRightRadius: 24,
+   },
+   headerBack: {
+     position: 'absolute',
+     top: 12,
+     left: 20,
+     width: 40,
+     height: 40,
+     borderRadius: 20,
+     backgroundColor: 'rgba(255,255,255,0.2)',
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+  headerTitle: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 17,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 16,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 5,
+    backgroundColor: '#FFF',
+  },
+  progressText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+    minWidth: 100,
+  },
+   photoSectionCard: {
+     alignItems: 'center',
+     marginHorizontal: 16,
+     marginTop: -8,
+     marginBottom: 16,
+     backgroundColor: '#FFFFFF',
+     borderRadius: 20,
+     paddingVertical: 24,
+     paddingHorizontal: 20,
+     shadowColor: '#6366F1',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.12,
+     shadowRadius: 12,
+     elevation: 4,
+   },
+  photoHint: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  sectionCard: {
+    marginHorizontal: 16,
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  sectionIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  almostThere: {
+    fontSize: 16,
+    color: '#6366F1',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '600',
+  },
    
    // Enhanced Content
    enhancedContent: {
@@ -523,39 +700,39 @@ export default function EditProfileScreen() {
      position: 'relative',
      alignItems: 'center',
    },
-   compactAvatarLoading: {
-     width: 80,
-     height: 80,
-     borderRadius: 40,
-     backgroundColor: '#F3F4F6',
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   compactAvatar: {
-     width: 80,
-     height: 80,
-     borderRadius: 40,
-   },
-   compactAvatarPlaceholder: {
-     width: 80,
-     height: 80,
-     borderRadius: 40,
-     backgroundColor: '#4F46E5',
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   compactAvatarInitials: {
-     fontSize: 24,
-     fontWeight: 'bold',
-     color: '#fff',
-   },
-   compactEditButton: {
-     position: 'absolute',
-     bottom: -2,
-     right: -2,
-     width: 36,
-     height: 36,
-     borderRadius: 18,
+  compactAvatarLoading: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactAvatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  compactAvatarPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactAvatarInitials: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  compactEditButton: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
      backgroundColor: '#4F46E5',
      justifyContent: 'center',
      alignItems: 'center',
@@ -570,48 +747,48 @@ export default function EditProfileScreen() {
    
    // Form Section Styles
    enhancedFormSection: {
-     paddingHorizontal: 16,
+     paddingHorizontal: 0,
      paddingBottom: 40,
    },
-   enhancedInputGroup: {
-     marginBottom: 24,
-   },
-   enhancedInputLabelContainer: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     marginBottom: 12,
-   },
-   enhancedInputIconContainer: {
-     width: 40,
-     height: 40,
-     borderRadius: 20,
-     justifyContent: 'center',
-     alignItems: 'center',
-     marginRight: 12,
-   },
-   enhancedInputLabel: {
-     fontSize: 16,
-     fontWeight: '600',
-     color: '#374151',
-     marginLeft: 8,
-   },
-   enhancedInputContainer: {
-     borderRadius: 12,
-     padding: 16,
-     shadowColor: '#4F46E5',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.1,
-     shadowRadius: 4,
-     elevation: 2,
-   },
-   enhancedInput: {
-     fontSize: 16,
-     color: '#1F2937',
-     paddingVertical: 4,
-   },
-   enhancedTextArea: {
-     minHeight: 50,
-   },
+  enhancedInputGroup: {
+    marginBottom: 28,
+  },
+  enhancedInputLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  enhancedInputIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  enhancedInputLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  enhancedInputContainer: {
+    borderRadius: 14,
+    padding: 18,
+    shadowColor: '#4F46E5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  enhancedInput: {
+    fontSize: 18,
+    color: '#1F2937',
+    paddingVertical: 8,
+  },
+  enhancedTextArea: {
+    minHeight: 88,
+  },
    enhancedRow: {
      flexDirection: 'row',
      gap: 12,
@@ -621,49 +798,49 @@ export default function EditProfileScreen() {
    },
    
    // Switch Styles
-   enhancedSwitchGroup: {
-     borderRadius: 16,
-     paddingHorizontal: 16,
-     paddingVertical: 16,
-     marginHorizontal: 16,
-     marginBottom: 24,
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.05,
-     shadowRadius: 8,
-     elevation: 2,
-   },
-   enhancedSwitchContent: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'space-between',
-   },
-   enhancedSwitchLabelContainer: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     flex: 1,
-   },
-   enhancedSwitchIconContainer: {
-     width: 40,
-     height: 40,
-     borderRadius: 20,
-     justifyContent: 'center',
-     alignItems: 'center',
-     marginRight: 12,
-   },
-   enhancedSwitchTextContainer: {
-     flex: 1,
-   },
-   enhancedSwitchLabel: {
-     fontSize: 16,
-     fontWeight: '600',
-     color: '#1F2937',
-     marginBottom: 4,
-   },
-   enhancedSwitchDescription: {
-     fontSize: 14,
-     color: '#6B7280',
-   },
+  enhancedSwitchGroup: {
+    borderRadius: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    marginHorizontal: 0,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  enhancedSwitchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  enhancedSwitchLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  enhancedSwitchIconContainer: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  enhancedSwitchTextContainer: {
+    flex: 1,
+  },
+  enhancedSwitchLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  enhancedSwitchDescription: {
+    fontSize: 16,
+    color: '#6B7280',
+  },
    
    // Save Button Styles
    enhancedSaveButtonContainer: {
@@ -678,41 +855,41 @@ export default function EditProfileScreen() {
      shadowRadius: 8,
      elevation: 6,
    },
-   enhancedSaveButton: {
-     borderRadius: 16,
-     overflow: 'hidden',
-     minHeight: 56,
-     backgroundColor: '#4F46E5',
-   },
-   enhancedSaveButtonDisabled: {
-     opacity: 0.6,
-     backgroundColor: '#9CA3AF',
-   },
-   enhancedSaveButtonGradient: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'center',
-     paddingVertical: 18,
-     paddingHorizontal: 24,
-     gap: 12,
-     minHeight: 56,
-   },
-   enhancedSaveButtonText: {
-     fontSize: 18,
-     fontWeight: 'bold',
-     color: '#fff',
-     textAlign: 'center',
-   },
+  enhancedSaveButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    minHeight: 62,
+    backgroundColor: '#4F46E5',
+  },
+  enhancedSaveButtonDisabled: {
+    opacity: 0.6,
+    backgroundColor: '#9CA3AF',
+  },
+  enhancedSaveButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 28,
+    gap: 12,
+    minHeight: 62,
+  },
+  enhancedSaveButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
    loadingContainer: {
      flex: 1,
      justifyContent: 'center',
      alignItems: 'center',
      backgroundColor: '#f8f9fa',
    },
-   loadingText: {
-     marginTop: 16,
-     fontSize: 16,
-     color: '#6B7280',
-     fontWeight: '500',
-   },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
 });

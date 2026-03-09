@@ -11,6 +11,12 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
     const { routes, index: activeIndex } = state;
     const { isLiveExamInProgress } = useLiveExam();
 
+    const activeRoute = routes[activeIndex];
+    // Hide app tab bar on Study Partner flow screens and on Messages (Study Partner Chats)
+    if (activeRoute?.name?.startsWith('study-partner') || activeRoute?.name === 'messages') {
+        return null;
+    }
+
     // Filter to only the routes we expect, to prevent duplicates
     const expectedRoutes = ['home', 'exam', 'quiz', 'timetable', 'book-store'];
     const filteredRoutes = routes.filter((r: any) => expectedRoutes.includes(r.name));
