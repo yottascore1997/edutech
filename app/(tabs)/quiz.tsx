@@ -1,5 +1,5 @@
-import { apiFetchAuth } from '@/constants/api';
 import QuestionOfTheDayPreview from '@/components/QuestionOfTheDayPreview';
+import { apiFetchAuth } from '@/constants/api';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,14 +7,12 @@ import { useRouter } from 'expo-router';
 import {
     ArrowRight,
     Brain,
-    CheckCircle,
     Clock,
     Crown,
     Map,
     MoreVertical,
     TestTube,
     Trophy,
-    Users,
     X,
     Zap
 } from 'lucide-react-native';

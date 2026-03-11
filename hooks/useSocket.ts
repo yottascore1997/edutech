@@ -1,7 +1,7 @@
 // hooks/useSocket.ts
+import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 
 interface ServerToClientEvents {
   connect: () => void;

@@ -420,6 +420,7 @@ export default function MessagesScreen() {
 
   // Regular chats list (only those having a latestMessage)
   const conversationsWithMessages = conversations.filter(c => !!c.latestMessage);
+  const totalUnread = conversationsWithMessages.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const filteredConversations = conversationsWithMessages.filter(conversation => {
     const userName = conversation.user.name || '';
     const lastMessage = conversation.latestMessage?.content || '';
@@ -576,6 +577,19 @@ export default function MessagesScreen() {
         style={styles.bgGradient}
       />
 
+      {/* Top header like Tinder: title + icons */}
+      <View style={styles.headerBar}>
+        <Text style={styles.headerBarTitle}>Chat</Text>
+        <View style={styles.headerBarIcons}>
+          <TouchableOpacity activeOpacity={0.8} style={styles.headerCircleBtn}>
+            <Ionicons name="shield-outline" size={18} color="#4B5563" />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.8} style={styles.headerCircleBtn}>
+            <Ionicons name="notifications-outline" size={18} color="#4B5563" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Matches without messages - premium strip */}
       {filteredMatchesWithoutMessages.length > 0 && (
         <View style={styles.matchesStripWrap}>
@@ -625,7 +639,14 @@ export default function MessagesScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={styles.chatsHeaderWrap}>
-            <Text style={styles.chatsHeaderTitle}>Chats</Text>
+            <View style={styles.messagesHeaderRow}>
+              <Text style={styles.chatsHeaderTitle}>Messages</Text>
+              {totalUnread > 0 && (
+                <View style={styles.messagesBadge}>
+                  <Text style={styles.messagesBadgeText}>{totalUnread}</Text>
+                </View>
+              )}
+            </View>
           </View>
         }
         refreshControl={
@@ -661,69 +682,31 @@ const styles = StyleSheet.create({
   bgGradient: {
     ...StyleSheet.absoluteFillObject,
   },
-  header: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 48 : 24,
-    paddingBottom: 16,
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
+    paddingBottom: 12,
   },
-  headerBtn: {
-    padding: 4,
+  headerBarTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111827',
   },
-  headerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
+  headerBarIcons: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  logoCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+  headerCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.3,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  plusButton: {
-    overflow: 'hidden',
-    borderRadius: 20,
-  },
-  plusButtonGradient: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
   },
   searchWrap: {
     paddingHorizontal: 16,
@@ -897,18 +880,37 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 20 : 12,
+    paddingTop: 12,
     paddingBottom: 100,
     flexGrow: 1,
   },
   chatsHeaderWrap: {
     marginBottom: 14,
   },
+  messagesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   chatsHeaderTitle: {
     fontSize: 22,
     fontWeight: '800',
     color: '#1F2937',
     letterSpacing: 0.3,
+  },
+  messagesBadge: {
+    minWidth: 20,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  messagesBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   chatRow: {
     flexDirection: 'row',

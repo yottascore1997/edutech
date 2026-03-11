@@ -1094,6 +1094,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
                 userId,
                 name: userName,
                 profilePhoto: displayPhotoUrl || displayPhoto || '',
+                fromMatchOrChat: 'true',
               },
             } as any);
           }}
@@ -1205,12 +1206,9 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
       {/* Message Input */}
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 160 : 150}
-        style={[
-          styles.inputContainer,
-          Platform.OS === 'android' && { paddingBottom: 150, marginBottom: 150 }
-        ]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        style={styles.inputContainer}
       >
         {/* Emoji Picker */}
         {showEmojiPicker && (
@@ -1859,13 +1857,14 @@ const styles = StyleSheet.create({
     right: 4,
     bottom: 4,
   },
-     inputContainer: {
+  inputContainer: {
     position: 'relative',
     backgroundColor: '#FFFFFF',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E2E8F0',
-    paddingBottom: Platform.OS === 'ios' ? 60 : 50,
-    marginBottom: Platform.OS === 'ios' ? 60 : 90,
+    paddingBottom: Platform.OS === 'ios' ? 16 : 8,
+    // Keep input just above bottom navigation bar (Android a bit higher)
+    marginBottom: Platform.OS === 'ios' ? 16 : 60,
     zIndex: 1,
   },
   enhancedInputWrapper: {

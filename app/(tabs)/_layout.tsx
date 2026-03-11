@@ -145,20 +145,6 @@ function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="spy-game"
-        options={{
-          title: 'Spy Game',
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="spy-room"
-        options={{
-          title: 'Spy Room',
-          href: null,
-        }}
-      />
-      <Tabs.Screen
         name="book-store"
         options={{
           title: 'Books',

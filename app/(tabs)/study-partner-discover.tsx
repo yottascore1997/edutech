@@ -1,5 +1,5 @@
 import StudyPartnerBottomNav from '@/components/StudyPartnerBottomNav';
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -44,6 +44,7 @@ export default function StudyPartnerDiscoverScreen() {
 
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [index, setIndex] = useState(0);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +52,15 @@ export default function StudyPartnerDiscoverScreen() {
   const [detailsSectionY, setDetailsSectionY] = useState<number | null>(null);
   const cardTranslateX = useRef(new Animated.Value(0)).current;
   const cardRotate = useRef(new Animated.Value(0)).current;
+  const [lastAction, setLastAction] = useState<'like' | 'pass' | null>(null);
+  const lastActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset card position when profile changes
   useEffect(() => {
     cardTranslateX.setValue(0);
     cardRotate.setValue(0);
     setDetailsOpen(false);
+    setPhotoIndex(0);
   }, [index, cardTranslateX, cardRotate]);
 
   useEffect(() => {
@@ -96,6 +100,23 @@ export default function StudyPartnerDiscoverScreen() {
   }, [user?.token]);
 
   const current = profiles[index];
+  const displayPhotos =
+    current
+      ? (Array.isArray(current.photos) && current.photos.length > 0
+          ? current.photos
+          : current.profilePhoto
+          ? [current.profilePhoto]
+          : [])
+      : [];
+  const currentPhotoUri =
+    displayPhotos.length > 0
+      ? (displayPhotos[photoIndex] || displayPhotos[0])
+      : current?.profilePhoto || '';
+
+  const resolvedCurrentPhotoUri =
+    currentPhotoUri && !currentPhotoUri.startsWith('http')
+      ? getImageUrl(currentPhotoUri)
+      : currentPhotoUri;
 
   const toggleDetails = () => {
     const next = !detailsOpen;
@@ -111,6 +132,20 @@ export default function StudyPartnerDiscoverScreen() {
         }
       }, 50);
     }
+  };
+
+  const handlePrevPhoto = () => {
+    if (!displayPhotos.length) return;
+    setPhotoIndex((prev) =>
+      prev <= 0 ? displayPhotos.length - 1 : prev - 1,
+    );
+  };
+
+  const handleNextPhoto = () => {
+    if (!displayPhotos.length) return;
+    setPhotoIndex((prev) =>
+      prev >= displayPhotos.length - 1 ? 0 : prev + 1,
+    );
   };
 
   const sendAction = async (action: 'like' | 'pass') => {
@@ -139,6 +174,15 @@ export default function StudyPartnerDiscoverScreen() {
         return;
       }
 
+      // Show quick feedback so user knows what happened
+      if (lastActionTimerRef.current) {
+        clearTimeout(lastActionTimerRef.current);
+      }
+      setLastAction(action);
+      lastActionTimerRef.current = setTimeout(() => {
+        setLastAction(null);
+      }, 1500);
+
       setIndex(prev => prev + 1);
     } catch (e: any) {
       console.error('StudyPartnerDiscover action error:', e);
@@ -146,6 +190,28 @@ export default function StudyPartnerDiscoverScreen() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const triggerSwipe = (action: 'like' | 'pass') => {
+    if (actionLoading || !current) return;
+    const isLike = action === 'like';
+    const toValue = isLike ? SCREEN_WIDTH + 100 : -SCREEN_WIDTH - 100;
+    const rotateTo = isLike ? 15 : -15;
+
+    Animated.parallel([
+      Animated.timing(cardTranslateX, {
+        toValue,
+        duration: 420,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardRotate, {
+        toValue: rotateTo,
+        duration: 420,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      sendAction(action);
+    });
   };
 
   const panResponder = useRef(
@@ -167,35 +233,9 @@ export default function StudyPartnerDiscoverScreen() {
         const shouldPass = dx + velocity < -threshold;
 
         if (shouldLike) {
-          Animated.parallel([
-            Animated.timing(cardTranslateX, {
-              toValue: SCREEN_WIDTH + 100,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(cardRotate, {
-              toValue: 15,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            sendAction('like');
-          });
+          triggerSwipe('like');
         } else if (shouldPass) {
-          Animated.parallel([
-            Animated.timing(cardTranslateX, {
-              toValue: -SCREEN_WIDTH - 100,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-            Animated.timing(cardRotate, {
-              toValue: -15,
-              duration: 200,
-              useNativeDriver: true,
-            }),
-          ]).start(() => {
-            sendAction('pass');
-          });
+          triggerSwipe('pass');
         } else {
           Animated.parallel([
             Animated.spring(cardTranslateX, {
@@ -269,6 +309,26 @@ export default function StudyPartnerDiscoverScreen() {
               </Text>
             </View>
           </View>
+
+          {lastAction && (
+            <View
+              style={[
+                styles.actionFeedback,
+                lastAction === 'like'
+                  ? styles.actionFeedbackLike
+                  : styles.actionFeedbackPass,
+              ]}
+            >
+              <Ionicons
+                name={lastAction === 'like' ? 'heart' : 'close'}
+                size={16}
+                color={lastAction === 'like' ? '#16A34A' : '#DC2626'}
+              />
+              <Text style={styles.actionFeedbackText}>
+                {lastAction === 'like' ? 'You liked this profile' : 'You passed this profile'}
+              </Text>
+            </View>
+          )}
 
           {/* Header row with back + title */}
           <View style={styles.headerRow}>
@@ -358,12 +418,32 @@ export default function StudyPartnerDiscoverScreen() {
                 </View>
               </Animated.View>
 
-              {current.profilePhoto ? (
+              {resolvedCurrentPhotoUri ? (
                 <ImageBackground
-                  source={{ uri: current.profilePhoto }}
+                  source={{ uri: resolvedCurrentPhotoUri }}
                   style={styles.photo}
                   imageStyle={styles.photoImage}
                 >
+                  {displayPhotos.length > 1 && (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.photoNavButton, styles.photoNavButtonLeft]}
+                        activeOpacity={0.9}
+                        onPress={handlePrevPhoto}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons name="chevron-back" size={20} color="#111827" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoNavButton, styles.photoNavButtonRight]}
+                        activeOpacity={0.9}
+                        onPress={handleNextPhoto}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons name="chevron-forward" size={20} color="#111827" />
+                      </TouchableOpacity>
+                    </>
+                  )}
                   <LinearGradient
                     colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.85)']}
                     start={{ x: 0, y: 0.4 }}
@@ -489,7 +569,7 @@ export default function StudyPartnerDiscoverScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.passButton]}
               activeOpacity={0.9}
-              onPress={() => sendAction('pass')}
+              onPress={() => triggerSwipe('pass')}
               disabled={actionLoading}
             >
               <Ionicons name="close" size={32} color="#EF4444" />
@@ -497,7 +577,7 @@ export default function StudyPartnerDiscoverScreen() {
             <TouchableOpacity
               style={[styles.actionButton, styles.likeButton]}
               activeOpacity={0.9}
-              onPress={() => sendAction('like')}
+              onPress={() => triggerSwipe('like')}
               disabled={actionLoading}
             >
               <Ionicons name="heart" size={32} color="#FFFFFF" />
@@ -561,6 +641,33 @@ const styles = StyleSheet.create({
   tipSubtitle: {
     fontSize: 11,
     color: '#4B5563',
+  },
+  actionFeedback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 6,
+  },
+  actionFeedbackLike: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  actionFeedbackPass: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  actionFeedbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#111827',
   },
   headerRow: {
     flexDirection: 'row',
@@ -686,6 +793,28 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
     paddingBottom: 16,
+  },
+  photoNavButton: {
+    position: 'absolute',
+    top: '45%',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 15,
+  },
+  photoNavButtonLeft: {
+    left: 10,
+  },
+  photoNavButtonRight: {
+    right: 10,
   },
   nameRow: {
     flexDirection: 'row',

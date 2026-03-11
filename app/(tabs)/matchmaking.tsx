@@ -53,6 +53,7 @@ export default function MatchmakingScreen() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   
   // Countdown state
   const [countdown, setCountdown] = useState(3);
@@ -102,6 +103,10 @@ export default function MatchmakingScreen() {
         clearTimeout(pendingRetryTimeoutRef.current);
         pendingRetryTimeoutRef.current = null;
       }
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        setSearchTimeout(null);
+      }
       hasStartedSearch.current = false;
       matchStartRetriesRef.current = 0;
       setMatchmakingState({
@@ -110,13 +115,41 @@ export default function MatchmakingScreen() {
         estimatedWait: 30
       });
       setError(null);
+
+      // Re-start matchmaking when returning to this screen
+      const s = socketRef.current;
+      if (s?.connected && category) {
+        searchStartTime.current = Date.now();
+        hasStartedSearch.current = true;
+
+        if (timerRef.current) clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setMatchmakingState(prev => ({
+            ...prev,
+            timeElapsed: Math.floor((Date.now() - searchStartTime.current) / 1000)
+          }));
+        }, 1000);
+
+        if (user?.id) s.emit('register_user', user.id);
+        s.emit('join_matchmaking', {
+          categoryId: category,
+          mode: mode || 'quick',
+          amount: amount ? parseFloat(amount) : undefined
+        });
+
+        const timeout = setTimeout(() => {
+          setError('No opponent found within 2 minutes. Please try again.');
+          setMatchmakingState(prev => ({ ...prev, status: 'error' }));
+        }, 120000);
+        setSearchTimeout(timeout);
+      }
     };
 
     const unsub = navigation?.addListener?.('focus', onFocus);
     return () => {
       try { unsub(); } catch (err) {}
     };
-  }, [navigation]);
+  }, [navigation, searchTimeout, category, mode, amount, user?.id]);
 
 
 
@@ -232,6 +265,7 @@ export default function MatchmakingScreen() {
       });
 
       setSocket(newSocket);
+      socketRef.current = newSocket;
 
       return () => {
 
@@ -245,14 +279,6 @@ export default function MatchmakingScreen() {
 
   // Start matchmaking - Simplified like web version
   useEffect(() => {
-    // Reset start flag to allow re-starting matchmaking after returning from a match
-    hasStartedSearch.current = false;
-    matchStartRetriesRef.current = 0;
-    if (pendingRetryTimeoutRef.current) {
-      clearTimeout(pendingRetryTimeoutRef.current);
-      pendingRetryTimeoutRef.current = null;
-    }
-
     if (!socket || !isConnected || hasStartedSearch.current) return;
 
 

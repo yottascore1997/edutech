@@ -57,8 +57,24 @@ const ORANGE_HIGHLIGHT = '#ea580c';
 const WHITE = '#ffffff';
 const TEXT_MUTED = 'rgba(255,255,255,0.7)';
 
-/** Minimum delay (ms) before showing next question after answering (e.g. to see correct/wrong feedback) */
-const NEXT_QUESTION_DELAY_MS = 10000;
+/** Delay (ms) to show correct/wrong feedback before next question. Kept short so multiplayer stays in sync. */
+const NEXT_QUESTION_DELAY_MS = 4000;
+
+/** Normalize questionEndsAt from API/socket: if in seconds (value < 1e12), convert to ms for Date.now() comparison */
+function toQuestionEndsAtMs(value: number | null | undefined): number | null {
+  if (value == null || value <= 0) return null;
+  return value < 1e12 ? value * 1000 : value;
+}
+
+/** Get question end timestamp in ms: use server value if valid, else compute from timePerQuestion */
+function getQuestionEndsAtMs(
+  serverEndsAt: number | null | undefined,
+  timePerQuestionSec: number
+): number {
+  const fromServer = toQuestionEndsAtMs(serverEndsAt);
+  if (fromServer != null && fromServer > Date.now()) return fromServer;
+  return Date.now() + (timePerQuestionSec ?? 10) * 1000;
+}
 
 export default function LiveQuizPlayScreen() {
   const insets = useSafeAreaInsets();
@@ -85,6 +101,7 @@ export default function LiveQuizPlayScreen() {
   const nextQuestionDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionEndsAtRef = useRef<number | null>(null);
   const answeredMapRef = useRef<AnsweredMap>({});
+  const refetchedAtZeroForQuestionRef = useRef<number | null>(null);
 
   const myUserId = useMemo(() => user?.id ?? null, [user?.id]);
 
@@ -106,7 +123,7 @@ export default function LiveQuizPlayScreen() {
       const data = res.data || {};
       if (data.session) {
         setSession({
-          id: String(data.session.id ?? session.id),
+          id: String(session.id),
           categoryId: String(data.session.categoryId ?? session.categoryId),
           categoryName: data.session.categoryName ?? session.categoryName,
           timePerQuestion: Number(data.session.timePerQuestion ?? session.timePerQuestion ?? 10),
@@ -119,18 +136,9 @@ export default function LiveQuizPlayScreen() {
         const newIndex = q.questionIndex;
         const prevIndex = currentQuestionRef.current?.questionIndex;
         const justAnswered = lastAnsweredQuestionIndexRef.current;
-        const hasAnsweredCurrent = prevIndex !== undefined && answeredMapRef.current[prevIndex] !== undefined;
-        const endsAt = questionEndsAtRef.current;
-        const timeLeftMs = endsAt != null ? Math.max(0, endsAt - Date.now()) : 0;
 
         const shouldDelayForFeedback =
           justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-        const shouldWaitForTimer =
-          !shouldDelayForFeedback &&
-          prevIndex !== undefined &&
-          !hasAnsweredCurrent &&
-          newIndex !== prevIndex &&
-          timeLeftMs > 0;
 
         const applyNextQuestion = () => {
           setCurrentQuestion({
@@ -144,15 +152,14 @@ export default function LiveQuizPlayScreen() {
           setAnswerFeedback(null);
           setCorrectAnswerIndex(null);
           lastAnsweredQuestionIndexRef.current = null;
-          if (data.questionEndsAt != null) setQuestionEndsAt(Number(data.questionEndsAt));
+          refetchedAtZeroForQuestionRef.current = null;
+          const endsAtMs = getQuestionEndsAtMs(data.questionEndsAt != null ? Number(data.questionEndsAt) : null, session.timePerQuestion ?? 10);
+          setQuestionEndsAt(endsAtMs);
         };
 
         if (shouldDelayForFeedback) {
           if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
           nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-        } else if (shouldWaitForTimer) {
-          if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-          nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, timeLeftMs);
         } else {
           applyNextQuestion();
         }
@@ -171,7 +178,10 @@ export default function LiveQuizPlayScreen() {
         );
       }
       if (typeof data.playingCount === 'number') setPlayingCount(data.playingCount);
-      if (data.questionEndsAt != null && !data.currentQuestion) setQuestionEndsAt(Number(data.questionEndsAt));
+      if (data.questionEndsAt != null && !data.currentQuestion) {
+        const endsAtMs = getQuestionEndsAtMs(Number(data.questionEndsAt), session.timePerQuestion ?? 10);
+        setQuestionEndsAt(endsAtMs);
+      }
     } catch (_) {}
   };
 
@@ -211,6 +221,10 @@ export default function LiveQuizPlayScreen() {
             });
           }
 
+          const timePerQuestion = Number(data.session?.timePerQuestion ?? data.timePerQuestion ?? 10);
+          const endsAtMs = getQuestionEndsAtMs(data.questionEndsAt != null ? Number(data.questionEndsAt) : null, timePerQuestion);
+          setQuestionEndsAt(endsAtMs);
+
           if (Array.isArray(data.leaderboard)) {
             setLeaderboard(
               data.leaderboard.map((e: any) => ({
@@ -227,10 +241,6 @@ export default function LiveQuizPlayScreen() {
 
           if (typeof data.playingCount === 'number') {
             setPlayingCount(data.playingCount);
-          }
-
-          if (data.questionEndsAt) {
-            setQuestionEndsAt(Number(data.questionEndsAt));
           }
         }
       } finally {
@@ -256,7 +266,7 @@ export default function LiveQuizPlayScreen() {
       if (!payload) return;
       if (payload.session) {
         setSession((prev) => ({
-          id: String(payload.session.id ?? prev?.id ?? ''),
+          id: String(prev?.id ?? payload.session.id ?? ''),
           categoryId: String(payload.session.categoryId ?? prev?.categoryId ?? ''),
           categoryName: payload.session.categoryName ?? prev?.categoryName ?? 'Live Quiz',
           timePerQuestion: Number(
@@ -271,18 +281,9 @@ export default function LiveQuizPlayScreen() {
         const newIndex = q.questionIndex;
         const prevIndex = currentQuestionRef.current?.questionIndex;
         const justAnswered = lastAnsweredQuestionIndexRef.current;
-        const hasAnsweredCurrent = prevIndex !== undefined && answeredMapRef.current[prevIndex] !== undefined;
-        const endsAt = questionEndsAtRef.current;
-        const timeLeftMs = endsAt != null ? Math.max(0, endsAt - Date.now()) : 0;
 
         const shouldDelayForFeedback =
           justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-        const shouldWaitForTimer =
-          !shouldDelayForFeedback &&
-          prevIndex !== undefined &&
-          !hasAnsweredCurrent &&
-          newIndex !== prevIndex &&
-          timeLeftMs > 0;
 
         const applyNextQuestion = () => {
           setCurrentQuestion({
@@ -290,22 +291,24 @@ export default function LiveQuizPlayScreen() {
             text: q.text,
             options: q.options || [],
           });
-          if (payload.questionEndsAt) setQuestionEndsAt(Number(payload.questionEndsAt));
+          const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
+          const endsAtMs = getQuestionEndsAtMs(payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null, timePerQuestion);
+          setQuestionEndsAt(endsAtMs);
           lastAnsweredQuestionIndexRef.current = null;
+          refetchedAtZeroForQuestionRef.current = null;
         };
 
         if (shouldDelayForFeedback) {
           if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
           nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-        } else if (shouldWaitForTimer) {
-          if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-          nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, timeLeftMs);
         } else {
           applyNextQuestion();
         }
       }
-      if (payload.questionEndsAt && !payload.currentQuestion) {
-        setQuestionEndsAt(Number(payload.questionEndsAt));
+      if (payload.questionEndsAt != null && !payload.currentQuestion) {
+        const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
+        const endsAtMs = getQuestionEndsAtMs(Number(payload.questionEndsAt), timePerQuestion);
+        setQuestionEndsAt(endsAtMs);
       }
       if (Array.isArray(payload.leaderboard)) {
         setLeaderboard(
@@ -342,19 +345,9 @@ export default function LiveQuizPlayScreen() {
       const newIndex = q?.questionIndex;
       const prevIndex = currentQuestionRef.current?.questionIndex;
       const justAnswered = lastAnsweredQuestionIndexRef.current;
-      const hasAnsweredCurrent = prevIndex !== undefined && answeredMapRef.current[prevIndex] !== undefined;
-      const endsAt = questionEndsAtRef.current;
-      const timeLeftMs = endsAt != null ? Math.max(0, endsAt - Date.now()) : 0;
 
       const shouldDelayForFeedback =
         q && justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-      const shouldWaitForTimer =
-        q &&
-        !shouldDelayForFeedback &&
-        prevIndex !== undefined &&
-        !hasAnsweredCurrent &&
-        newIndex !== prevIndex &&
-        timeLeftMs > 0;
 
       const applyNextQuestion = () => {
         setAnswerFeedback(null);
@@ -380,18 +373,16 @@ export default function LiveQuizPlayScreen() {
               : prev,
           );
         }
-        if (payload.questionEndsAt) {
-          setQuestionEndsAt(Number(payload.questionEndsAt));
-        }
+        const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
+        const endsAtMs = getQuestionEndsAtMs(payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null, timePerQuestion);
+        setQuestionEndsAt(endsAtMs);
         lastAnsweredQuestionIndexRef.current = null;
+        refetchedAtZeroForQuestionRef.current = null;
       };
 
       if (shouldDelayForFeedback) {
         if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
         nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-      } else if (shouldWaitForTimer) {
-        if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-        nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, timeLeftMs);
       } else {
         applyNextQuestion();
       }
@@ -458,6 +449,21 @@ export default function LiveQuizPlayScreen() {
     const id = setInterval(update, 500);
     return () => clearInterval(id);
   }, [questionEndsAt]);
+
+  // When timer hits 0, sync with server so we get next question even if socket didn't push (fixes one user stuck while other advances)
+  useEffect(() => {
+    if (timeLeft !== 0 || !currentQuestion || !session?.id || !user?.token) return;
+    if (refetchedAtZeroForQuestionRef.current === currentQuestion.questionIndex) return;
+    refetchedAtZeroForQuestionRef.current = currentQuestion.questionIndex;
+    refetchSessionState();
+  }, [timeLeft, currentQuestion?.questionIndex, session?.id, user?.token]);
+
+  // Periodic sync so all players stay on same question and leaderboard stays updated
+  useEffect(() => {
+    if (!session?.id || !currentQuestion || !user?.token) return;
+    const interval = setInterval(() => refetchSessionState(), 6000);
+    return () => clearInterval(interval);
+  }, [session?.id, currentQuestion?.questionIndex, user?.token]);
 
   const handleSelectOption = async (optionIndex: number) => {
     if (!session || !currentQuestion || !user?.token) return;

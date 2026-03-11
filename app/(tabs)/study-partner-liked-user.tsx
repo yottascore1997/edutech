@@ -31,9 +31,11 @@ export default function StudyPartnerLikedUserScreen() {
     profilePhoto?: string;
     age?: string;
     examType?: string;
+    fromMatchOrChat?: string;
   }>();
 
   const userId = params.userId || '';
+  const fromMatchOrChat = params.fromMatchOrChat === 'true';
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -170,7 +172,7 @@ export default function StudyPartnerLikedUserScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color="#111827" />
           </TouchableOpacity>
-          <Text style={styles.title}>Discover</Text>
+          <Text style={styles.title}>{fromMatchOrChat ? 'Profile' : 'Discover'}</Text>
         </View>
 
         {loading ? (
@@ -396,25 +398,27 @@ export default function StudyPartnerLikedUserScreen() {
               </View>
             )}
 
-            {/* Bottom actions like Tinder (X / Heart) */}
-            <View style={styles.actionsRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.passButton]}
-                activeOpacity={0.9}
-                onPress={() => sendAction('pass')}
-                disabled={actionLoading}
-              >
-                <Ionicons name="close" size={32} color="#EF4444" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.likeButton]}
-                activeOpacity={0.9}
-                onPress={() => sendAction('like')}
-                disabled={actionLoading}
-              >
-                <Ionicons name="heart" size={32} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
+            {/* Bottom actions like Tinder (X / Heart) – only when coming from discovery / liked list */}
+            {!fromMatchOrChat && (
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.passButton]}
+                  activeOpacity={0.9}
+                  onPress={() => sendAction('pass')}
+                  disabled={actionLoading}
+                >
+                  <Ionicons name="close" size={32} color="#EF4444" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.likeButton]}
+                  activeOpacity={0.9}
+                  onPress={() => sendAction('like')}
+                  disabled={actionLoading}
+                >
+                  <Ionicons name="heart" size={32} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
       </ScrollView>

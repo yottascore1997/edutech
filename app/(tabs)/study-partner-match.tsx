@@ -1,4 +1,5 @@
 import { useAuth } from '@/context/AuthContext';
+import { getImageUrl } from '@/constants/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,11 +29,21 @@ export default function StudyPartnerMatchScreen() {
 
   const otherUserId = params.otherUserId || '';
   const otherName = params.otherName || 'Your match';
-  const otherPhoto = params.otherPhoto || '';
-  const myPhoto =
+  const rawOtherPhoto = params.otherPhoto || '';
+  const rawMyPhoto =
     (user as any)?.profilePhoto ||
     (user as any)?.profilePicture ||
     '';
+
+  const otherPhoto =
+    rawOtherPhoto && !rawOtherPhoto.startsWith('http')
+      ? getImageUrl(rawOtherPhoto)
+      : rawOtherPhoto;
+
+  const myPhoto =
+    rawMyPhoto && !rawMyPhoto.startsWith('http')
+      ? getImageUrl(rawMyPhoto)
+      : rawMyPhoto;
 
   const goToChat = (preset?: string) => {
     router.push({

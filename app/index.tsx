@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Easing, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,6 +18,15 @@ const Welcome = () => {
     const loadingDot1 = useRef(new Animated.Value(0)).current;
     const loadingDot2 = useRef(new Animated.Value(0)).current;
     const loadingDot3 = useRef(new Animated.Value(0)).current;
+    const scrollX = useRef(new Animated.Value(0)).current;
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    const slideBackgrounds = ['#FFE7EC', '#F3E8FF', '#FEF3C7'];
+    const slides = [
+        { image: require('../assets/images/icons/splash1.png') },
+        { image: require('../assets/images/icons/splash2.png') },
+        { image: require('../assets/images/icons/splash3.png') },
+    ];
 
     useEffect(() => {
         // Simple typing animation for YOTTASCORE
@@ -90,7 +99,7 @@ const Welcome = () => {
     
 
   return (
-    <LinearGradient colors={[ '#4c1d95', '#7c3aed' ]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+    <LinearGradient colors={[ '#FFF4E5', '#FFF7EB' ]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
         {/* Background with Abstract Shapes */}
         <View style={styles.backgroundContainer}>
             {/* Purple Blob Shapes */}
@@ -202,73 +211,58 @@ const Welcome = () => {
             </Animated.View>
         </View>
 
-        {/* Main Content */}
+        {/* Main Content with 3-slide onboarding */}
         <View style={styles.contentContainer}>
-            {/* Enhanced Logo + Title */}
-            <Animated.View style={[styles.logoWrap, {
-                transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) }],
-                opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] })
-            }]}>
-                <View style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 40,
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 15,
-                    borderWidth: 2,
-                    borderColor: 'rgba(255,255,255,0.4)',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 12,
-                    elevation: 12,
-                    position: 'relative',
-                }}>
-                    <View style={{
-                        width: 50,
-                        height: 50,
-                        borderRadius: 25,
-                        backgroundColor: 'rgba(255,255,255,0.3)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        shadowColor: '#fff',
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: 0.5,
-                        shadowRadius: 8,
-                        elevation: 8,
-                    }}>
-                        <Ionicons name="school" size={32} color="#fff" />
+            <Animated.ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    { useNativeDriver: false }
+                )}
+                onMomentumScrollEnd={(e) => {
+                    const { contentOffset, layoutMeasurement } = e.nativeEvent;
+                    const pageWidth = layoutMeasurement.width || width;
+                    const index = Math.round(contentOffset.x / pageWidth);
+                    setCurrentIndex(index);
+                }}
+                scrollEventThrottle={16}
+            >
+                {slides.map((slide, index) => (
+                    <View
+                        key={index}
+                        style={[
+                            styles.slide,
+                            { backgroundColor: slideBackgrounds[index] || slideBackgrounds[0] },
+                        ]}
+                    >
+                        {/* Text header like reference design */}
+                        <View style={styles.slideHeader}>
+                            <Text style={styles.slideTitle}>Smart Learning Platform</Text>
+                            <Text style={styles.slideSubtitle}>Prep • Play • Win with YOTTASCORE</Text>
+                        </View>
+
+                        {/* Big educational image only */}
+                        <View style={styles.slideImageWrapper}>
+                            <Image source={slide.image} style={styles.slideImage} resizeMode="cover" />
+                        </View>
                     </View>
-                </View>
-                <View style={styles.titleContainer}>
-                    <Text style={styles.brandLine}>{displayText}</Text>
-                </View>
-            </Animated.View>
-            {/* Tagline */}
-            <TouchableOpacity activeOpacity={0.9} style={styles.taglineChip}>
-                <LinearGradient colors={['#10B981', '#059669']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.taglineGradient}>
-                    <Ionicons name="sparkles" size={14} color="#ffffff" />
-                <Text style={styles.taglineText}>Smart Learning Platform</Text>
-                </LinearGradient>
-            </TouchableOpacity>
-            
-            {/* Enhanced Inspirational Quote */}
-            <Animated.View style={[styles.quoteContainer, {
-                opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }),
-                transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.02] }) }]
-            }]}>
-                <View style={styles.quoteBackground}>
-                    <Text style={styles.quoteText}>Prep • Play • Win</Text>
-                    <View style={styles.quoteUnderline} />
-                </View>
-                <View style={styles.quoteAccentDots}>
-                    <View style={styles.accentDot} />
-                    <View style={styles.accentDot} />
-                    <View style={styles.accentDot} />
+                ))}
+            </Animated.ScrollView>
+
+            {/* Pagination dots */}
+            <View style={styles.pagination}>
+                {[0, 1, 2].map((i) => (
+                    <View
+                        key={i}
+                        style={[
+                            styles.paginationDot,
+                            currentIndex === i && styles.paginationDotActive,
+                        ]}
+                    />
+                ))}
             </View>
-            </Animated.View>
         </View>
 
         {/* Action Buttons */}
@@ -325,19 +319,16 @@ const Welcome = () => {
                     </View>
                 </View>
             ) : (
-                <>
-            <TouchableOpacity onPress={handleLogin} activeOpacity={0.9} style={styles.primaryBtn}>
-                <LinearGradient colors={[ '#f59e0b', '#f97316' ]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtnBg}>
-                    <Text style={styles.primaryBtnText}>Login</Text>
-                </LinearGradient>
-            </TouchableOpacity>
-            <View style={styles.separator} />
-            <TouchableOpacity onPress={handleRegister} activeOpacity={0.9} style={styles.primaryBtn}>
-                <LinearGradient colors={[ '#fb923c', '#f59e0b' ]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryBtnBg}>
-                    <Text style={styles.primaryBtnText}>Register</Text>
-                </LinearGradient>
-            </TouchableOpacity>
-                </>
+                <View style={styles.authCard}>
+                    <Text style={styles.authRegionText}>Smart learning for exam heroes</Text>
+                    <TouchableOpacity onPress={handleRegister} activeOpacity={0.9} style={styles.authPrimaryBtn}>
+                        <Text style={styles.authPrimaryText}>Register</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleLogin} activeOpacity={0.9} style={styles.authSecondaryBtn}>
+                        <Text style={styles.authSecondaryText}>Login</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.authSubNote}>You can change this later in settings.</Text>
+                </View>
             )}
         </View>
     </LinearGradient>
@@ -488,8 +479,38 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 0,
         paddingTop: 80,
+    },
+    logoOuter: {
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: 'rgba(255,255,255,0.18)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 18,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.45)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+        elevation: 14,
+        position: 'relative',
+    },
+    logoInner: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.32)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#fff',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 10,
+        elevation: 10,
     },
     titleContainer: {
         alignItems: 'center',
@@ -603,6 +624,86 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
+    illustrationRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        width: '100%',
+        marginTop: 30,
+        marginBottom: 10,
+        paddingHorizontal: 8,
+    },
+    illustrationCard: {
+        flex: 1,
+        marginHorizontal: 4,
+        borderRadius: 18,
+        overflow: 'hidden',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        borderWidth: 1,
+        borderColor: 'rgba(148, 163, 184, 0.35)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    illustrationCardLeft: {
+        transform: [{ rotate: '-4deg' }],
+    },
+    illustrationCardCenter: {
+        transform: [{ scale: 1.02 }],
+    },
+    illustrationCardRight: {
+        transform: [{ rotate: '4deg' }],
+    },
+    illustrationImage: {
+        width: '100%',
+        height: height * 0.18,
+    },
+    illustrationLabel: {
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        color: '#e5e7eb',
+        fontSize: 12,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+    slide: {
+        width,
+        paddingHorizontal: 24,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingTop: 70,
+    },
+    slideHeader: {
+        width: '100%',
+        paddingHorizontal: 8,
+        marginBottom: 24,
+    },
+    slideTitle: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: '#111827',
+        textAlign: 'left',
+    },
+    slideSubtitle: {
+        fontSize: 14,
+        marginTop: 6,
+        color: '#4B5563',
+        textAlign: 'left',
+    },
+    slideImageWrapper: {
+        marginTop: 10,
+        marginBottom: 24,
+        width: width - 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    slideImage: {
+        width: width - 48,
+        height: height * 0.32,
+        borderRadius: 28,
+    },
     quoteContainer: {
         alignItems: 'center',
         marginTop: 25,
@@ -663,36 +764,81 @@ const styles = StyleSheet.create({
         shadowRadius: 1,
         elevation: 1,
     },
-    buttonContainer: {
+    pagination: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-        paddingBottom: 100,
-        gap: 20,
-    },
-    primaryBtn: { flex: 1, borderRadius: 26, overflow: 'hidden' },
-    primaryBtnBg: {
-        paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 26,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
+        gap: 8,
+        paddingBottom: 12,
     },
-    primaryBtnText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-    ghostBtn: {
-        flex: 1,
-        borderWidth: 2,
-        borderColor: 'rgba(255,255,255,0.7)',
-        borderRadius: 26,
+    paginationDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(209, 213, 219, 0.5)',
+    },
+    paginationDotActive: {
+        width: 18,
+        borderRadius: 999,
+        backgroundColor: '#ffffff',
+    },
+    buttonContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+    },
+    authCard: {
+        width: '100%',
+        borderRadius: 24,
+        backgroundColor: '#F9FAFB',
+        paddingHorizontal: 16,
+        paddingVertical: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 10,
+        gap: 10,
+    },
+    authRegionText: {
+        fontSize: 13,
+        color: '#4B5563',
+        marginBottom: 4,
+    },
+    authPrimaryBtn: {
+        marginTop: 4,
+        borderRadius: 999,
+        backgroundColor: '#111827',
         paddingVertical: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'transparent',
     },
-    ghostBtnText: { color: 'white', fontSize: 18, fontWeight: '800' },
-    separator: {
-        width: 20,
+    authPrimaryText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    authSecondaryBtn: {
+        marginTop: 6,
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#D1D5DB',
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    authSecondaryText: {
+        color: '#111827',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    authSubNote: {
+        marginTop: 6,
+        fontSize: 11,
+        color: '#6B7280',
+        textAlign: 'center',
     },
     loadingContainer: {
         alignItems: 'center',
