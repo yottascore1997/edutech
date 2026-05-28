@@ -2,7 +2,7 @@ import { TimetableTheme, SUBJECT_ICON_COLORS } from '@/constants/TimetableTheme'
 import { FontFamily } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Calendar, ChevronLeft, ChevronRight, Clock, MoreVertical, Plus } from 'lucide-react-native';
+import { Calendar, ChevronLeft, ChevronRight, Clock, MoreVertical, Plus, Trophy } from 'lucide-react-native';
 import {
   Animated,
   Dimensions,
@@ -348,7 +348,11 @@ export default function TimetableScreenUI({
                 </Text>
               </View>
             </View>
-            <Image source={require('../../assets/images/quiz-hero-trophy.png')} style={styles.motivationTrophy} resizeMode="contain" />
+            <View style={styles.motivationTrophy}>
+              <LinearGradient colors={['#FDE68A', '#F59E0B']} style={styles.motivationTrophyBadge}>
+                <Trophy size={34} color="#1C1917" strokeWidth={2.4} />
+              </LinearGradient>
+            </View>
           </LinearGradient>
         </Animated.View>
       </ScrollView>
@@ -695,5 +699,19 @@ const styles = StyleSheet.create({
     height: 22,
     backgroundColor: 'rgba(0,0,0,0.12)',
   },
-  motivationTrophy: { width: Platform.OS === 'android' ? 62 : 76, height: Platform.OS === 'android' ? 62 : 76 },
+  motivationTrophy: {
+    width: Platform.OS === 'android' ? 62 : 76,
+    height: Platform.OS === 'android' ? 62 : 76,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  motivationTrophyBadge: {
+    width: Platform.OS === 'android' ? 56 : 68,
+    height: Platform.OS === 'android' ? 56 : 68,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
 });

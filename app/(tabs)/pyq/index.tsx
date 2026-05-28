@@ -322,7 +322,7 @@ export default function PYQListScreen() {
                         </TouchableOpacity>
                       </View>
                       <Image
-                        source={require('../../../assets/images/pyq-hero-books.png')}
+                        source={require('../../../assets/images/pyq-hero-books.jpg')}
                         style={st.heroImage}
                         resizeMode="contain"
                       />

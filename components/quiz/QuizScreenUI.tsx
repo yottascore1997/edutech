@@ -12,6 +12,7 @@ import {
   Target,
   TestTube,
   TrendingUp,
+  Trophy,
   Zap,
 } from 'lucide-react-native';
 import {
@@ -158,11 +159,9 @@ export default function QuizScreenUI({
             </View>
             <View style={styles.heroTrophyWrap}>
               <View style={styles.heroTrophyGlow} />
-              <Image
-                source={require('../../assets/images/quiz-hero-trophy.png')}
-                style={styles.heroTrophyImg}
-                resizeMode="contain"
-              />
+              <LinearGradient colors={['#FBBF24', '#F59E0B']} style={styles.heroTrophyBadge}>
+                <Trophy size={40} color="#1C1917" strokeWidth={2.4} />
+              </LinearGradient>
             </View>
           </View>
         </LinearGradient>
@@ -441,7 +440,16 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     backgroundColor: 'rgba(251, 191, 36, 0.25)',
   },
-  heroTrophyImg: { width: 82, height: 96, zIndex: 1 },
+  heroTrophyBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
 
   block: { marginBottom: 18 },
   blockHeader: {

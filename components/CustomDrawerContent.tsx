@@ -333,13 +333,12 @@ const CustomDrawerContent = (props: any) => {
                             )}
                             
                             <MenuItem 
-                                icon="stats-chart-outline" 
+                                icon="trophy-outline" 
                                 label="Leaderboard" 
                                 onPress={handleLeaderboardPress}
                                 isActive={activeMenu === 'leaderboard'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#FF6348"
-                                iconImage={require('../assets/images/trophy.png')}
                             />
 
                             <MenuItem 

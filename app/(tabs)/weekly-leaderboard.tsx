@@ -275,7 +275,11 @@ export default function WeeklyLeaderboardScreen() {
                   <Trophy size={11} color="#FFF" strokeWidth={2.5} />
                   <Text style={st.hubPillTxt}>LEADERBOARD</Text>
                 </LinearGradient>
-                <Image source={require('@/assets/images/trophy.png')} style={st.trophyImg} resizeMode="contain" />
+                <View style={st.trophyRight}>
+                  <LinearGradient colors={['#F59E0B', '#FBBF24']} style={st.trophyBadge}>
+                    <Trophy size={18} color="#1C1917" strokeWidth={2.6} />
+                  </LinearGradient>
+                </View>
               </View>
               <Text style={st.headerTitle}>
                 Weekly <Text style={st.headerAccent}>Leaderboard</Text>
@@ -465,7 +469,16 @@ const st = StyleSheet.create({
   },
   hubPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, marginLeft: 10 },
   hubPillTxt: { fontFamily: FontFamily.bold, fontSize: 9, color: '#FFF', letterSpacing: 0.6 },
-  trophyImg: { width: 56, height: 56, marginLeft: 'auto' },
+  trophyRight: { marginLeft: 'auto' },
+  trophyBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
   headerTitle: { fontFamily: FontFamily.extraBold, fontSize: 24, color: C.ink, lineHeight: 30 },
   headerAccent: { color: C.primary },
   headerSub: { fontFamily: FontFamily.regular, fontSize: 13, color: C.muted, marginTop: 4 },

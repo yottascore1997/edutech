@@ -374,7 +374,7 @@ export default function ExamNotificationsScreen() {
             </Text>
           </View>
           <Image
-            source={require('@/assets/images/exam-notifications-hero.png')}
+            source={require('@/assets/images/exam-notifications-hero.jpg')}
             style={st.titleHeroImg}
             resizeMode="contain"
           />

@@ -125,7 +125,7 @@ export default function ExamScreenUI({
             <Text style={s.heroSub}>Join live battles · Earn prizes · Climb the leaderboard</Text>
           </View>
           <Image
-            source={require('../../assets/images/exam-notifications-hero.png')}
+            source={require('../../assets/images/exam-notifications-hero.jpg')}
             style={s.heroImg}
             resizeMode="contain"
           />

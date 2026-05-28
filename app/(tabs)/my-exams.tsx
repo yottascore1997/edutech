@@ -200,7 +200,7 @@ function ExamListCard({
 }
 
 const PAD = 16;
-const HERO_IMG = require('@/assets/images/my-exams-hero.png');
+const HERO_IMG = require('@/assets/images/my-exams-hero.jpg');
 
 export default function MyExamsScreen() {
     const { user } = useAuth();
