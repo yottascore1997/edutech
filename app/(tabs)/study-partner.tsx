@@ -1,978 +1,886 @@
-import { apiFetchAuth } from '@/constants/api';
+import { apiFetchAuth, getImageUrl } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
 import StudyPartnerBottomNav from '@/components/StudyPartnerBottomNav';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import {
+  ArrowRight,
+  Calendar,
+  Flame,
+  Heart,
+  MapPin,
+  Sparkles,
+  Star,
+  Target,
+  TrendingUp,
+  Users,
+  X,
+} from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Dimensions,
   Image,
+  ImageBackground,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
 
-type StudyPartnerProfile = {
-  bio?: string | null;
-  examType?: string | null;
-  goals?: string | null;
-  studyTimeFrom?: string | null;
-  studyTimeTo?: string | null;
-  language?: string | null;
-  isActive?: boolean;
+const { width: SCREEN_W } = Dimensions.get('window');
+const PAD = 16;
+const BUDDY_W = 168;
+const DISCOVER_CARD_H = Math.min(440, SCREEN_W * 1.12);
+
+const INTEREST_TAGS: Record<string, string[]> = {
+  JEE: ['Physics', 'Mathematics', 'Mock Tests'],
+  NEET: ['Biology', 'Chemistry', 'Physics'],
+  GATE: ['Aptitude', 'Technical', 'Mock Tests'],
+  UPSC: ['Current Affairs', 'GS', 'Essay'],
+  default: ['Study Plan', 'Notes', 'Revision'],
 };
 
-export default function StudyPartnerHomeScreen() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<StudyPartnerProfile | null>(null);
-  const [matchesCount, setMatchesCount] = useState(0);
-  const [whoLikedCount, setWhoLikedCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+const C = {
+  bg: ['#EDE9FE', '#FDF2F8', '#FAFAFF'] as const,
+  primary: '#6344D4',
+  primaryLight: '#8E78E7',
+  pink: '#EC4899',
+  ink: '#0F0A1E',
+  muted: '#64748B',
+  card: '#FFFFFF',
+  border: '#E8E8F0',
+  heroGrad: ['#F8F4FF', '#FCE7F3', '#EDE9FE'] as const,
+  ctaGrad: ['#1A0F3C', '#2D2068', '#312E81'] as const,
+  heroCta: ['#A78BFA', '#8E78E7', '#6344D4', '#5546C9'] as const,
+};
 
-  useEffect(() => {
-    let isMounted = true;
+const TAG_COLORS: Record<string, { bg: string; text: string }> = {
+  JEE: { bg: '#F3EEFF', text: '#6344D4' },
+  NEET: { bg: '#ECFDF5', text: '#059669' },
+  GATE: { bg: '#EFF6FF', text: '#2563EB' },
+  UPSC: { bg: '#FFFBEB', text: '#D97706' },
+  default: { bg: '#F3EEFF', text: '#7C3AED' },
+};
 
-    const load = async () => {
-      if (!user?.token) {
-        setLoading(false);
-        return;
-      }
-      setError(null);
-      try {
-        const [profRes, matchesRes, whoRes] = await Promise.all([
-          apiFetchAuth('/student/study-partner/profile', user.token),
-          apiFetchAuth('/student/study-partner/matches', user.token),
-          apiFetchAuth('/student/study-partner/who-liked-you', user.token),
-        ]);
+type Buddy = {
+  id: string;
+  name: string;
+  examType?: string | null;
+  bio?: string | null;
+  profilePhoto?: string | null;
+  matchPct: number;
+};
 
-        if (!isMounted) return;
+type DiscoverProfile = {
+  id: string;
+  userId: string;
+  name: string;
+  examType?: string | null;
+  bio?: string | null;
+  goals?: string | null;
+  language?: string | null;
+  profilePhoto?: string | null;
+  photos?: string[] | null;
+  matchPct: number;
+};
 
-        setProfile((profRes.data as any) || null);
-        const matchesList = (matchesRes.data as any[]) || [];
-        const whoList = (whoRes.data as any[]) || [];
-        setMatchesCount(matchesList.length || 0);
-        setWhoLikedCount(whoList.length || 0);
-      } catch (e: any) {
-        if (!isMounted) return;
-        console.error('StudyPartnerHome load error:', e);
-        setError('Unable to load study partner data. Please try again.');
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
+function normalizeDiscovery(p: Record<string, unknown>): DiscoverProfile {
+  const id = String(p.userId ?? p.id ?? '');
+  return {
+    id: String(p.id ?? id),
+    userId: id,
+    name: String(p.name ?? 'Student'),
+    examType: (p.examType as string) ?? null,
+    bio: (p.bio as string) ?? null,
+    goals: (p.goals as string) ?? null,
+    language: (p.language as string) ?? null,
+    profilePhoto: (p.profilePhoto as string) ?? null,
+    photos: Array.isArray(p.photos) ? (p.photos as string[]) : null,
+    matchPct: pseudoMatch(id),
+  };
+}
 
-    load();
+function resolvePhotoUri(profile: DiscoverProfile) {
+  const raw =
+    (profile.photos?.[0] || profile.profilePhoto || '') as string;
+  if (!raw) return null;
+  return raw.startsWith('http') ? raw : getImageUrl(raw);
+}
 
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.token]);
+function interestTagsFor(exam?: string | null) {
+  const key = Object.keys(INTEREST_TAGS).find((k) =>
+    (exam || '').toUpperCase().includes(k)
+  );
+  return INTEREST_TAGS[key ?? 'default'] ?? INTEREST_TAGS.default;
+}
 
-  if (!user?.token) {
+function tagFor(exam?: string | null) {
+  const e = (exam || 'General').toUpperCase();
+  const key = Object.keys(TAG_COLORS).find((k) => e.includes(k)) || 'default';
+  const colors = TAG_COLORS[key] ?? TAG_COLORS.default;
+  return { label: exam || 'Exam Prep', ...colors };
+}
+
+function pseudoMatch(id: string) {
+  const n = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return 78 + (n % 22);
+}
+
+function formatCount(n: number, suffix = '') {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1).replace(/\.0$/, '')}M${suffix}`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K${suffix}`;
+  return `${n}${suffix}`;
+}
+
+function ProgressRing({ pct, size = 52 }: { pct: number; size?: number }) {
+  const r = (size - 8) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="#E9E0FF" strokeWidth={5} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke="#6344D4"
+          strokeWidth={5}
+          fill="none"
+          strokeDasharray={`${circ}`}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          rotation="-90"
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <Text style={st.ringTxt}>{Math.round(pct)}%</Text>
+    </View>
+  );
+}
+
+function StatCard({ icon, value, label, colors }: {
+  icon: React.ReactElement;
+  value: string;
+  label: string;
+  colors: readonly [string, string];
+}) {
+  return (
+    <View style={st.statCard}>
+      <LinearGradient colors={colors} style={st.statIcon}>{icon}</LinearGradient>
+      <Text style={st.statVal}>{value}</Text>
+      <Text style={st.statLbl} numberOfLines={2}>{label}</Text>
+    </View>
+  );
+}
+
+function DiscoverSwipeCard({
+  profiles,
+  cardIndex,
+  actionLoading,
+  lastAction,
+  onPass,
+  onLike,
+  onSuperLike,
+  onOpenDiscover,
+}: {
+  profiles: DiscoverProfile[];
+  cardIndex: number;
+  actionLoading: boolean;
+  lastAction: 'like' | 'pass' | null;
+  onPass: () => void;
+  onLike: () => void;
+  onSuperLike: () => void;
+  onOpenDiscover: () => void;
+}) {
+  const safeProfiles = Array.isArray(profiles) ? profiles : [];
+  const current = safeProfiles[cardIndex];
+  const next = safeProfiles[cardIndex + 1];
+  const total = Math.max(safeProfiles.length, 1);
+
+  if (!current) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.title}>Study Partner</Text>
-        <Text style={styles.subtitle}>
-          Please login to use Study Partner.
-        </Text>
+      <View style={st.discoverEmpty}>
+        <Ionicons name="people-outline" size={40} color={C.primaryLight} />
+        <Text style={st.discoverEmptyTitle}>No more profiles right now</Text>
+        <TouchableOpacity onPress={onOpenDiscover} activeOpacity={0.9}>
+          <LinearGradient colors={[...C.heroCta]} style={st.discoverEmptyBtn}>
+            <Text style={st.discoverEmptyBtnTxt}>Open Discover</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     );
   }
 
+  const photoUri = resolvePhotoUri(current);
+  const tags = interestTagsFor(current.examType);
+  const goalLabel = current.examType || current.goals || 'Exam Preparation';
+  const eduLine = current.goals || 'Student • Exam Prep';
+  const location = current.language ? `${current.language}` : '📍 India';
+
   return (
-    <View style={styles.screen}>
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#7C3AED" />
-          <Text style={styles.loadingText}>Loading Study Buddy...</Text>
+    <View style={st.discoverWrap}>
+      {lastAction && (
+        <View style={[st.actionFb, lastAction === 'like' ? st.actionFbLike : st.actionFbPass]}>
+          <Ionicons name={lastAction === 'like' ? 'heart' : 'close'} size={14} color={lastAction === 'like' ? '#059669' : '#DC2626'} />
+          <Text style={st.actionFbTxt}>{lastAction === 'like' ? 'You liked this profile' : 'Passed'}</Text>
         </View>
-      ) : (
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          <LinearGradient
-            colors={['#7C3AED', '#5B21B6', '#4C1D95']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.hero}
-          >
-            <Text style={styles.heroTitle}>STUDY BUDDY</Text>
-            <Text style={styles.heroSubtitle}>
-              Find your study partner today.
-            </Text>
+      )}
 
-            {/* Decorative glow dots */}
-            <View style={styles.heroDotA} />
-            <View style={styles.heroDotB} />
-            <View style={styles.heroDotC} />
-          </LinearGradient>
+      <View style={st.cardStack}>
+        {next ? (
+          <View style={[st.swipeCard, st.swipeCardBehind]}>
+            <LinearGradient colors={['#C4B5FD', '#E9D5FF']} style={st.swipeCardPlaceholder} />
+          </View>
+        ) : null}
 
-          {error && <Text style={styles.errorText}>{error}</Text>}
-
-          {/* Find your Study Buddies - above Discover */}
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onPress={() => router.push('/(tabs)/study-partner-discover' as any)}
-            style={styles.inspireWrapper}
-          >
-            <LinearGradient
-              colors={['#FFFFFF', '#FAF5FF', '#FFFFFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.inspireCard}
-            >
-              <View style={styles.inspireTopRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inspireKicker}>Find your</Text>
-                  <Text style={styles.inspireHeadline}>
-                    Study <Text style={styles.inspireAccent}>Buddies</Text>
-                  </Text>
-                </View>
-                <View style={styles.inspireAvatarStack}>
-                  <View style={[styles.inspireAvatar, styles.inspireAvatarA]}>
-                    <Image
-                      source={require('@/assets/images/icons/student.jpg')}
-                      style={styles.inspireAvatarImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View style={[styles.inspireAvatar, styles.inspireAvatarB]}>
-                    <Image
-                      source={require('@/assets/images/icons/student1.png')}
-                      style={styles.inspireAvatarImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <View style={[styles.inspireAvatar, styles.inspireAvatarC]}>
-                    <Image
-                      source={require('@/assets/images/icons/student2.png')}
-                      style={styles.inspireAvatarImage}
-                      resizeMode="cover"
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.inspirePill}>
-                <Text style={styles.inspirePillText}>
-                  Connect with like-minded students and share your study journey.
-                </Text>
-              </View>
-
-              <View style={styles.inspireDotsRow}>
-                <View style={styles.inspireDot} />
-                <View style={[styles.inspireDot, styles.inspireDotActive]} />
-                <View style={styles.inspireDot} />
-              </View>
-
-              <View style={styles.neverImageWrap}>
-                <Image
-                  source={require('@/assets/images/icons/partner.png')}
-                  style={styles.neverPartnerImage}
-                  resizeMode="cover"
-                />
-              </View>
-              <View style={styles.neverBlock}>
-                <Text style={styles.neverTitle}>Never</Text>
-                <Text style={styles.neverTitleBig}>Feel Alone</Text>
-                <Text style={styles.neverSubtitle}>
-                  Crafted with <Text style={styles.neverHeart}>❤️</Text> in India for the World
-                </Text>
-              </View>
-
-              <LinearGradient
-                colors={['#7C3AED', '#EC4899']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.inspireCta}
-              >
-                <Ionicons name="compass" size={16} color="#FFFFFF" />
-                <Text style={styles.inspireCtaText}>Open Discover</Text>
-              </LinearGradient>
+        <View style={st.swipeCard}>
+          {photoUri ? (
+            <ImageBackground source={{ uri: photoUri }} style={st.swipePhoto} imageStyle={st.swipePhotoImg}>
+              <CardOverlays
+                current={current}
+                cardIndex={cardIndex}
+                total={total}
+                tags={tags}
+                goalLabel={goalLabel}
+                eduLine={eduLine}
+                location={location}
+              />
+            </ImageBackground>
+          ) : (
+            <LinearGradient colors={['#C4B5FD', '#8E78E7', '#6344D4']} style={st.swipePhoto}>
+              <Text style={st.swipeInitial}>{current.name.charAt(0)}</Text>
+              <CardOverlays
+                current={current}
+                cardIndex={cardIndex}
+                total={total}
+                tags={tags}
+                goalLabel={goalLabel}
+                eduLine={eduLine}
+                location={location}
+              />
             </LinearGradient>
-          </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
-          <View style={styles.grid}>
-            {/* Find Local Partner + Matches: horizontal row */}
-            <View style={styles.tilesRow}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.tile, styles.tileInRow]}
-              onPress={() =>
-                router.push({
-                  pathname: '/(tabs)/study-partner-discover',
-                  params: { mode: 'local' },
-                } as any)
-              }
-            >
-              <LinearGradient
-                colors={['#FFFFFF', '#F5F3FF']}
-                style={styles.tileInnerRow}
-              >
-              <View style={styles.tileTopRow}>
-                <Text style={styles.tileTitleRow} numberOfLines={2}>Find Local Partner</Text>
-                <View style={styles.tileIconWrap}>
-                  <Ionicons name="location" size={18} color="#22C55E" />
+      <View style={st.actionRow}>
+        <TouchableOpacity style={st.actBtnPass} onPress={onPass} disabled={actionLoading} activeOpacity={0.9}>
+          <X size={26} color={C.primary} strokeWidth={2.5} />
+        </TouchableOpacity>
+        <TouchableOpacity style={st.actBtnStar} onPress={onSuperLike} disabled={actionLoading} activeOpacity={0.9}>
+          <Star size={24} color={C.primary} strokeWidth={2.5} />
+        </TouchableOpacity>
+        <TouchableOpacity style={st.actBtnLike} onPress={onLike} disabled={actionLoading} activeOpacity={0.9}>
+          {actionLoading ? (
+            <ActivityIndicator color={C.pink} />
+          ) : (
+            <Heart size={28} color={C.pink} fill={C.pink} strokeWidth={2} />
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function CardOverlays({
+  current,
+  cardIndex,
+  total,
+  tags,
+  goalLabel,
+  eduLine,
+  location,
+}: {
+  current: DiscoverProfile;
+  cardIndex: number;
+  total: number;
+  tags: string[];
+  goalLabel: string;
+  eduLine: string;
+  location: string;
+}) {
+  return (
+    <>
+      <LinearGradient colors={['rgba(0,0,0,0.35)', 'transparent']} style={st.swipeTopGrad} />
+      <View style={st.swipeTopRow}>
+        <View style={st.matchPill}>
+          <Star size={10} color="#FBBF24" fill="#FBBF24" />
+          <Text style={st.matchPillTxt}>{current.matchPct}% Match</Text>
+        </View>
+        <View style={st.countPill}>
+          <Text style={st.countPillTxt}>{cardIndex + 1}/{total}</Text>
+        </View>
+      </View>
+
+      <View style={st.interestCol}>
+        {tags.map((t) => (
+          <View key={t} style={st.interestPill}>
+            <Text style={st.interestPillTxt}>{t}</Text>
+          </View>
+        ))}
+      </View>
+
+      <LinearGradient colors={['transparent', 'rgba(15,10,30,0.92)']} style={st.swipeBottomGrad}>
+        <View style={st.nameRow}>
+          <Text style={st.swipeName}>{current.name}</Text>
+          <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+        </View>
+        <Text style={st.swipeEdu}>{eduLine}</Text>
+        <View style={st.goalBadge}>
+          <Text style={st.goalBadgeTxt}>{goalLabel}</Text>
+        </View>
+        <View style={st.locRow}>
+          <MapPin size={12} color="rgba(255,255,255,0.9)" />
+          <Text style={st.locTxt}>{location}</Text>
+        </View>
+        {current.bio ? (
+          <Text style={st.swipeBio} numberOfLines={2}>{current.bio}</Text>
+        ) : (
+          <Text style={st.swipeBio} numberOfLines={2}>
+            Looking for a study partner to prepare together and achieve big! 🚀
+          </Text>
+        )}
+      </LinearGradient>
+    </>
+  );
+}
+
+export default function StudyPartnerHomeScreen() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [matchesCount, setMatchesCount] = useState(0);
+  const [whoLikedCount, setWhoLikedCount] = useState(0);
+  const [buddies, setBuddies] = useState<Buddy[]>([]);
+  const [discoveryProfiles, setDiscoveryProfiles] = useState<DiscoverProfile[]>([]);
+  const [cardIndex, setCardIndex] = useState(0);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [lastAction, setLastAction] = useState<'like' | 'pass' | null>(null);
+  const [profileDone, setProfileDone] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(1));
+  const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const load = useCallback(async (refresh = false) => {
+    if (!user?.token) { setLoading(false); return; }
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+      setError(null);
+      try {
+      const [profRes, matchesRes, whoRes, discRes] = await Promise.all([
+          apiFetchAuth('/student/study-partner/profile', user.token),
+          apiFetchAuth('/student/study-partner/matches', user.token),
+          apiFetchAuth('/student/study-partner/who-liked-you', user.token),
+        apiFetchAuth('/student/study-partner/discovery?limit=8', user.token),
+      ]);
+      const prof = (profRes.data as { bio?: string }) || {};
+      setProfileDone(!!prof.bio);
+      const matches = (matchesRes.data as unknown[]) || [];
+      const who = (whoRes.data as unknown[]) || [];
+      setMatchesCount(matches.length);
+      setWhoLikedCount(who.length);
+        const disc = (discRes.data as Array<Record<string, unknown>>) || [];
+        const normalized = disc.map((p) => normalizeDiscovery(p));
+        setDiscoveryProfiles(normalized);
+        setCardIndex(0);
+        setBuddies(
+          normalized.slice(0, 6).map((p) => ({
+            id: p.userId,
+            name: p.name,
+            examType: p.examType,
+            bio: p.bio,
+            profilePhoto: p.profilePhoto,
+            matchPct: p.matchPct,
+          }))
+        );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load');
+      } finally {
+          setLoading(false);
+      setRefreshing(false);
+      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
+    }
+  }, [user?.token, fadeAnim]);
+
+  useFocusEffect(useCallback(() => { load(false); }, [load]));
+
+  const sendDiscoverAction = async (action: 'like' | 'pass') => {
+    const current = discoveryProfiles[cardIndex];
+    if (!user?.token || !current || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const res = await apiFetchAuth('/student/study-partner/like', user.token, {
+        method: 'POST',
+        body: { targetUserId: current.userId, action },
+      });
+      const data = res.data as { newMatch?: boolean };
+      if (action === 'like' && data?.newMatch) {
+        router.push({
+          pathname: '/(tabs)/study-partner-match',
+          params: {
+            otherUserId: current.userId,
+            otherName: current.name,
+            otherPhoto: current.profilePhoto || '',
+          },
+        } as any);
+        return;
+      }
+      if (actionTimerRef.current) clearTimeout(actionTimerRef.current);
+      setLastAction(action);
+      actionTimerRef.current = setTimeout(() => setLastAction(null), 1400);
+      setCardIndex((i) => i + 1);
+    } catch (e) {
+      console.error('Discover action error', e);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const displayBuddies = useMemo(() => {
+    if (buddies.length) return buddies;
+    return [
+      { id: '1', name: 'Priya Sharma', examType: 'JEE Preparation', matchPct: 92, profilePhoto: null },
+      { id: '2', name: 'Rahul Verma', examType: 'GATE Preparation', matchPct: 88, profilePhoto: null },
+      { id: '3', name: 'Ananya Singh', examType: 'NEET Preparation', matchPct: 85, profilePhoto: null },
+    ];
+  }, [buddies]);
+
+  if (!user?.token) {
+    return (
+      <View style={st.centered}>
+        <Text style={st.loginTitle}>Study Partner</Text>
+        <Text style={st.loginSub}>Please login to find your study buddy</Text>
+      </View>
+    );
+  }
+
+  if (loading && !refreshing) {
+  return (
+      <LinearGradient colors={[...C.bg]} style={[st.centered, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={st.loadTxt}>Finding study buddies…</Text>
+          </LinearGradient>
+    );
+  }
+
+  return (
+    <View style={st.root}>
+      <LinearGradient colors={[...C.bg]} style={StyleSheet.absoluteFill} />
+      <View style={st.orb1} /><View style={st.orb2} />
+
+      <SafeAreaView style={st.safe} edges={[]}>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingTop: 2, paddingBottom: insets.bottom + 100 }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.primary} />}
+          >
+            {error ? (
+              <TouchableOpacity style={st.errBox} onPress={() => load(false)}>
+                <Text style={st.errTxt}>{error} — Tap to retry</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Hero */}
+            <View style={st.heroWrap}>
+              <LinearGradient colors={['#E9D5FF', '#FBCFE8', '#EDE9FE']} style={st.heroBorder}>
+                <LinearGradient colors={[...C.heroGrad]} style={st.heroCard}>
+                  <View style={st.heroOrb} />
+                  <View style={st.heroRow}>
+                    <View style={st.heroCopy}>
+                      <Text style={st.heroTitle}>
+                        Study <Text style={st.heroAccent}>Buddy</Text>
+                  </Text>
+                      <Text style={st.heroSub}>Connect. Collaborate. Achieve.</Text>
+                      <TouchableOpacity activeOpacity={0.92} onPress={() => router.push('/(tabs)/study-partner-discover' as any)}>
+                        <LinearGradient colors={[...C.ctaGrad]} style={st.heroCta}>
+                          <Text style={st.heroCtaTxt}>Find a Study Buddy</Text>
+                          <ArrowRight size={16} color="#FFF" strokeWidth={2.5} />
+                        </LinearGradient>
+                      </TouchableOpacity>
                 </View>
+                    <Image
+                      source={require('@/assets/images/icons/partner.png')}
+                      style={st.heroImg}
+                      resizeMode="contain"
+                    />
+                  </View>
+                </LinearGradient>
+              </LinearGradient>
+                  </View>
+
+            {/* Stats */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.statsRow}>
+              <StatCard icon={<Users size={18} color="#FFF" strokeWidth={2.2} />} value="12K+" label="Active Buddies" colors={['#8E78E7', C.primary]} />
+              <StatCard icon={<Target size={18} color="#FFF" strokeWidth={2.2} />} value={formatCount(Math.max(matchesCount, 8500), '+')} label="Matches Made" colors={['#F472B6', C.pink]} />
+              <StatCard icon={<Calendar size={18} color="#FFF" strokeWidth={2.2} />} value="1.2M+" label="Study Sessions" colors={['#60A5FA', '#3B82F6']} />
+              <StatCard icon={<TrendingUp size={18} color="#FFF" strokeWidth={2.2} />} value="95%" label="Success Rate" colors={['#34D399', '#10B981']} />
+            </ScrollView>
+
+            {/* Study Journey */}
+            <View style={st.secHead}>
+              <Text style={st.secTitle}>Your Study Journey</Text>
+              <TouchableOpacity style={st.viewProgress} activeOpacity={0.85} onPress={() => router.push('/(tabs)/study-partner-profile' as any)}>
+                <Text style={st.viewProgressTxt}>View Progress</Text>
+                <ArrowRight size={14} color={C.primary} strokeWidth={2.5} />
+              </TouchableOpacity>
+                  </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.journeyRow}>
+              <LinearGradient colors={['#FFF7ED', '#FFEDD5']} style={st.journeyCard}>
+                <View style={st.journeyIconWrap}><Flame size={22} color="#EA580C" fill="#F97316" /></View>
+                <Text style={st.journeyVal}>7 Days</Text>
+                <Text style={st.journeyLbl}>Study Streak</Text>
+                <Text style={st.journeyHint}>Keep it up! 🔥</Text>
+              </LinearGradient>
+              <View style={[st.journeyCard, st.journeyCardWhite]}>
+                <ProgressRing pct={(matchesCount % 7) / 7 * 100 || 57} />
+                <Text style={st.journeyVal}>{Math.min(matchesCount, 7)}/7</Text>
+                <Text style={st.journeyLbl}>Weekly Goal</Text>
+                <Text style={st.journeyHint}>Almost there!</Text>
+                </View>
+              <LinearGradient colors={['#ECFDF5', '#D1FAE5']} style={st.journeyCard}>
+                <View style={[st.journeyIconWrap, { backgroundColor: '#D1FAE5' }]}>
+                  <Ionicons name="time-outline" size={22} color="#059669" />
               </View>
-              <Text style={styles.tileSubtitleRow} numberOfLines={2}>
-                Nearby study partners, same vibe.
-              </Text>
-              <LinearGradient
-                colors={['#EC4899', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.tileCta}
-              >
-                <Text style={styles.tileCtaText}>Find nearby</Text>
+                <Text style={st.journeyVal}>12h 30m</Text>
+                <Text style={st.journeyLbl}>This Week</Text>
+                <View style={st.trendRow}>
+                  <TrendingUp size={12} color="#059669" />
+                  <Text style={st.trendTxt}>↗ 15% from last week</Text>
+              </View>
               </LinearGradient>
-              <LinearGradient
-                colors={['#DBEAFE', '#E0E7FF']}
-                style={styles.tileMediaRow}
+            </ScrollView>
+
+            {/* Discover swipe card — like & profile */}
+            <View style={st.secHead}>
+              <Text style={st.secTitle}>Swipe to Connect</Text>
+              <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(tabs)/study-partner-discover' as any)}>
+                <Text style={st.seeAll}>Full Discover</Text>
+              </TouchableOpacity>
+              </View>
+            <DiscoverSwipeCard
+              profiles={discoveryProfiles}
+              cardIndex={cardIndex}
+              actionLoading={actionLoading}
+              lastAction={lastAction}
+              onPass={() => sendDiscoverAction('pass')}
+              onLike={() => sendDiscoverAction('like')}
+              onSuperLike={() => sendDiscoverAction('like')}
+              onOpenDiscover={() => router.push('/(tabs)/study-partner-discover' as any)}
+            />
+
+            {/* Boost matches */}
+            {!profileDone && (
+            <TouchableOpacity
+                style={st.boostWrap}
+                activeOpacity={0.92}
+                onPress={() => router.push('/(tabs)/study-partner-profile' as any)}
               >
-                <Ionicons name="navigate" size={22} color="#4F46E5" />
-                <Text style={[styles.tileMediaText, { color: '#3730A3', fontSize: 11 }]} numberOfLines={1}>
-                  Meet nearby
-                </Text>
-              </LinearGradient>
+                <LinearGradient colors={['#60A5FA', '#8E78E7', C.primary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.boostBanner}>
+                  <View style={st.boostTextCol}>
+                    <Text style={st.boostTitle}>Boost your matches! 🚀</Text>
+                    <Text style={st.boostSub}>Complete your profile for better buddy recommendations</Text>
+                </View>
+                  <View style={st.boostBtn}>
+                    <Text style={st.boostBtnTxt}>Complete Profile</Text>
+                    <ArrowRight size={14} color={C.primary} strokeWidth={2.5} />
+              </View>
               </LinearGradient>
             </TouchableOpacity>
+            )}
 
-            {/* Matches */}
+            {/* Top buddies */}
+            <View style={st.secHead}>
+              <Text style={st.secTitle}>Top Study Buddies</Text>
+              <TouchableOpacity activeOpacity={0.85} onPress={() => router.push('/(tabs)/study-partner-discover' as any)}>
+                <Text style={st.seeAll}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.buddyRow}>
+              {displayBuddies.map((b) => {
+                const tag = tagFor(b.examType);
+                const photo = b.profilePhoto
+                  ? (b.profilePhoto.startsWith('http') ? b.profilePhoto : getImageUrl(b.profilePhoto))
+                  : null;
+                return (
             <TouchableOpacity
-              activeOpacity={0.9}
-              style={[styles.tile, styles.tileInRow]}
-              onPress={() => router.push('/(tabs)/study-partner-matches' as any)}
-            >
-              <LinearGradient
-                colors={['#FFFFFF', '#FFF1F2']}
-                style={styles.tileInnerRow}
-              >
-              <View style={styles.tileTopRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.tileTitleRow} numberOfLines={1}>Matches</Text>
-                  <Text style={styles.tileCount}>
-                    {matchesCount} match{matchesCount === 1 ? '' : 'es'}
-                  </Text>
+                    key={b.id}
+                    activeOpacity={0.92}
+                    style={st.buddyCard}
+                    onPress={() => router.push({ pathname: '/(tabs)/study-partner-liked-user' as any, params: { userId: b.id, userName: b.name } })}
+                  >
+                    <View style={st.buddyPhotoWrap}>
+                      {photo ? (
+                        <Image source={{ uri: photo }} style={st.buddyPhoto} />
+                      ) : (
+                        <LinearGradient colors={['#C4B5FD', '#8E78E7']} style={st.buddyPhoto}>
+                          <Text style={st.buddyInitial}>{b.name.charAt(0)}</Text>
+                        </LinearGradient>
+                      )}
+                      <View style={st.onlineDot} />
                 </View>
-                <View style={styles.tileIconWrap}>
-                  <Ionicons name="heart" size={18} color="#DC2626" />
+                    <Text style={st.buddyName} numberOfLines={1}>{b.name}</Text>
+                    <Text style={st.buddyMeta} numberOfLines={1}>{b.examType || 'Exam Prep'}</Text>
+                    <View style={[st.buddyTag, { backgroundColor: tag.bg }]}>
+                      <Text style={[st.buddyTagTxt, { color: tag.text }]} numberOfLines={1}>{tag.label}</Text>
                 </View>
-              </View>
-              <Text style={styles.tileSubtitleRow} numberOfLines={2}>
-                Chat with your study buddies.
-              </Text>
-              <LinearGradient
-                colors={['#EC4899', '#7C3AED']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.tileCta}
-              >
-                <Text style={styles.tileCtaText}>Open matches</Text>
-              </LinearGradient>
-              <LinearGradient
-                colors={['#FCE7F3', '#EDE9FE']}
-                style={styles.tileMediaRow}
-              >
-                <Ionicons name="chatbubbles" size={22} color="#BE185D" />
-                <Text style={[styles.tileMediaText, { color: '#9D174D', fontSize: 11 }]} numberOfLines={1}>
-                  Start chatting
-                </Text>
-              </LinearGradient>
-              </LinearGradient>
+                    <View style={st.buddyFoot}>
+                      <Text style={st.matchTxt}>{b.matchPct}% Match</Text>
+                      <TouchableOpacity
+                        style={st.chatBtn}
+                        onPress={() => router.push('/(tabs)/messages' as any)}
+                        hitSlop={8}
+                      >
+                        <Ionicons name="chatbubble" size={14} color="#FFF" />
             </TouchableOpacity>
             </View>
-          </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-          {/* Optional: who liked you quick link */}
+            {/* Quick actions */}
           {whoLikedCount > 0 && (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.whoLikedRow}
-              onPress={() =>
-                router.push('/(tabs)/study-partner-who-liked-you' as any)
-              }
-            >
-              <Ionicons name="eye" size={18} color="#6D28D9" />
-              <Text style={styles.whoLikedText}>Who liked you</Text>
-              <View style={styles.whoLikedBadge}>
-                <Text style={styles.whoLikedBadgeText}>{whoLikedCount}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#6B7280" />
+              <TouchableOpacity style={st.likedBanner} activeOpacity={0.9} onPress={() => router.push('/(tabs)/study-partner-who-liked-you' as any)}>
+                <LinearGradient colors={['#FDF2F8', '#F3EEFF']} style={st.likedGrad}>
+                  <Heart size={18} color={C.pink} fill={C.pink} />
+                  <Text style={st.likedTxt}>{whoLikedCount} people liked your profile</Text>
+                  <ArrowRight size={16} color={C.primary} />
+                </LinearGradient>
             </TouchableOpacity>
           )}
 
-          {/* Profile quick link */}
-          <TouchableOpacity
-            activeOpacity={0.9}
-            style={styles.profileRow}
-            onPress={() => router.push('/(tabs)/study-partner-profile' as any)}
-          >
-            <View style={styles.profileRowLeft}>
-              <View style={styles.profileIcon}>
-                <Image
-                  source={require('@/assets/images/icons/student2.png')}
-                  style={styles.profileIconImage}
-                  resizeMode="cover"
-                />
+            {/* How it works */}
+            <Text style={[st.secTitle, { paddingHorizontal: PAD, marginTop: 8, marginBottom: 14 }]}>How It Works?</Text>
+            <View style={st.howWrap}>
+              {[
+                { step: '1', icon: 'person-circle-outline' as const, title: 'Create Profile', sub: 'Set goals & exam preferences', color: '#6344D4', bg: '#F3EEFF' },
+                { step: '2', icon: 'heart' as const, title: 'Find a Match', sub: 'Swipe & connect with buddies', color: '#EC4899', bg: '#FCE7F3' },
+                { step: '3', icon: 'people' as const, title: 'Study Together', sub: 'Chat, plan & grow together', color: '#2563EB', bg: '#EFF6FF' },
+              ].map((item, i) => (
+                <View key={item.step} style={st.howStepWrap}>
+                  {i < 2 && <View style={st.howDots}><View style={st.howDotLine} /></View>}
+                  <View style={st.howStep}>
+                    <View style={[st.howIcon, { backgroundColor: item.bg }]}>
+                      <Ionicons name={item.icon} size={24} color={item.color} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.profileTitle}>My Profile</Text>
-                <Text style={styles.profileSubtitle} numberOfLines={1}>
-                  {profile?.bio ? 'Profile completed' : 'Complete your profile for better matches'}
-                </Text>
+                    <Text style={st.howTitle}>{item.title}</Text>
+                    <Text style={st.howSub}>{item.sub}</Text>
               </View>
             </View>
-            <View style={styles.profilePill}>
-              <Text style={styles.profilePillText}>
-                {profile?.bio ? 'Edit' : 'Complete'}
-              </Text>
+              ))}
             </View>
-          </TouchableOpacity>
 
-          {/* Discover Find your Study Buddy - below My Profile */}
-          <View style={styles.findBuddyBelowProfileWrap}>
-          <TouchableOpacity
-            activeOpacity={0.95}
-            style={styles.tileFull}
-            onPress={() => router.push('/(tabs)/study-partner-discover' as any)}
-          >
-            <LinearGradient
-              colors={['#EDE9FE', '#E9D5FF', '#DDD6FE', '#F5F3FF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.findBuddyCardInner}
-            >
-              <View style={styles.findBuddyRow}>
-                <View style={styles.findBuddyCopy}>
-                  <Text style={styles.findBuddyLabel}>DISCOVER</Text>
-                  <Text style={styles.findBuddyTitle}>Find your Study Buddy</Text>
-                  <Text style={styles.findBuddySubtitle}>
-                    Swipe, match & study together. Your perfect partner is a tap away.
-                  </Text>
+            {/* Profile CTA */}
+            {!profileDone && (
+              <TouchableOpacity style={st.profileCta} activeOpacity={0.9} onPress={() => router.push('/(tabs)/study-partner-profile' as any)}>
+                <LinearGradient colors={['#8E78E7', C.primary]} style={st.profileCtaGrad}>
+                  <Sparkles size={18} color="#FFF" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.profileCtaTitle}>Complete your profile</Text>
+                    <Text style={st.profileCtaSub}>Get better matches — takes 2 min</Text>
                 </View>
-                <View style={styles.findBuddyImageContainer}>
-                  <Image
-                    source={require('@/assets/images/icons/study-buddy.png')}
-                    style={styles.findBuddyHeroImage}
-                    resizeMode="contain"
-                  />
-                </View>
-              </View>
-              <View style={styles.findBuddyCtaWrap}>
-                <LinearGradient
-                  colors={['#7C3AED', '#6D28D9']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.findBuddyCta}
-                >
-                  <Ionicons name="sparkles" size={16} color="#FFF" />
-                  <Text style={styles.findBuddyCtaText}>Start discovering</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#FFF" />
-                </LinearGradient>
-              </View>
-              <View style={styles.findBuddyFooter}>
-                <Ionicons name="people" size={12} color="#FFFFFF" />
-                <Text style={styles.findBuddyFooterText}>New profiles added daily</Text>
-              </View>
+                  <ArrowRight size={18} color="#FFF" />
             </LinearGradient>
           </TouchableOpacity>
-          </View>
+            )}
 
+            <TouchableOpacity style={st.matchesLink} activeOpacity={0.9} onPress={() => router.push('/(tabs)/study-partner-matches' as any)}>
+              <Text style={st.matchesLinkTxt}>{matchesCount} active match{matchesCount === 1 ? '' : 'es'} — View all</Text>
+              <ArrowRight size={16} color={C.primary} />
+            </TouchableOpacity>
         </ScrollView>
-      )}
+        </Animated.View>
+      </SafeAreaView>
       <StudyPartnerBottomNav />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F5F3FF',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F3FF',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#F9FAFB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 16,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  errorText: {
-    color: '#DC2626',
-    marginBottom: 12,
-    fontSize: 13,
-  },
-  hero: {
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  heroTitle: {
-    fontSize: 30,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  heroSubtitle: {
-    marginTop: 6,
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.85)',
-    textAlign: 'center',
-  },
-  grid: {
-    marginTop: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-  },
-  tilesRow: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 14,
-    marginBottom: 0,
-  },
-  tileInRow: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 180,
-  },
-  tileFull: {
-    width: '100%',
-    borderRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  findBuddyBelowProfileWrap: {
-    marginTop: 14,
-  },
-  tile: {
-    width: '48%',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-    minHeight: 190,
-    overflow: 'hidden',
-  },
-  findBuddyCardInner: {
-    paddingTop: 14,
-    paddingHorizontal: 18,
-    paddingBottom: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.2)',
-    borderRadius: 22,
-  },
-  findBuddyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 10,
-  },
-  findBuddyCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  findBuddyImageContainer: {
-    width: 140,
-    height: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  findBuddyHeroImage: {
-    width: 260,
-    height: 260,
-  },
-  findBuddyCtaWrap: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  findBuddyLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    color: '#6D28D9',
-    marginBottom: 2,
-  },
-  findBuddyTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: -0.3,
-    lineHeight: 24,
-  },
-  findBuddySubtitle: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#4B5563',
-    lineHeight: 17,
-  },
-  findBuddyCta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 18,
-    borderRadius: 9999,
-    shadowColor: '#6D28D9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  findBuddyCtaText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  findBuddyFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#22C55E',
-    borderWidth: 0,
-  },
-  findBuddyFooterText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  tileInner: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
-    minHeight: 190,
-    overflow: 'hidden',
-  },
-  tileInnerRow: {
-    flex: 1,
-    padding: 12,
-  },
-  tileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  tileIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#F5F3FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tileTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  tileTitleRow: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  tileSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  tileSubtitleRow: {
-    marginTop: 4,
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#6B7280',
-    lineHeight: 14,
-  },
-  tileCta: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  tileCtaText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  tileCtaAlt: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  tileCtaTextAlt: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#6D28D9',
-  },
-  tileMedia: {
-    marginTop: 12,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(109,40,217,0.12)',
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  tileMediaRow: {
-    marginTop: 8,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(109,40,217,0.12)',
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tileMediaText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#6D28D9',
-  },
-  tileCount: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#6D28D9',
-  },
-  whoLikedRow: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  whoLikedText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  whoLikedBadge: {
-    minWidth: 28,
-    height: 24,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    backgroundColor: '#7C3AED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  whoLikedBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  profileRow: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  profileRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  profileIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F5F3FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    overflow: 'hidden',
-  },
-  profileIconImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profileTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  profileSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  profilePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#7C3AED',
-  },
-  profilePillText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  inspireWrapper: {
-    marginTop: 14,
-  },
-  inspireCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  inspireTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  inspireKicker: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#6B7280',
-  },
-  inspireHeadline: {
-    marginTop: 2,
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  inspireAccent: {
-    color: '#7C3AED',
-  },
-  inspireAvatarStack: {
-    width: 86,
-    height: 40,
-    position: 'relative',
-  },
-  inspireAvatar: {
-    position: 'absolute',
-    top: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  inspireAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  inspireAvatarA: { left: 0, backgroundColor: '#7C3AED' },
-  inspireAvatarB: { left: 22, backgroundColor: '#EC4899' },
-  inspireAvatarC: { left: 44, backgroundColor: '#4F46E5' },
-  inspirePill: {
-    marginTop: 12,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    backgroundColor: '#F5F3FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  inspirePillText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#374151',
-    lineHeight: 18,
-  },
-  inspireDotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-  },
-  inspireDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D1D5DB',
-  },
-  inspireDotActive: {
-    width: 18,
-    backgroundColor: '#FBBF24',
-  },
-  neverImageWrap: {
-    marginTop: 8,
-    marginHorizontal: -16,
-    marginLeft: -48,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  neverPartnerImage: {
-    width: '100%',
-    height: 200,
-  },
-  neverBlock: {
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  neverTitle: {
-    fontSize: 42,
-    fontWeight: '300',
-    color: '#111827',
-    letterSpacing: -0.5,
-  },
-  neverTitleBig: {
-    marginTop: -6,
-    fontSize: 54,
-    fontWeight: '300',
-    color: '#111827',
-    letterSpacing: -1.2,
-  },
-  neverSubtitle: {
-    marginTop: 10,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6B7280',
-  },
-  neverHeart: {
-    color: '#EC4899',
-  },
-  inspireCta: {
-    marginTop: 16,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  inspireCtaText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 13,
-  },
-  heroDotA: {
-    position: 'absolute',
-    right: -20,
-    top: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(236,72,153,0.25)',
-  },
-  heroDotB: {
-    position: 'absolute',
-    left: -30,
-    bottom: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(99,102,241,0.22)',
-  },
-  heroDotC: {
-    position: 'absolute',
-    right: 40,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-  },
+const purpleSh = Platform.select({
+  ios: { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.12, shadowRadius: 12 },
+  android: { elevation: 4 },
 });
 
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#FAFAFF' },
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadTxt: { fontFamily: FontFamily.medium, fontSize: 14, color: C.muted, marginTop: 12 },
+  loginTitle: { fontFamily: FontFamily.bold, fontSize: 22, color: C.ink },
+  loginSub: { fontFamily: FontFamily.regular, fontSize: 14, color: C.muted, marginTop: 6 },
+  orb1: { position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: '#DDD6FE', top: -80, right: -60, opacity: 0.45 },
+  orb2: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: '#FBCFE8', top: 400, left: -70, opacity: 0.35 },
+  errBox: { marginHorizontal: PAD, padding: 12, backgroundColor: '#FEF2F2', borderRadius: 12, marginBottom: 10, marginTop: 4 },
+  errTxt: { fontFamily: FontFamily.medium, fontSize: 13, color: '#DC2626', textAlign: 'center' },
+  heroWrap: { marginHorizontal: PAD, marginBottom: 16, ...purpleSh },
+  heroBorder: { borderRadius: 24, padding: 2 },
+  heroCard: { borderRadius: 22, padding: 18, overflow: 'hidden', minHeight: 168 },
+  heroOrb: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.5)', top: -20, right: 40 },
+  heroRow: { flexDirection: 'row', alignItems: 'center' },
+  heroCopy: { flex: 1, paddingRight: 4 },
+  heroTitle: { fontFamily: FontFamily.extraBold, fontSize: 22, color: C.ink, lineHeight: 28 },
+  heroAccent: { color: C.primary },
+  heroSub: { fontFamily: FontFamily.regular, fontSize: 12, color: C.muted, marginTop: 4, marginBottom: 12 },
+  heroCta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 11, borderRadius: 22, gap: 6 },
+  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+  heroImg: { width: 110, height: 120 },
+  statsRow: { paddingHorizontal: PAD, gap: 10, paddingBottom: 18 },
+  statCard: {
+    width: (SCREEN_W - PAD * 2 - 30) / 4 + 8,
+    minWidth: 88,
+    backgroundColor: C.card,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    ...purpleSh,
+  },
+  statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  statVal: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink },
+  statLbl: { fontFamily: FontFamily.regular, fontSize: 9, color: C.muted, textAlign: 'center', marginTop: 2 },
+  secHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAD, marginBottom: 12 },
+  secTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: C.ink },
+  viewProgress: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  viewProgressTxt: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.primary },
+  seeAll: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.primaryLight },
+  journeyRow: { paddingHorizontal: PAD, gap: 12, paddingBottom: 18 },
+  journeyCard: { width: 140, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)' },
+  journeyCardWhite: { backgroundColor: C.card, borderColor: C.border, alignItems: 'center', ...purpleSh },
+  journeyIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  journeyVal: { fontFamily: FontFamily.bold, fontSize: 18, color: C.ink },
+  journeyLbl: { fontFamily: FontFamily.medium, fontSize: 11, color: C.muted, marginTop: 2 },
+  journeyHint: { fontFamily: FontFamily.regular, fontSize: 10, color: C.muted, marginTop: 4 },
+  ringTxt: { position: 'absolute', fontFamily: FontFamily.bold, fontSize: 11, color: C.primary },
+  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
+  trendTxt: { fontFamily: FontFamily.medium, fontSize: 9, color: '#059669' },
+  buddyRow: { paddingHorizontal: PAD, gap: 12, paddingBottom: 16 },
+  buddyCard: {
+    width: BUDDY_W,
+    backgroundColor: C.card,
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.border,
+    ...purpleSh,
+  },
+  buddyPhotoWrap: { alignSelf: 'center', marginBottom: 10, position: 'relative' },
+  buddyPhoto: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  buddyInitial: { fontFamily: FontFamily.bold, fontSize: 28, color: '#FFF' },
+  onlineDot: {
+    position: 'absolute', bottom: 4, right: 4, width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#22C55E', borderWidth: 2.5, borderColor: '#FFF',
+  },
+  buddyName: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink, textAlign: 'center' },
+  buddyMeta: { fontFamily: FontFamily.regular, fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 2 },
+  buddyTag: { alignSelf: 'center', marginTop: 8, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  buddyTagTxt: { fontFamily: FontFamily.semiBold, fontSize: 10 },
+  buddyFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  matchTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: C.primary },
+  chatBtn: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+  likedBanner: { marginHorizontal: PAD, marginBottom: 14, borderRadius: 16, overflow: 'hidden' },
+  likedGrad: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10, borderWidth: 1, borderColor: '#FBCFE8', borderRadius: 16 },
+  likedTxt: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: 13, color: C.ink },
+  howWrap: { flexDirection: 'row', paddingHorizontal: PAD, marginBottom: 20, justifyContent: 'space-between' },
+  howStepWrap: { flex: 1, alignItems: 'center', position: 'relative' },
+  howDots: { position: 'absolute', top: 28, left: '55%', right: '-45%', height: 2, zIndex: 0 },
+  howDotLine: { flex: 1, borderStyle: 'dotted', borderWidth: 1, borderColor: '#C4B5FD' },
+  howStep: { alignItems: 'center', zIndex: 1 },
+  howIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  howTitle: { fontFamily: FontFamily.bold, fontSize: 12, color: C.ink, textAlign: 'center' },
+  howSub: { fontFamily: FontFamily.regular, fontSize: 9, color: C.muted, textAlign: 'center', marginTop: 3, paddingHorizontal: 4 },
+  profileCta: { marginHorizontal: PAD, marginBottom: 12, borderRadius: 18, overflow: 'hidden' },
+  profileCtaGrad: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  profileCtaTitle: { fontFamily: FontFamily.bold, fontSize: 14, color: '#FFF' },
+  profileCtaSub: { fontFamily: FontFamily.regular, fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  matchesLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginHorizontal: PAD },
+  matchesLinkTxt: { fontFamily: FontFamily.semiBold, fontSize: 14, color: C.primary },
+  discoverWrap: { marginHorizontal: PAD, marginBottom: 8 },
+  actionFb: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginBottom: 10 },
+  actionFbLike: { backgroundColor: '#DCFCE7' },
+  actionFbPass: { backgroundColor: '#FEE2E2' },
+  actionFbTxt: { fontFamily: FontFamily.semiBold, fontSize: 12, color: C.ink },
+  cardStack: { alignItems: 'center', marginBottom: 8, minHeight: DISCOVER_CARD_H + 16, width: '100%' },
+  swipeCard: {
+    width: SCREEN_W - PAD * 2,
+    height: DISCOVER_CARD_H,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#1A0F3C',
+    ...Platform.select({
+      ios: { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.35, shadowRadius: 20 },
+      android: { elevation: 10 },
+    }),
+  },
+  swipeCardBehind: {
+    position: 'absolute',
+    top: 10,
+    transform: [{ scale: 0.96 }],
+    opacity: 0.55,
+    zIndex: 0,
+  },
+  swipeCardPlaceholder: { flex: 1, borderRadius: 24 },
+  swipePhoto: { flex: 1, justifyContent: 'flex-end' },
+  swipePhotoImg: { borderRadius: 24 },
+  swipeInitial: { position: 'absolute', top: '40%', alignSelf: 'center', fontFamily: FontFamily.extraBold, fontSize: 64, color: 'rgba(255,255,255,0.5)' },
+  swipeTopGrad: { ...StyleSheet.absoluteFillObject, height: 100 },
+  swipeTopRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, zIndex: 2 },
+  matchPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  matchPillTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: C.ink },
+  countPill: { backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  countPillTxt: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#FFF' },
+  interestCol: { position: 'absolute', right: 12, top: 56, gap: 8, zIndex: 2 },
+  interestPill: { backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
+  interestPillTxt: { fontFamily: FontFamily.semiBold, fontSize: 10, color: '#FFF' },
+  swipeBottomGrad: { padding: 16, paddingTop: 48 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  swipeName: { fontFamily: FontFamily.bold, fontSize: 22, color: '#FFF' },
+  swipeEdu: { fontFamily: FontFamily.medium, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginBottom: 8 },
+  goalBadge: { alignSelf: 'flex-start', backgroundColor: C.primary, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 12, marginBottom: 8 },
+  goalBadgeTxt: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#FFF' },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  locTxt: { fontFamily: FontFamily.regular, fontSize: 11, color: 'rgba(255,255,255,0.9)' },
+  swipeBio: { fontFamily: FontFamily.regular, fontSize: 12, color: 'rgba(255,255,255,0.8)', lineHeight: 17 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: 12 },
+  actBtnPass: {
+    width: 58, height: 58, borderRadius: 29, backgroundColor: C.card,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E9E0FF',
+    ...purpleSh,
+  },
+  actBtnStar: {
+    width: 52, height: 52, borderRadius: 26, backgroundColor: C.card,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E9E0FF',
+    ...purpleSh,
+  },
+  actBtnLike: {
+    width: 62, height: 62, borderRadius: 31, backgroundColor: C.card,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FBCFE8',
+    ...purpleSh,
+  },
+  discoverEmpty: { alignItems: 'center', padding: 28, backgroundColor: C.card, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: C.border },
+  discoverEmptyTitle: { fontFamily: FontFamily.semiBold, fontSize: 14, color: C.muted, marginTop: 10, marginBottom: 12 },
+  discoverEmptyBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16 },
+  discoverEmptyBtnTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+  boostWrap: { marginHorizontal: PAD, marginBottom: 16, borderRadius: 18, overflow: 'hidden' },
+  boostBanner: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  boostTextCol: { flex: 1 },
+  boostTitle: { fontFamily: FontFamily.bold, fontSize: 15, color: '#FFF' },
+  boostSub: { fontFamily: FontFamily.regular, fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 15 },
+  boostBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, gap: 4 },
+  boostBtnTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: C.primary },
+});

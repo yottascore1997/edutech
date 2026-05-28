@@ -3,6 +3,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { FontFamily } from '@/constants/Typography';
+import { HomeTheme } from '@/constants/HomeTheme';
 import {
     ActivityIndicator,
     Dimensions,
@@ -15,7 +17,7 @@ import {
 } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = screenWidth * 0.55;
+const CARD_WIDTH = screenWidth * 0.48;
 const CARD_SPACING = 12;
 
 /** Success story item – matches API response (admin adds these from backend). */
@@ -166,61 +168,34 @@ export default function StudentSuccessStories() {
       <TouchableOpacity
         style={[
           styles.videoCard,
-          index === 0 && { marginLeft: 20 },
-          index === stories.length - 1 && { marginRight: 20 }
+          index === 0 && { marginLeft: 16 },
+          index === stories.length - 1 && { marginRight: 16 },
         ]}
         onPress={() => handleVideoPress(item)}
         activeOpacity={0.9}
       >
-        <View style={styles.videoContainer}>
-          {/* Video Thumbnail */}
-          <Image
-            source={{ uri: item.videoThumbnail }}
-            style={styles.videoThumbnail}
-            resizeMode="cover"
-          />
-          
-          {/* Play Button Overlay */}
-          <View style={styles.playButtonOverlay}>
-            <View style={styles.playButton}>
-              <Ionicons name="play" size={32} color="#FFFFFF" />
-            </View>
-          </View>
-
-          {/* Duration Badge */}
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{item.duration}</Text>
-          </View>
-
-          {/* Brand Logo (if available) */}
-          {item.brandName && (
-            <View style={styles.brandLogoContainer}>
-              <View style={styles.brandLogoCircle}>
-                <Ionicons name="logo-google" size={16} color="#FFFFFF" />
+        <View style={styles.cardShell}>
+          <View style={styles.videoContainer}>
+            <Image source={{ uri: item.videoThumbnail }} style={styles.videoThumbnail} resizeMode="cover" />
+            <View style={styles.playButtonOverlay}>
+              <View style={styles.playButton}>
+                <Ionicons name="play" size={22} color={HomeTheme.primary} />
               </View>
             </View>
-          )}
-
-          {/* Description Overlay (if available) */}
-          {item.description && (
-            <View style={styles.descriptionOverlay}>
-              <Text style={styles.descriptionText} numberOfLines={2}>
-                {item.description}
-              </Text>
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>{item.duration}</Text>
             </View>
-          )}
-        </View>
-
-        {/* Student Info Section */}
-        <View style={styles.studentInfoContainer}>
-          <View style={styles.studentInfoLeft}>
-            {item.brandName && (
-              <View style={styles.brandNameContainer}>
-                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                <Text style={styles.brandNameText}>{item.brandName}</Text>
-              </View>
-            )}
-            <Text style={styles.followersText}>{item.followers} followers</Text>
+          </View>
+          <View style={styles.cardBody}>
+            <Text style={styles.storyTitle} numberOfLines={2}>
+              {item.description || item.achievement || 'Success Story'}
+            </Text>
+            <Text style={styles.studentName} numberOfLines={1}>
+              {item.studentName}
+            </Text>
+            <Text style={styles.achievement} numberOfLines={1}>
+              {item.achievement}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -231,26 +206,10 @@ export default function StudentSuccessStories() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.headerIconContainer}>
-            <Image
-              source={require('../assets/images/icons/instagram-stories.png')}
-              style={styles.headerStoriesIcon}
-              resizeMode="contain"
-            />
-          </View>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle}>Stories that</Text>
-            <Text style={styles.headerTitleUnderlined}>inspire</Text>
-          </View>
-        </View>
-        <View style={styles.headerStats}>
-          {loading ? (
-            <ActivityIndicator size="small" color="#F97316" />
-          ) : (
-            <Text style={styles.headerStatsText}>{stories.length}+ Success Stories</Text>
-          )}
-        </View>
+        <Text style={styles.headerTitle}>
+          Stories that <Text style={styles.headerAccent}>inspire</Text>
+        </Text>
+        {loading && <ActivityIndicator size="small" color={HomeTheme.primary} />}
       </View>
 
       {error ? (
@@ -277,72 +236,26 @@ export default function StudentSuccessStories() {
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 0,
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 14,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerIconContainer: {
-    marginRight: 12,
-  },
-  headerStoriesIcon: {
-    width: 50,
-    height: 50,
-  },
-  headerIconGradient: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  headerTextContainer: {
-    flex: 1,
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: 0.5,
+    fontFamily: FontFamily.bold,
+    fontSize: 17,
+    color: HomeTheme.ink,
   },
-  headerTitleUnderlined: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#F97316',
-    letterSpacing: 0.5,
+  headerAccent: {
+    fontFamily: FontFamily.bold,
+    color: HomeTheme.primary,
     textDecorationLine: 'underline',
-    textDecorationColor: '#F97316',
-    textDecorationStyle: 'solid',
-  },
-  headerStats: {
-    backgroundColor: '#FEF3F2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#F97316',
-  },
-  headerStatsText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#F97316',
-    letterSpacing: 0.3,
+    textDecorationColor: HomeTheme.primary,
   },
   errorContainer: {
     paddingHorizontal: 20,
@@ -355,17 +268,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listContent: {
-    paddingRight: 20,
+    paddingRight: 16,
   },
   videoCard: {
     width: CARD_WIDTH,
     marginRight: CARD_SPACING,
   },
-  videoContainer: {
-    width: '100%',
-    height: CARD_WIDTH * 1.2,
+  cardShell: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: HomeTheme.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  videoContainer: {
+    width: '100%',
+    height: CARD_WIDTH * 0.95,
     backgroundColor: '#F3F4F6',
     position: 'relative',
   },
@@ -380,84 +303,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   playButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    paddingLeft: 3,
   },
   durationBadge: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   durationText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 10,
+    color: '#FFFFFF',
+  },
+  cardBody: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  storyTitle: {
+    fontFamily: FontFamily.bold,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  brandLogoContainer: {
-    position: 'absolute',
-    bottom: 60,
-    left: 15,
-  },
-  brandLogoCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  descriptionOverlay: {
-    position: 'absolute',
-    bottom: 15,
-    left: 15,
-    right: 15,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  descriptionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    lineHeight: 18,
-  },
-  studentInfoContainer: {
-    marginTop: 12,
-    paddingHorizontal: 8,
-  },
-  studentInfoLeft: {
-    flex: 1,
-  },
-  brandNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: HomeTheme.ink,
+    lineHeight: 16,
     marginBottom: 4,
   },
-  brandNameText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginLeft: 4,
+  studentName: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: HomeTheme.primary,
+    marginBottom: 2,
   },
-  followersText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
+  achievement: {
+    fontFamily: FontFamily.regular,
+    fontSize: 10,
+    color: HomeTheme.inkMuted,
   },
 });

@@ -1,30 +1,72 @@
 import { apiFetchAuth } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useCategory } from '@/context/CategoryContext';
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {
+  Bell,
+  Bookmark,
+  Calendar,
+  ChevronRight,
+  Clock,
+  FileText,
+  Grid3x3,
+  Megaphone,
+  Sparkles,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
+  Dimensions,
   FlatList,
   Image,
-  Linking,
   Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+const PAD = 16;
 const TAB_BAR_PADDING = 88;
+
+const C = {
+  bg: '#FFFBF7',
+  bgGrad: ['#FFFCF8', '#FFFBF7', '#FAF8F5'] as const,
+  primary: '#2563EB',
+  primaryLight: '#3B82F6',
+  ink: '#0F172A',
+  inkSoft: '#1E3A8A',
+  muted: '#64748B',
+  card: '#FFFFFF',
+  border: '#EDE8E3',
+  sectionBg: '#EFF4FB',
+  heroGrad: ['#1E40AF', '#2563EB', '#3B82F6', '#60A5FA'] as const,
+  heroCta: ['#60A5FA', '#2563EB', '#1D4ED8'] as const,
+  cardBorderGrad: ['#EEF2F8', '#F7F9FC', '#FFFCF8'] as const,
+};
+
+type FilterKey = 'all' | 'exam' | 'update' | 'reminder';
+
+const FILTER_TABS: { key: FilterKey; label: string; icon: typeof Grid3x3; colors: readonly [string, string] }[] = [
+  { key: 'all', label: 'All', icon: Grid3x3, colors: ['#60A5FA', '#2563EB'] },
+  { key: 'exam', label: 'Exams', icon: FileText, colors: ['#60A5FA', '#3B82F6'] },
+  { key: 'update', label: 'Updates', icon: Megaphone, colors: ['#34D399', '#10B981'] },
+  { key: 'reminder', label: 'Reminders', icon: Bookmark, colors: ['#FBBF24', '#F59E0B'] },
+];
+
+const CARD_THEMES = [
+  { dot: '#2563EB', iconBg: ['#DBEAFE', '#EFF6FF'] as const, iconColor: '#2563EB', Icon: Calendar },
+  { dot: '#F59E0B', iconBg: ['#FEF3C7', '#FFFBEB'] as const, iconColor: '#D97706', Icon: Bookmark },
+  { dot: '#3B82F6', iconBg: ['#DBEAFE', '#EFF6FF'] as const, iconColor: '#2563EB', Icon: FileText },
+  { dot: '#10B981', iconBg: ['#D1FAE5', '#ECFDF5'] as const, iconColor: '#059669', Icon: Megaphone },
+];
 
 interface ExamNotification {
   id: string;
@@ -39,6 +81,210 @@ interface ExamNotification {
   logoUrl?: string;
 }
 
+function getDaysRemaining(lastDate: string) {
+  const diff = new Date(lastDate).getTime() - Date.now();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+function formatDateShort(dateString: string) {
+  const d = new Date(dateString);
+  return `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
+}
+
+function formatDateHero(dateString: string) {
+  const d = new Date(dateString);
+  const day = d.toLocaleString('default', { weekday: 'short' });
+  return `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}, ${day}`;
+}
+
+function notifKind(n: ExamNotification): FilterKey {
+  const t = `${n.title} ${n.description}`.toLowerCase();
+  if (t.includes('update') || t.includes('syllabus') || t.includes('uploaded') || t.includes('important')) {
+    return 'update';
+  }
+  const days = getDaysRemaining(n.applyLastDate);
+  if (
+    t.includes('deadline') ||
+    t.includes('reminder') ||
+    t.includes('last date') ||
+    t.includes('form') ||
+    (days >= 0 && days <= 14)
+  ) {
+    return 'reminder';
+  }
+  return 'exam';
+}
+
+function useCountdown(targetIso: string | null) {
+  const [parts, setParts] = useState({ days: 0, hrs: 0, mins: 0, secs: 0 });
+  useEffect(() => {
+    if (!targetIso) return;
+    const tick = () => {
+      const diff = Math.max(0, new Date(targetIso).getTime() - Date.now());
+      setParts({
+        days: Math.floor(diff / 86400000),
+        hrs: Math.floor((diff % 86400000) / 3600000),
+        mins: Math.floor((diff % 3600000) / 60000),
+        secs: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetIso]);
+  return parts;
+}
+
+function CountdownBox({ value, label }: { value: number; label: string }) {
+  const v = String(value).padStart(2, '0');
+  return (
+    <View style={st.countBox}>
+      <Text style={st.countVal}>{v}</Text>
+      <Text style={st.countLbl}>{label}</Text>
+    </View>
+  );
+}
+
+function HeroUpcomingCard({
+  item,
+  onViewDetails,
+}: {
+  item: ExamNotification | null;
+  onViewDetails: () => void;
+}) {
+  const countdown = useCountdown(item?.applyLastDate ?? null);
+  const title = item?.title ?? 'Upcoming Exam';
+  const dateLine = item ? formatDateHero(item.applyLastDate) : 'New alerts coming soon';
+  const daysLeft = item ? getDaysRemaining(item.applyLastDate) : null;
+
+  return (
+    <LinearGradient colors={['#93C5FD', '#BFDBFE', '#DBEAFE']} style={st.heroBorder}>
+      <LinearGradient colors={[...C.heroGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.85 }} style={st.heroCard}>
+        <View style={st.heroShine} pointerEvents="none" />
+        <View style={st.heroTopRow}>
+          <View style={st.heroBadge}>
+            <Sparkles size={10} color={C.primary} strokeWidth={2.5} />
+            <Text style={st.heroBadgeTxt}>UPCOMING</Text>
+          </View>
+          {daysLeft !== null && daysLeft >= 0 ? (
+            <View style={st.heroUrgentPill}>
+              <Text style={st.heroUrgentTxt}>{daysLeft === 0 ? 'Today' : `${daysLeft}d left`}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={st.heroBody}>
+          <View style={st.heroCopy}>
+            <Text style={st.heroExamTitle} numberOfLines={1}>{title}</Text>
+            <View style={st.heroMetaRow}>
+              <Calendar size={11} color="rgba(255,255,255,0.85)" strokeWidth={2} />
+              <Text style={st.heroMetaTxt} numberOfLines={1}>{dateLine}</Text>
+              <Text style={st.heroMetaDot}>·</Text>
+              <Clock size={11} color="rgba(255,255,255,0.85)" strokeWidth={2} />
+              <Text style={st.heroMetaTxt}>Apply by deadline</Text>
+            </View>
+            <View style={st.countdownRow}>
+              <CountdownBox value={countdown.days} label="DAYS" />
+              <CountdownBox value={countdown.hrs} label="HRS" />
+              <CountdownBox value={countdown.mins} label="MIN" />
+              <CountdownBox value={countdown.secs} label="SEC" />
+            </View>
+          </View>
+          <Image
+            source={require('@/assets/images/icons/calendar.png')}
+            style={st.heroCardArt}
+            resizeMode="contain"
+          />
+        </View>
+
+        <TouchableOpacity style={st.heroCtaWrap} onPress={onViewDetails} activeOpacity={0.92}>
+          <LinearGradient colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.88)']} style={st.heroCtaBtn}>
+            <Text style={st.heroCtaTxt}>View Details</Text>
+            <ChevronRight size={14} color={C.primary} strokeWidth={2.5} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </LinearGradient>
+    </LinearGradient>
+  );
+}
+
+function FilterTabs({ active, onChange }: { active: FilterKey; onChange: (k: FilterKey) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterRow}>
+      {FILTER_TABS.map((tab) => {
+        const isActive = active === tab.key;
+        const Icon = tab.icon;
+        return (
+          <TouchableOpacity key={tab.key} onPress={() => onChange(tab.key)} activeOpacity={0.88}>
+            {isActive ? (
+              <LinearGradient colors={[...tab.colors]} style={st.filterChipActive}>
+                <Icon size={15} color="#FFF" strokeWidth={2.2} />
+                <Text style={st.filterTxtActive}>{tab.label}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={st.filterChip}>
+                <View style={[st.filterIconWrap, { backgroundColor: `${tab.colors[1]}18` }]}>
+                  <Icon size={15} color={tab.colors[1]} strokeWidth={2.2} />
+                </View>
+                <Text style={st.filterTxt}>{tab.label}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+function NotificationRow({
+  item,
+  index,
+  onPress,
+}: {
+  item: ExamNotification;
+  index: number;
+  onPress: () => void;
+}) {
+  const theme = CARD_THEMES[index % CARD_THEMES.length];
+  const IconComp = theme.Icon;
+  const days = getDaysRemaining(item.applyLastDate);
+  const kind = notifKind(item);
+  const footer =
+    kind === 'reminder'
+      ? `Last date · ${formatDateShort(item.applyLastDate)}`
+      : `${formatDateShort(item.applyLastDate)} · ${days >= 0 ? `${days} days left` : 'Expired'}`;
+  const urgent = days >= 0 && days <= 7;
+
+  return (
+    <LinearGradient colors={[...C.cardBorderGrad]} style={st.listCardBorder}>
+      <TouchableOpacity style={st.listCard} onPress={onPress} activeOpacity={0.88}>
+        <View style={[st.statusDot, { backgroundColor: theme.dot }]} />
+        <LinearGradient colors={[...theme.iconBg]} style={st.listIcon}>
+          <IconComp size={18} color={theme.iconColor} strokeWidth={2.2} />
+        </LinearGradient>
+        <View style={st.listBody}>
+          <View style={st.listTitleRow}>
+            <Text style={st.listTitle} numberOfLines={1}>{item.title}</Text>
+            {urgent ? (
+              <View style={st.listUrgent}>
+                <Text style={st.listUrgentTxt}>Urgent</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={st.listDesc} numberOfLines={2}>{item.description}</Text>
+          <View style={st.listFooter}>
+            <Calendar size={11} color={C.primaryLight} strokeWidth={2} />
+            <Text style={st.listFooterTxt}>{footer}</Text>
+          </View>
+        </View>
+        <View style={st.listChev}>
+          <ChevronRight size={16} color={C.primary} strokeWidth={2.5} />
+        </View>
+      </TouchableOpacity>
+    </LinearGradient>
+  );
+}
+
 export default function ExamNotificationsScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -48,37 +294,32 @@ export default function ExamNotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
 
-  const categories = ['All', 'SSC', 'UPSC', 'Railway', 'Banking', 'State Exams', 'Others'];
-
-  useEffect(() => {
-    fetchNotifications();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     if (!user?.token) {
       setLoading(false);
       return;
     }
-
     try {
       setLoading(true);
       const response = await apiFetchAuth('/student/exam-notifications', user.token);
       if (response.ok) {
-        setNotifications(response.data);
+        setNotifications(Array.isArray(response.data) ? response.data : []);
         setError(null);
       } else {
-        setError(response.data.message || 'Failed to fetch notifications');
+        setError(response.data?.message || 'Failed to fetch notifications');
       }
     } catch {
       setError('Failed to fetch exam notifications');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -86,517 +327,319 @@ export default function ExamNotificationsScreen() {
     setRefreshing(false);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return `${date.getDate()} ${date.toLocaleString('default', { month: 'short' })} ${date.getFullYear()}`;
-  };
+  const sorted = useMemo(() => {
+    return [...notifications].sort((a, b) => {
+      const dA = getDaysRemaining(a.applyLastDate);
+      const dB = getDaysRemaining(b.applyLastDate);
+      const pA = dA < 0 ? 3 : dA <= 7 ? 1 : 2;
+      const pB = dB < 0 ? 3 : dB <= 7 ? 1 : 2;
+      if (pA !== pB) return pA - pB;
+      return dA - dB;
+    });
+  }, [notifications]);
 
-  const getDaysRemaining = (lastDate: string) => {
-    const today = new Date();
-    const lastDateObj = new Date(lastDate);
-    const diffTime = lastDateObj.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getStatusInfo = (daysLeft: number) => {
-    if (daysLeft < 0) {
-      return { text: 'Expired', color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.1)' };
-    } else if (daysLeft <= 7) {
-      return { text: 'Urgent', color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.1)' };
-    } else {
-      return { text: 'Active', color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.1)' };
+  const filtered = useMemo(() => {
+    let list = sorted;
+    if (activeFilter !== 'all') {
+      list = list.filter((n) => notifKind(n) === activeFilter);
     }
-  };
+    if (globalCategory) {
+      const c = globalCategory.toLowerCase();
+      list = list.filter(
+        (n) => n.title.toLowerCase().includes(c) || n.description?.toLowerCase().includes(c)
+      );
+    }
+    return list;
+  }, [sorted, activeFilter, globalCategory]);
 
-  const handleApplyPress = (link: string) => {
-    if (link) Linking.openURL(link);
-  };
+  const heroItem = useMemo(() => {
+    const active = sorted.filter((n) => getDaysRemaining(n.applyLastDate) >= 0);
+    return active[0] ?? sorted[0] ?? null;
+  }, [sorted]);
 
   const handleNotificationPress = (notification: ExamNotification) => {
     router.push(`/exam-notification/${notification.id}` as any);
   };
 
-  const filteredAndSortedNotifications = useMemo(() => {
-    let filtered = [...notifications];
+  const renderHeader = () => (
+    <>
+      <View style={st.sectionPanel}>
+        <View style={st.titleCard}>
+          <View style={st.titleCopy}>
+            <Text style={st.titleMain}>
+              Exam <Text style={st.titleAccent}>Notifications</Text>
+            </Text>
+            <Text style={st.titleSub} numberOfLines={2}>
+              Stay updated with exams, deadlines & alerts
+            </Text>
+          </View>
+          <Image
+            source={require('@/assets/images/exam-notifications-hero.png')}
+            style={st.titleHeroImg}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter((notif) => notif.title.toLowerCase().includes(q) || notif.description.toLowerCase().includes(q));
-    }
+      <HeroUpcomingCard
+        item={heroItem}
+        onViewDetails={() => {
+          if (heroItem) handleNotificationPress(heroItem);
+        }}
+      />
 
-    const categoryToFilter = globalCategory || (selectedCategory !== 'All' ? selectedCategory : null);
-    if (categoryToFilter) {
-      const c = categoryToFilter.toLowerCase();
-      filtered = filtered.filter((notif) => notif.title.toLowerCase().includes(c) || notif.description?.toLowerCase().includes(c));
-    }
+      <FilterTabs active={activeFilter} onChange={setActiveFilter} />
 
-    filtered.sort((a, b) => {
-      const daysA = getDaysRemaining(a.applyLastDate);
-      const daysB = getDaysRemaining(b.applyLastDate);
-      const priorityA = daysA < 0 ? 3 : daysA <= 7 ? 1 : 2;
-      const priorityB = daysB < 0 ? 3 : daysB <= 7 ? 1 : 2;
-      if (priorityA !== priorityB) return priorityA - priorityB;
-      return daysA - daysB;
-    });
+      {error ? (
+        <TouchableOpacity style={st.errBox} onPress={fetchNotifications} activeOpacity={0.9}>
+          <Text style={st.errTxt}>{error} — Tap to retry</Text>
+        </TouchableOpacity>
+      ) : null}
 
-    return filtered;
-  }, [notifications, searchQuery, selectedCategory, globalCategory]);
-
-  const renderNotificationItem = useCallback(
-    ({ item }: { item: ExamNotification }) => {
-      const daysLeft = getDaysRemaining(item.applyLastDate);
-      const statusInfo = getStatusInfo(daysLeft);
-      const isExpired = daysLeft < 0;
-      const isUrgent = daysLeft <= 7 && daysLeft >= 0;
-
-      const flashAnim = new Animated.Value(1);
-      const startFlash = () => {
-        Animated.sequence([
-          Animated.timing(flashAnim, { toValue: 0.3, duration: 200, useNativeDriver: true }),
-          Animated.timing(flashAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-        ]).start();
-      };
-
-      const pulseAnim = new Animated.Value(1);
-      if (!isExpired) {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, { toValue: 1.15, duration: 800, easing: Easing.ease, useNativeDriver: true }),
-            Animated.timing(pulseAnim, { toValue: 1, duration: 800, easing: Easing.ease, useNativeDriver: true }),
-          ])
-        ).start();
-      }
-
-      return (
-        <Animated.View style={{ opacity: flashAnim }}>
-          <TouchableOpacity
-            style={[
-              styles.notificationCard,
-              {
-                backgroundColor: isUrgent ? 'rgba(245, 158, 11, 0.05)' : isExpired ? 'rgba(239, 68, 68, 0.05)' : 'rgba(16, 185, 129, 0.05)',
-                borderLeftWidth: 4,
-                borderLeftColor: isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : '#10B981',
-              },
-            ]}
-            onPress={() => handleNotificationPress(item)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <View style={styles.cardHeaderRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    {isUrgent && (
-                      <View style={styles.urgentBadge}>
-                        <Ionicons name="alert-circle" size={14} color="#FFF" />
-                      </View>
-                    )}
-                    <Text style={styles.examTitle} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
-                  <Text style={styles.statusText}>{statusInfo.text}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.examDescription} numberOfLines={2}>
-                {item.description}
-              </Text>
-
-              {isUrgent && (
-                <View style={styles.countdownContainer}>
-                  <Ionicons name="time-outline" size={16} color="#EF4444" />
-                  <Animated.Text style={[styles.countdownText, { transform: [{ scale: pulseAnim }] }]}>
-                    {daysLeft === 0 ? '⚠️ LAST DAY TO APPLY!' : `⏰ ${daysLeft} ${daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT`}
-                  </Animated.Text>
-                </View>
-              )}
-
-              <View style={styles.examInfoRow}>
-                <View style={styles.infoItem}>
-                  <Ionicons name="calendar-outline" size={16} color="#047857" />
-                  <Text style={styles.infoText}>Last Date: {formatDate(item.applyLastDate)}</Text>
-                </View>
-              </View>
-
-              {item.applyLink && (
-                <TouchableOpacity
-                  style={styles.applyNowButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleApplyPress(item.applyLink);
-                  }}
-                >
-                  <LinearGradient
-                    colors={isUrgent ? ['#EF4444', '#DC2626'] : ['#10B981', '#059669']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.applyButtonGradient}
-                  >
-                    <Text style={styles.applyButtonText}>{isUrgent ? '⚡ Apply Now (Urgent)' : 'Apply Online'}</Text>
-                    <Ionicons name="open-outline" size={16} color="#FFFFFF" />
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#94A3B8" style={styles.chevronIcon} />
-          </TouchableOpacity>
-        </Animated.View>
-      );
-    },
-    [handleNotificationPress]
+      <View style={st.sectionRow}>
+        <Text style={st.sectionLbl}>Recent Alerts</Text>
+        <View style={st.sectionCount}>
+          <Text style={st.sectionCountTxt}>{filtered.length}</Text>
+        </View>
+      </View>
+    </>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <View style={styles.emptyIconContainer}>
-        <Ionicons name="notifications-outline" size={48} color="#6366F1" />
-      </View>
-      <Text style={styles.emptyTitle}>No notifications yet</Text>
-      <Text style={styles.emptyMessage}>When new exam dates or application deadlines are added, they’ll show up here.</Text>
+  const renderEmpty = () => (
+    <View style={st.empty}>
+      <LinearGradient colors={['#EFF6FF', '#DBEAFE']} style={st.emptyIcon}>
+        <Bell size={32} color={C.primary} strokeWidth={2} />
+      </LinearGradient>
+      <Text style={st.emptyTitle}>No notifications yet</Text>
+      <Text style={st.emptyMsg}>
+        When new exam dates or application deadlines are added, they&apos;ll show up here.
+      </Text>
     </View>
   );
 
-  if (loading) {
+  if (loading && !notifications.length) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366F1" />
-          <Text style={styles.loadingText}>Loading exam notifications...</Text>
-        </View>
-      </SafeAreaView>
+      <View style={[st.centered, { backgroundColor: C.bg, paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={st.loadTxt}>Loading exam notifications…</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+    <View style={st.root}>
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={[...C.bgGrad]} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.searchSortSection}>
-        <View style={styles.searchContainer}>
-          <Image source={require('@/assets/images/icons/search.png')} style={styles.searchBarIcon} resizeMode="contain" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search exams..."
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#6B7280" />
-            </TouchableOpacity>
+      <SafeAreaView style={st.safe} edges={[]}>
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item, index }) => (
+            <NotificationRow item={item} index={index} onPress={() => handleNotificationPress(item)} />
           )}
-        </View>
-      </View>
-
-      <View style={styles.categoryContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScrollContent}>
-          {categories.map((category, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.categoryChip, selectedCategory === category && styles.categoryChipActive]}
-              onPress={() => setSelectedCategory(category)}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={selectedCategory === category ? ['#8B5CF6', '#7C3AED'] : ['#FFFFFF', '#FFFFFF']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.categoryChipGradient}
-              >
-                <Text style={[styles.categoryText, selectedCategory === category && styles.categoryTextActive]}>{category}</Text>
-                {selectedCategory === category && (
-                  <View style={styles.categoryBadge}>
-                    <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      <FlatList
-        data={filteredAndSortedNotifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNotificationItem}
-        ListEmptyComponent={renderEmptyState}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6366F1']} tintColor="#6366F1" />}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.listContainer,
-          { paddingBottom: TAB_BAR_PADDING + insets.bottom + 16 },
-        ]}
-        removeClippedSubviews
-      />
-    </SafeAreaView>
+          ListHeaderComponent={renderHeader}
+          ListEmptyComponent={renderEmpty}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 2, paddingHorizontal: PAD, paddingBottom: TAB_BAR_PADDING + insets.bottom + 24 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />
+          }
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6366F1',
-    fontWeight: '600',
-  },
-  searchSortSection: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 10,
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadTxt: { marginTop: 14, fontFamily: FontFamily.medium, fontSize: 15, color: C.primary },
+  sectionPanel: {
+    marginBottom: 12,
+    backgroundColor: C.sectionBg,
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#DCE4F0',
   },
-  searchBarIcon: {
-    width: 20,
-    height: 20,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#1F2937',
-    fontWeight: '500',
-  },
-  categoryContainer: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  categoryScrollContent: {
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  categoryChip: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  categoryChipActive: {},
-  categoryChipGradient: {
+  titleCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: '#8B5CF6',
-    borderRadius: 20,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
-  },
-  categoryTextActive: {
-    color: '#FFFFFF',
-  },
-  categoryBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listContainer: {
-    flexGrow: 1,
-    padding: 16,
-  },
-  notificationCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 14,
+    backgroundColor: C.card,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: 16,
+    padding: 14,
+    gap: 8,
+  },
+  titleCopy: { flex: 1 },
+  titleMain: { fontFamily: FontFamily.extraBold, fontSize: 22, color: C.ink, lineHeight: 28 },
+  titleAccent: { color: C.primary },
+  titleSub: { fontFamily: FontFamily.regular, fontSize: 12, color: C.muted, lineHeight: 17, marginTop: 4 },
+  titleHeroImg: { width: 80, height: 72 },
+  heroBorder: { borderRadius: 20, padding: 1.5, marginBottom: 14 },
+  heroCard: {
+    borderRadius: 18.5,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    overflow: 'hidden',
     ...(Platform.OS === 'ios'
-      ? {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 6,
-        }
-      : { elevation: 0 }),
+      ? { shadowColor: '#1E40AF', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16 }
+      : { elevation: 6 }),
   },
-  urgentBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
+  heroShine: {
+    position: 'absolute',
+    top: -30,
+    right: -20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  cardContent: {
-    flex: 1,
-  },
-  cardHeaderRow: {
+  heroTopRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 8,
   },
-  examTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1F2937',
-    flex: 1,
-    marginRight: 8,
-    lineHeight: 22,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 14,
   },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  examDescription: {
-    fontSize: 13,
-    color: '#6B7280',
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  examInfoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#047857',
-    fontWeight: '600',
-  },
-  applyNowButton: {
+  heroBadgeTxt: { fontFamily: FontFamily.bold, fontSize: 9, color: C.primary, letterSpacing: 0.8 },
+  heroUrgentPill: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 10,
-    overflow: 'hidden',
-    marginTop: 4,
   },
-  applyButtonGradient: {
+  heroUrgentTxt: { fontFamily: FontFamily.semiBold, fontSize: 10, color: '#FFF' },
+  heroBody: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  heroCopy: { flex: 1, paddingRight: 4 },
+  heroCardArt: { width: 56, height: 56, opacity: 0.92, marginBottom: 2 },
+  heroExamTitle: { fontFamily: FontFamily.extraBold, fontSize: 17, color: '#FFF', marginBottom: 4 },
+  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8, flexWrap: 'nowrap' },
+  heroMetaTxt: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.88)', maxWidth: SCREEN_W * 0.32 },
+  heroMetaDot: { fontFamily: FontFamily.bold, fontSize: 10, color: 'rgba(255,255,255,0.5)' },
+  countdownRow: { flexDirection: 'row', gap: 5 },
+  countBox: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    minWidth: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  countVal: { fontFamily: FontFamily.extraBold, fontSize: 13, color: C.ink },
+  countLbl: { fontFamily: FontFamily.medium, fontSize: 7, color: C.muted, marginTop: 1, letterSpacing: 0.4 },
+  heroCtaWrap: { alignSelf: 'flex-end', marginTop: 8 },
+  heroCtaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    gap: 2,
+  },
+  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 12, color: C.primary },
+  filterRow: { gap: 8, paddingBottom: 14, paddingRight: 8 },
+  filterChipActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#2563EB', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }
+      : { elevation: 4 }),
   },
-  applyButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  chevronIcon: {
-    marginLeft: 8,
-    marginTop: 4,
-  },
-  countdownContainer: {
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    gap: 7,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-    marginVertical: 8,
+    borderRadius: 20,
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: C.border,
   },
-  countdownText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#EF4444',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+  filterIconWrap: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  filterTxt: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.ink },
+  filterTxtActive: { fontFamily: FontFamily.semiBold, fontSize: 13, color: '#FFF' },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  sectionLbl: { fontFamily: FontFamily.bold, fontSize: 15, color: C.ink },
+  sectionCount: {
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  expandedSection: {
-    marginTop: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 10,
-    padding: 14,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 12,
-  },
-  detailRow: {
+  sectionCountTxt: { fontFamily: FontFamily.bold, fontSize: 12, color: C.primary },
+  listCardBorder: { borderRadius: 16, padding: 1, marginBottom: 10 },
+  listCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    backgroundColor: C.card,
+    borderRadius: 15,
+    padding: 12,
+    gap: 8,
   },
-  detailLabel: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
-    flex: 1,
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  listIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  listBody: { flex: 1 },
+  listTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  listTitle: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink, flex: 1 },
+  listUrgent: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
-  detailValue: {
-    fontSize: 13,
-    color: '#1F2937',
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  listUrgentTxt: { fontFamily: FontFamily.bold, fontSize: 9, color: '#D97706' },
+  listChev: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#EFF6FF',
     alignItems: 'center',
-    paddingVertical: 80,
-  },
-  emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
     justifyContent: 'center',
+  },
+  listDesc: { fontFamily: FontFamily.regular, fontSize: 12, color: C.muted, lineHeight: 17, marginBottom: 6 },
+  listFooter: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  listFooterTxt: { fontFamily: FontFamily.medium, fontSize: 11, color: C.muted },
+  errBox: {
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errTxt: { fontFamily: FontFamily.medium, fontSize: 13, color: '#DC2626' },
+  empty: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  emptyMessage: {
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-    paddingHorizontal: 32,
-    lineHeight: 22,
-  },
+  emptyTitle: { fontFamily: FontFamily.bold, fontSize: 18, color: C.ink, marginBottom: 8 },
+  emptyMsg: { fontFamily: FontFamily.regular, fontSize: 14, color: C.muted, textAlign: 'center', lineHeight: 21 },
 });
-

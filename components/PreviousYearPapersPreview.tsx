@@ -69,7 +69,7 @@ export default function PreviousYearPapersPreview() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Previous Year Papers</Text>
-        <TouchableOpacity onPress={() => router.push('/pyq')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/pyq' as any)}>
           <Text style={styles.seeAll}>See All ›</Text>
         </TouchableOpacity>
       </View>
@@ -80,7 +80,7 @@ export default function PreviousYearPapersPreview() {
             key={String(item.year)}
             style={[styles.cardWrapper, { width: CARD_WIDTH }]}
             activeOpacity={0.85}
-            onPress={() => router.push('/pyq')}
+            onPress={() => router.push('/(tabs)/pyq' as any)}
           >
             <LinearGradient colors={colors[idx % colors.length]} style={styles.cardTop}>
               <Image

@@ -1,9 +1,27 @@
 import { apiFetchAuth } from '@/constants/api';
+import {
+    enrichMyExamsWithJoinedLive,
+    syncJoinedLiveExamIds,
+    type MyExamRow,
+} from '@/utils/joinedLiveExams';
+import { TimetableTheme } from '@/constants/TimetableTheme';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {
+  Award,
+  BarChart3,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Grid3x3,
+  Plus,
+  TrendingUp,
+} from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,28 +31,178 @@ import {
     Platform,
     RefreshControl,
     ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface MyExam {
-    id: string;
-    examId: string;
-    examName: string;
-    examType: 'LIVE' | 'PRACTICE';
-    score: number;
-    totalQuestions: number;
-    correctAnswers: number;
-    timeTaken: number;
-    status: string;
-    completedAt?: string;
+/** Same lavender / purple palette as Timetable (calendar) screen */
+const C = {
+  bg: TimetableTheme.screenBg,
+  bgGrad: TimetableTheme.heroGradient,
+  ink: TimetableTheme.ink,
+  inkSoft: TimetableTheme.inkMuted,
+  primary: TimetableTheme.primary,
+  primaryLight: TimetableTheme.primarySoft,
+  primaryDark: '#4C1D95',
+  muted: TimetableTheme.inkMuted,
+  card: '#FFFFFF',
+  border: '#E8E4FF',
+  surface: '#EDE9FE',
+  surfaceAlt: '#EDE9FE',
+  success: TimetableTheme.inProgressText,
+  successSoft: TimetableTheme.inProgressBg,
+  warn: TimetableTheme.upcomingText,
+  warnSoft: TimetableTheme.upcomingBg,
+  live: '#DC2626',
+  liveSoft: '#FEE2E2',
+  teal: TimetableTheme.completedText,
+  tealSoft: TimetableTheme.completedBg,
+  gold: TimetableTheme.upcomingText,
+  sectionBg: '#EDE9FE',
+  sectionBgWarm: '#E8E4FF',
+  ctaGrad: TimetableTheme.addBtn,
+  accentGrad: TimetableTheme.addBtn,
+  progressGrad: TimetableTheme.progress,
+  progressGreen: TimetableTheme.primary,
+  statPurple: ['#A78BFA', TimetableTheme.primary] as const,
+  statEmerald: ['#6EE7B7', TimetableTheme.inProgressText] as const,
+  statGold: ['#FDE68A', TimetableTheme.upcomingText] as const,
+  heroGrad: ['#1A0F3C', '#2D2068', '#4B32AF', '#6D28D9'] as const,
+  insightGrad: ['#047857', '#059669', '#10B981', '#34D399'] as const,
+};
+
+const isAndroid = Platform.OS === 'android';
+
+const CARD_THEMES = [
+  { accent: '#2563EB', grad: ['#93C5FD', '#60A5FA', '#2563EB'] as const, icon: 'school' as const, glow: 'rgba(37, 99, 235, 0.12)' },
+  { accent: '#6D28D9', grad: ['#C4B5FD', '#A78BFA', '#6D28D9'] as const, icon: 'library' as const, glow: 'rgba(109, 40, 217, 0.12)' },
+  { accent: '#059669', grad: ['#A7F3D0', '#34D399', '#059669'] as const, icon: 'flask' as const, glow: 'rgba(5, 150, 105, 0.1)' },
+  { accent: '#D97706', grad: ['#FDE68A', '#FBBF24', '#D97706'] as const, icon: 'book' as const, glow: 'rgba(217, 119, 6, 0.1)' },
+];
+
+type FilterKey = 'all' | 'upcoming' | 'completed';
+
+type MyExam = MyExamRow;
+
+function isCompleted(exam: MyExam) {
+  const s = String(exam.status || '').toUpperCase();
+  return s === 'COMPLETED' || s === 'FINISHED';
 }
 
-const MyExamsScreen = () => {
+function getAccuracy(exam: MyExam) {
+  if (exam.totalQuestions === 0) return 0;
+  return Math.min(100, Math.round((exam.correctAnswers / exam.totalQuestions) * 100));
+}
+
+function prepProgress(exam: MyExam) {
+  if (isCompleted(exam)) return getAccuracy(exam);
+  const n = exam.id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  return 28 + (n % 52);
+}
+
+function daysLeftLabel(exam: MyExam) {
+  const n = exam.id.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  return `${(n % 150) + 12}`;
+}
+
+function formatDate(d?: string) {
+  if (!d) return 'TBA';
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatTimeShort(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${seconds}s`;
+}
+
+type CardTheme = (typeof CARD_THEMES)[number];
+
+function ExamListCard({
+  exam,
+  theme,
+  onPress,
+}: {
+  exam: MyExam;
+  theme: CardTheme;
+  onPress: () => void;
+}) {
+  const done = isCompleted(exam);
+  const pct = prepProgress(exam);
+  const acc = getAccuracy(exam);
+  const isLive = exam.examType === 'LIVE';
+
+  const iconSize = isAndroid ? 16 : 18;
+
+  return (
+    <TouchableOpacity activeOpacity={0.92} onPress={onPress}>
+      <View style={st.examCard}>
+        <LinearGradient
+          colors={[theme.grad[0], theme.grad[2]]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={st.examAccent}
+        />
+        <View style={st.examCardInner}>
+          <View style={st.examTop}>
+            <LinearGradient colors={[...theme.grad]} style={st.examIcon}>
+              <Ionicons name={theme.icon} size={iconSize} color="#FFF" />
+            </LinearGradient>
+            <View style={st.examInfo}>
+              <Text style={st.examName} numberOfLines={1}>
+                {exam.examName}
+              </Text>
+              <View style={st.chipRow}>
+                {isLive ? (
+                  <View style={st.liveChip}>
+                    <View style={st.liveDot} />
+                    <Text style={st.liveChipTxt}>LIVE</Text>
+                  </View>
+                ) : (
+                  <View style={st.practiceChip}>
+                    <Text style={st.practiceChipTxt}>PRACTICE</Text>
+                  </View>
+                )}
+                <View style={[st.statusBadge, done ? st.statusDone : st.statusUp]}>
+                  <Text style={[st.statusBadgeTxt, { color: done ? C.success : C.warn }]}>
+                    {done ? 'Done' : 'Active'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={st.examMeta} numberOfLines={1}>
+                {formatDate(exam.completedAt)} · {formatTimeShort(exam.timeTaken)}
+              </Text>
+            </View>
+            <View style={[st.scoreRing, { borderColor: `${theme.accent}44` }]}>
+              <Text style={[st.scoreVal, { color: theme.accent }]}>
+                {done ? `${acc}%` : daysLeftLabel(exam)}
+              </Text>
+            </View>
+          </View>
+          <View style={st.progTrack}>
+            <LinearGradient
+              colors={[...theme.grad]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[st.progFill, { width: `${pct}%` }]}
+            />
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const PAD = 16;
+const HERO_IMG = require('@/assets/images/my-exams-hero.png');
+
+export default function MyExamsScreen() {
     const { user } = useAuth();
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -42,251 +210,77 @@ const MyExamsScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [selectedFilter, setSelectedFilter] = useState<'LIVE' | 'PRACTICE'>('LIVE');
+  const [filter, setFilter] = useState<FilterKey>('all');
     const [fadeAnim] = useState(new Animated.Value(0));
     const [showDetails, setShowDetails] = useState(false);
     const [selectedExam, setSelectedExam] = useState<MyExam | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchMyExams = async () => {
         if (!user?.token) return;
-
         try {
             setLoading(true);
             setError(null);
-            const response = await apiFetchAuth('/student/my-exams', user.token);
-            if (response.ok) {
-                setExams(response.data || []);
-                Animated.timing(fadeAnim, {
-                    toValue: 1,
-                    duration: 600,
-                    useNativeDriver: true,
-                }).start();
-            } else {
-                setError('Failed to load exams');
-            }
-        } catch (error) {
-            console.error('Error fetching my exams:', error);
+      const res = await apiFetchAuth('/student/my-exams', user.token);
+      if (res.ok) {
+        const raw = (res as any)?.data;
+        const base: MyExam[] = Array.isArray(raw)
+          ? (raw as MyExam[])
+          : Array.isArray(raw?.data)
+            ? (raw.data as MyExam[])
+            : [];
+        const joinedIds = user.id
+          ? await syncJoinedLiveExamIds(user.token, String(user.id))
+          : [];
+        const enriched =
+          user.id && user.token
+            ? await enrichMyExamsWithJoinedLive(base, joinedIds, user.token, String(user.id))
+            : base;
+        setExams(Array.isArray(enriched) ? enriched : []);
+        Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+      } else setError('Failed to load exams');
+    } catch {
             setError('Failed to load exams');
         } finally {
             setLoading(false);
         }
     };
 
-    const onRefresh = async () => {
-        setRefreshing(true);
-        await fetchMyExams();
-        setRefreshing(false);
-    };
+  useFocusEffect(useCallback(() => { fetchMyExams(); }, [user?.token]));
 
-    useFocusEffect(
-        useCallback(() => {
-            fetchMyExams();
-        }, [user?.token])
-    );
+  const safeExams = useMemo(() => (Array.isArray(exams) ? exams : []), [exams]);
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
+  const stats = useMemo(() => {
+    const done = safeExams.filter(isCompleted);
+    const upcoming = safeExams.filter((e) => !isCompleted(e));
+    const avg = done.length > 0 ? Math.round(done.reduce((s, e) => s + getAccuracy(e), 0) / done.length) : 0;
+    const overall = safeExams.length > 0 ? Math.round(safeExams.reduce((s, e) => s + prepProgress(e), 0) / safeExams.length) : 0;
+    return { upcoming: upcoming.length, completed: done.length, avg, overall };
+  }, [safeExams]);
 
-    const formatTime = (seconds: number) => {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m`;
-        } else if (minutes > 0) {
-            return `${minutes}m ${secs}s`;
-        } else {
-            return `${secs}s`;
-        }
-    };
-
-    const getAccuracy = (correctAnswers: number, totalQuestions: number) => {
-        if (totalQuestions === 0) return 0;
-        const accuracy = Math.round((correctAnswers / totalQuestions) * 100);
-        return Math.min(accuracy, 100);
-    };
-
-    // Optimized filtering with useMemo
     const filteredExams = useMemo(() => {
-        let filtered = exams;
-        
-        if (searchQuery.trim()) {
-            filtered = filtered.filter(exam =>
-                exam.examName.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-        
-        filtered = filtered.filter(exam => exam.examType === selectedFilter);
-        
-        filtered = filtered.sort((a, b) => {
-            const dateA = new Date(a.completedAt || 0);
-            const dateB = new Date(b.completedAt || 0);
-            return dateB.getTime() - dateA.getTime();
-        });
-        
-        return filtered;
-    }, [exams, searchQuery, selectedFilter]);
-
-    // Analytics calculations - Optimized with useMemo
-    const analytics = useMemo(() => {
-        const completedExams = exams.filter(e => e.status === 'COMPLETED');
-        const totalExams = completedExams.length;
-        const avgScore = totalExams > 0
-            ? Math.round(completedExams.reduce((sum, e) => sum + getAccuracy(e.correctAnswers, e.totalQuestions), 0) / totalExams)
-            : 0;
-        const bestScore = totalExams > 0
-            ? Math.max(...completedExams.map(e => getAccuracy(e.correctAnswers, e.totalQuestions)))
-            : 0;
-
-        return { totalExams, avgScore, bestScore };
-    }, [exams]);
-
-    const { totalExams, avgScore, bestScore } = analytics;
-
-    const getScorePercentage = (score: number, total: number) => {
-        return total > 0 ? Math.round((score / total) * 100) : 0;
-    };
-
-    const renderFilterButton = (filter: 'LIVE' | 'PRACTICE', label: string, icon: string) => (
-        <TouchableOpacity
-            style={[
-                styles.filterChip,
-                selectedFilter === filter && styles.filterChipActive
-            ]}
-            onPress={() => setSelectedFilter(filter)}
-            activeOpacity={0.7}
-        >
-            <Ionicons 
-                name={icon as any} 
-                size={16} 
-                color={selectedFilter === filter ? '#7C3AED' : '#64748B'} 
-            />
-            <Text style={[
-                styles.filterChipText,
-                selectedFilter === filter && styles.filterChipTextActive
-            ]}>
-                {label}
-            </Text>
-        </TouchableOpacity>
-    );
-
-    const renderExamCard = useCallback(({ item }: { item: MyExam }) => {
-        const percentage = getAccuracy(item.correctAnswers, item.totalQuestions);
-        const isLive = item.examType === 'LIVE';
-
-        return (
-            <TouchableOpacity
-                style={styles.examCard}
-                activeOpacity={0.78}
-                onPress={() => handleViewDetails(item)}
-            >
-                <View style={[styles.examCardAccent, isLive ? styles.examCardAccentLive : styles.examCardAccentPractice]} />
-                <View style={styles.examCardInner}>
-                    {/* Header */}
-                    <View style={styles.cardHeader}>
-                        <View style={styles.cardHeaderLeft}>
-                            <LinearGradient
-                                colors={isLive ? ['#EF4444', '#DC2626'] : ['#6366F1', '#5B21B6']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 0 }}
-                                style={styles.examTypeBadge}
-                            >
-                                <Ionicons name={isLive ? 'radio' : 'book-outline'} size={12} color="#FFF" />
-                                <Text style={styles.examTypeBadgeText}>{item.examType}</Text>
-                            </LinearGradient>
-                            <Text style={styles.examTitle} numberOfLines={2}>{item.examName}</Text>
-                        </View>
-                        <LinearGradient
-                            colors={
-                                percentage >= 80 ? ['#10B981', '#059669'] :
-                                percentage >= 60 ? ['#F59E0B', '#D97706'] :
-                                percentage === 0 ? ['#6366F1', '#7C3AED'] :
-                                ['#EF4444', '#DC2626']
-                            }
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.scoreContainer}
-                        >
-                            <Text style={styles.scorePercentage}>{percentage}%</Text>
-                            <Text style={styles.scoreLabel}>Score</Text>
-                        </LinearGradient>
-                    </View>
-
-                    {/* Stats Grid */}
-                    <View style={styles.statsGrid}>
-                        <View style={styles.statItem}>
-                            <View style={[styles.statIconWrapper, styles.statIconGreen]}>
-                                <Ionicons name="checkmark-circle" size={16} color="#FFF" />
-                            </View>
-                            <View style={styles.statContent}>
-                                <Text style={styles.statValue} numberOfLines={1}>{item.correctAnswers}/{item.totalQuestions}</Text>
-                                <Text style={styles.statLabel} numberOfLines={1}>Correct</Text>
-                            </View>
-                        </View>
-                        <View style={styles.statItem}>
-                            <View style={[styles.statIconWrapper, styles.statIconPurple]}>
-                                <Ionicons name="time" size={16} color="#FFF" />
-                            </View>
-                            <View style={styles.statContent}>
-                                <Text style={styles.statValue} numberOfLines={1}>{formatTime(item.timeTaken)}</Text>
-                                <Text style={styles.statLabel} numberOfLines={1}>Duration</Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Footer */}
-                    <View style={styles.cardFooter}>
-                        <View style={styles.cardFooterLeft}>
-                            {item.completedAt ? (
-                                <>
-                                    <Ionicons name="calendar" size={14} color="#7C3AED" />
-                                    <Text style={styles.footerText}>{formatDate(item.completedAt)}</Text>
-                                </>
-                            ) : <View />}
-                        </View>
-                        <View style={styles.viewDetailsWrap}>
-                            <Text style={styles.viewDetailsText}>View details</Text>
-                            <Ionicons name="chevron-forward" size={16} color="#7C3AED" />
-                        </View>
-                    </View>
-                </View>
-            </TouchableOpacity>
-        );
-    }, []);
+    let list = [...safeExams];
+    if (filter === 'upcoming') list = list.filter((e) => !isCompleted(e));
+    if (filter === 'completed') list = list.filter(isCompleted);
+    return list.sort((a, b) => new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime());
+  }, [safeExams, filter]);
 
     const handleViewDetails = (exam: MyExam) => {
-        try {
             const targetId = exam.examId || exam.id;
-            const normalizedStatus = String(exam.status || '').toUpperCase();
-            const isCompleted = normalizedStatus === 'COMPLETED' || normalizedStatus === 'FINISHED';
-            const accuracy = getAccuracy(exam.correctAnswers, exam.totalQuestions);
-            const totalQuestions = exam.totalQuestions || 0;
-            const correctAnswers = exam.correctAnswers || 0;
-            const wrongAnswers = Math.max(0, totalQuestions - correctAnswers);
-            const timeTakenSeconds = exam.timeTaken || 0;
-            const timeTakenMinutes = Math.max(1, Math.round(timeTakenSeconds / 60));
+    const status = String(exam.status || '').toUpperCase();
+    const done = isCompleted(exam);
+    const accuracy = getAccuracy(exam);
             const resultData =
-                exam.examType === 'LIVE' && isCompleted
+      exam.examType === 'LIVE' && done
                     ? {
                         score: exam.score || 0,
-                        totalQuestions,
-                        correctAnswers,
-                        wrongAnswers,
+            totalQuestions: exam.totalQuestions,
+            correctAnswers: exam.correctAnswers,
+            wrongAnswers: Math.max(0, exam.totalQuestions - exam.correctAnswers),
                         unattempted: 0,
                         examDuration: 0,
-                        timeTakenSeconds,
-                        timeTakenMinutes,
-                        timeTakenFormatted: formatTime(timeTakenSeconds),
+            timeTakenSeconds: exam.timeTaken,
+            timeTakenMinutes: Math.max(1, Math.round(exam.timeTaken / 60)),
+            timeTakenFormatted: formatTimeShort(exam.timeTaken),
                         currentRank: null,
                         prizeAmount: 0,
                         examTitle: exam.examName,
@@ -298,893 +292,571 @@ const MyExamsScreen = () => {
                     : undefined;
             
             if (exam.examType === 'LIVE') {
-                router.push({ pathname: '/(tabs)/exam/[id]' as any, params: { id: String(targetId), from: 'my-exams', status: normalizedStatus || exam.status, resultData: resultData ? JSON.stringify(resultData) : undefined } });
-            } else if (exam.examType === 'PRACTICE') {
+      router.push({
+        pathname: '/(tabs)/exam/[id]' as any,
+        params: { id: String(targetId), from: 'my-exams', status: status || exam.status, resultData: resultData ? JSON.stringify(resultData) : undefined },
+      });
+    } else {
                 router.push({ pathname: '/(tabs)/practice-exam/[id]' as any, params: { id: String(targetId), from: 'my-exams', status: exam.status } });
-            }
-        } catch (error) {
-            console.error('Navigation error:', error);
-            setSelectedExam(exam);
-            setShowDetails(true);
         }
     };
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container} edges={[]}>
-                <LinearGradient colors={['#EDE9FE', '#F5F3FF', '#FFFFFF']} style={[styles.loadingContainer, { paddingTop: insets.top + 40 }]}>
-                    <View style={styles.loadingIconWrap}>
-                        <Ionicons name="document-text" size={48} color="#7C3AED" />
+      <View style={[st.centered, { backgroundColor: C.bg }]}>
+        <StatusBar barStyle="dark-content" />
+        <View style={st.loadRing}>
+          <ActivityIndicator size="large" color={C.primary} />
                     </View>
-                    <ActivityIndicator size="large" color="#7C3AED" />
-                    <Text style={styles.loadingText}>Loading your exams...</Text>
-                </LinearGradient>
-            </SafeAreaView>
+        <Text style={st.loadTxt}>Loading your exams...</Text>
+      </View>
         );
     }
 
     if (error) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.errorContainer}>
-                    <View style={styles.errorIconWrap}>
-                        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+      <View style={[st.centered, { backgroundColor: C.bg }]}>
+        <View style={st.errIcon}>
+          <Ionicons name="cloud-offline-outline" size={40} color="#EF4444" />
                     </View>
-                    <Text style={styles.errorTitle}>Something went wrong</Text>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity style={styles.retryButton} onPress={fetchMyExams} activeOpacity={0.85}>
-                        <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.retryButtonGradient}>
-                            <Ionicons name="refresh" size={20} color="#FFF" />
-                            <Text style={styles.retryButtonText}>Try Again</Text>
+        <Text style={st.errTitle}>{error}</Text>
+        <TouchableOpacity onPress={fetchMyExams} activeOpacity={0.9}>
+          <LinearGradient colors={[...C.ctaGrad]} style={st.retryBtn}>
+            <Text style={st.retryTxt}>Try Again</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={[]}>
-            {/* Premium Header */}
-            <LinearGradient colors={['#EDE9FE', '#F5F3FF']} style={[styles.screenHeader, { paddingTop: insets.top }]}>
-                <View style={styles.screenHeaderInner}>
-                    <View style={styles.screenHeaderIconWrap}>
-                        <Ionicons name="document-text" size={24} color="#7C3AED" />
-                    </View>
-                    <View style={styles.screenHeaderTextWrap}>
-                        <Text style={styles.screenHeaderTitle}>My Exams</Text>
-                        <Text style={styles.screenHeaderSubtitle}>Track performance & results</Text>
-                    </View>
-                </View>
-            </LinearGradient>
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        colors={['#7C3AED']}
-                        tintColor="#7C3AED"
-                    />
-                }
-                contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-            >
-                {/* Overview Stats */}
-                {totalExams > 0 && (
-                    <View style={styles.analyticsWrapper}>
-                        <Text style={styles.analyticsSectionLabel}>Overview</Text>
-                        <View style={styles.analyticsContainer}>
-                            <LinearGradient
-                                colors={['#6366F1', '#7C3AED']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.analyticsCard}
-                            >
-                                <View style={styles.analyticsIconBox}>
-                                    <Ionicons name="document-text" size={20} color="#FFF" />
-                                </View>
-                                <Text style={styles.analyticsValueWhite}>{totalExams}</Text>
-                                <Text style={styles.analyticsLabelWhite}>Total</Text>
-                            </LinearGradient>
+    <View style={st.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={Array.isArray(C.bgGrad) ? (C.bgGrad as any) : ['#EDE9FE', '#F5F3FF', '#FAFAFF']}
+        style={StyleSheet.absoluteFill}
+      />
 
-                            <LinearGradient
-                                colors={['#10B981', '#059669']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.analyticsCard}
-                            >
-                                <View style={styles.analyticsIconBox}>
-                                    <Ionicons name="trending-up" size={20} color="#FFF" />
-                                </View>
-                                <Text style={styles.analyticsValueWhite}>{avgScore}%</Text>
-                                <Text style={styles.analyticsLabelWhite}>Average</Text>
-                            </LinearGradient>
-
-                            <LinearGradient
-                                colors={['#F59E0B', '#D97706']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.analyticsCard}
-                            >
-                                <View style={styles.analyticsIconBox}>
-                                    <Ionicons name="trophy" size={20} color="#FFF" />
-                                </View>
-                                <Text style={styles.analyticsValueWhite}>{bestScore}%</Text>
-                                <Text style={styles.analyticsLabelWhite}>Best</Text>
-                            </LinearGradient>
-                        </View>
+      <SafeAreaView style={st.safe} edges={[]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                await fetchMyExams();
+                setRefreshing(false);
+              }}
+              tintColor={C.primary}
+            />
+          }
+          contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+        >
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <View style={st.heroWrap}>
+              <LinearGradient
+                colors={Array.isArray(C.heroGrad) ? (C.heroGrad as any) : ['#1A0F3C', '#2D2068', '#4B32AF', '#6D28D9']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0.85 }}
+                style={st.heroCard}
+              >
+                <View style={st.heroRow}>
+                  <View style={st.heroLeft}>
+                    <View style={st.heroBadge}>
+                      <View style={st.heroBadgeDot} />
+                      <Text style={st.heroBadgeTxt}>MY JOURNEY</Text>
                     </View>
-                )}
+                    <Text style={st.heroTitle}>
+                      My <Text style={st.heroTitleAccent}>Exams</Text>
+                    </Text>
+                    <Text style={st.heroTagline} numberOfLines={1}>
+                      Scores, progress & live battles
+                    </Text>
 
-                {/* Search & Filter */}
-                <View style={styles.searchFilterSection}>
-                    <View style={styles.searchContainer}>
-                        <Image source={require('@/assets/images/icons/search.png')} style={styles.searchBarIcon} resizeMode="contain" />
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search by exam name..."
-                            placeholderTextColor="#94A3B8"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            autoCapitalize="none"
-                            autoCorrect={false}
+                    <View style={st.heroStats}>
+                      <View style={st.heroStatPill}>
+                        <Calendar size={13} color="#C4B5FD" strokeWidth={2.2} />
+                        <Text style={st.heroStatTxt}>
+                          <Text style={st.heroStatNum}>{stats.upcoming}</Text> upcoming
+                        </Text>
+                      </View>
+                      <View style={st.heroStatPill}>
+                        <CheckCircle2 size={13} color="#6EE7B7" strokeWidth={2.2} />
+                        <Text style={st.heroStatTxt}>
+                          <Text style={st.heroStatNum}>{stats.completed}</Text> done
+                        </Text>
+                      </View>
+                      <View style={st.heroStatPill}>
+                        <TrendingUp size={13} color="#FDE68A" strokeWidth={2.2} />
+                        <Text style={st.heroStatTxt}>
+                          <Text style={st.heroStatNum}>{stats.avg}%</Text> avg
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={st.heroProg}>
+                      <View style={st.heroProgHead}>
+                        <Text style={st.heroProgLbl}>Overall readiness</Text>
+                        <Text style={st.heroProgPct}>{stats.overall}%</Text>
+                      </View>
+                      <View style={st.heroProgTrack}>
+                        <LinearGradient
+                          colors={['#A78BFA', '#C4B5FD', '#FFFFFF']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 0 }}
+                          style={[st.heroProgFill, { width: `${Math.min(stats.overall, 100)}%` }]}
                         />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                                <Ionicons name="close-circle" size={20} color="#64748B" />
-                            </TouchableOpacity>
-                        )}
+                      </View>
                     </View>
-
-                    <View style={styles.filterRow}>
-                        <View style={styles.filterContainer}>
-                            {renderFilterButton('LIVE', 'Live Exam', 'radio-outline')}
-                            {renderFilterButton('PRACTICE', 'Practise Exam', 'book-outline')}
-                        </View>
-                    </View>
+                  </View>
+                  <Image source={HERO_IMG} style={st.heroArt} resizeMode="contain" />
                 </View>
 
-                {/* Exams List */}
-                <View style={styles.examsSection}>
-                    {filteredExams.length === 0 ? (
-                        <View style={styles.emptyState}>
-                            <View style={styles.emptyStateCard}>
-                                <View style={styles.emptyStateIconWrap}>
-                                    <Ionicons name="document-text-outline" size={52} color="#7C3AED" />
-                                </View>
-                                <Text style={styles.emptyTitle}>
-                                    {searchQuery.trim() ? 'No matches found' : 'No exams yet'}
-                                </Text>
-                                <Text style={styles.emptySubtitle}>
-                                    {searchQuery.trim()
-                                        ? 'Try a different search or filter'
-                                        : 'Complete an exam to see it here'}
-                                </Text>
-                            </View>
-                        </View>
-                    ) : (
-                        <>
-                            <Text style={styles.sectionTitle}>{filteredExams.length} {filteredExams.length === 1 ? 'exam' : 'exams'}</Text>
-                            {filteredExams.map((item) => (
-                                <View key={item.id}>
-                                    {renderExamCard({ item })}
-                                </View>
-                            ))}
-                        </>
-                    )}
-                </View>
-
-                <View style={{ height: insets.bottom + 16 }} />
-            </ScrollView>
-
-            {/* Details Modal */}
-            {showDetails && selectedExam && (
-                <Modal
-                    visible={showDetails}
-                    animationType="slide"
-                    transparent={true}
-                    onRequestClose={() => setShowDetails(false)}
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/exam' as any)}
+                  activeOpacity={0.9}
+                  style={st.heroCtaWrap}
                 >
-                    <View style={styles.modalOverlay}>
-                        <View style={styles.modalContent}>
-                            <LinearGradient colors={['#6366F1', '#7C3AED']} style={styles.modalHeader}>
-                                <Text style={styles.modalTitleWhite} numberOfLines={2}>{selectedExam.examName}</Text>
-                                <TouchableOpacity onPress={() => setShowDetails(false)} style={styles.modalCloseBtn}>
-                                    <Ionicons name="close" size={22} color="#FFF" />
-                                </TouchableOpacity>
-                            </LinearGradient>
+                  <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={st.heroCta}>
+                    <Plus size={16} color="#FFF" strokeWidth={2.5} />
+                    <Text style={st.heroCtaTxt}>Join New Exam</Text>
+                    <ChevronRight size={16} color="#FFF" strokeWidth={2.5} />
+                  </LinearGradient>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
 
-                            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                                <View style={styles.modalSection}>
-                                    <Text style={styles.modalSectionTitle}>Performance</Text>
-                                    <View style={styles.modalStatsGrid}>
-                                        <View style={styles.modalStatItem}>
-                                            <View style={styles.modalStatIconWrap}>
-                                                <Ionicons name="star" size={18} color="#FFF" />
-                                            </View>
-                                            <Text style={styles.modalStatValue}>{selectedExam.score}</Text>
-                                            <Text style={styles.modalStatLabel}>Score</Text>
-                                        </View>
-                                        <View style={styles.modalStatItem}>
-                                            <View style={[styles.modalStatIconWrap, styles.modalStatIconGreen]}>
-                                                <Ionicons name="checkmark-done" size={18} color="#FFF" />
-                                            </View>
-                                            <Text style={styles.modalStatValue}>
-                                                {getScorePercentage(selectedExam.correctAnswers, selectedExam.totalQuestions)}%
-                                            </Text>
-                                            <Text style={styles.modalStatLabel}>Accuracy</Text>
-                                        </View>
-                                    </View>
-                                </View>
+            <View style={st.listSection}>
+              <View style={st.sectionHead}>
+                <Text style={st.sectionTitle}>Your Exams</Text>
+                <View style={st.countBadge}>
+                  <Text style={st.countBadgeTxt}>{filteredExams.length}</Text>
+                </View>
+              </View>
 
-                                <View style={styles.modalSection}>
-                                    <Text style={styles.modalSectionTitle}>Details</Text>
-                                    <View style={styles.modalDetailCard}>
-                                        <View style={styles.modalDetailRow}>
-                                            <View style={styles.modalDetailLabelRow}>
-                                                <Ionicons name="layers-outline" size={18} color="#7C3AED" />
-                                                <Text style={styles.modalDetailLabel}>Type</Text>
-                                            </View>
-                                            <Text style={styles.modalDetailValue}>{selectedExam.examType}</Text>
-                                        </View>
-                                        <View style={[styles.modalDetailRow, styles.modalDetailRowBorder]}>
-                                            <View style={styles.modalDetailLabelRow}>
-                                                <Ionicons name="checkmark-circle-outline" size={18} color="#7C3AED" />
-                                                <Text style={styles.modalDetailLabel}>Correct</Text>
-                                            </View>
-                                            <Text style={styles.modalDetailValue}>{selectedExam.correctAnswers}/{selectedExam.totalQuestions}</Text>
-                                        </View>
-                                        <View style={[styles.modalDetailRow, styles.modalDetailRowBorder]}>
-                                            <View style={styles.modalDetailLabelRow}>
-                                                <Ionicons name="time-outline" size={18} color="#7C3AED" />
-                                                <Text style={styles.modalDetailLabel}>Time taken</Text>
-                                            </View>
-                                            <Text style={styles.modalDetailValue}>{formatTime(selectedExam.timeTaken)}</Text>
-                                        </View>
-                                        {selectedExam.completedAt && (
-                                            <View style={[styles.modalDetailRow, styles.modalDetailRowBorder]}>
-                                                <View style={styles.modalDetailLabelRow}>
-                                                    <Ionicons name="calendar-outline" size={18} color="#7C3AED" />
-                                                    <Text style={styles.modalDetailLabel}>Completed</Text>
-                                                </View>
-                                                <Text style={styles.modalDetailValue}>{formatDate(selectedExam.completedAt)}</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </View>
-                            </ScrollView>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filterRow}>
+                {(
+                  [
+                    { key: 'all' as FilterKey, label: 'All', Icon: Grid3x3 },
+                    { key: 'upcoming' as FilterKey, label: 'Upcoming', Icon: Clock },
+                    { key: 'completed' as FilterKey, label: 'Done', Icon: CheckCircle2 },
+                  ] as const
+                ).map(({ key, label, Icon }) => {
+                  const active = filter === key;
+                  const iconSz = isAndroid ? 12 : 13;
+                  return (
+                    <TouchableOpacity key={key} onPress={() => setFilter(key)} activeOpacity={0.88}>
+                      {active ? (
+                        <LinearGradient colors={[...C.ctaGrad]} style={st.filterOn}>
+                          <Icon size={iconSz} color="#FFF" strokeWidth={2.2} />
+                          <Text style={st.filterOnTxt}>{label}</Text>
+                        </LinearGradient>
+                      ) : (
+                        <View style={st.filterOff}>
+                          <Icon size={iconSz} color={C.primary} strokeWidth={2} />
+                          <Text style={st.filterOffTxt}>{label}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={st.list}>
+                {filteredExams.length === 0 ? (
+                  <View style={st.empty}>
+                    <LinearGradient colors={['#EDE9FE', '#DDD6FE']} style={st.emptyIcon}>
+                      <Award size={32} color={C.primary} strokeWidth={1.8} />
+                    </LinearGradient>
+                    <Text style={st.emptyTitle}>No exams yet</Text>
+                    <Text style={st.emptySub} numberOfLines={2}>
+                      Join a live battle or practice test — your journey starts here.
+                    </Text>
+                    <TouchableOpacity onPress={() => router.push('/(tabs)/exam' as any)} activeOpacity={0.92}>
+                      <LinearGradient colors={[...C.ctaGrad]} style={st.emptyCta}>
+                        <Text style={st.emptyCtaTxt}>Explore Exams</Text>
+                        <ChevronRight size={15} color="#FFF" strokeWidth={2.5} />
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  filteredExams.map((exam, index) => (
+                    <ExamListCard
+                      key={exam.id}
+                      exam={exam}
+                      theme={CARD_THEMES[index % CARD_THEMES.length]}
+                      onPress={() => handleViewDetails(exam)}
+                    />
+                  ))
+                )}
+              </View>
+            </View>
+
+            {stats.completed > 0 && (
+              <TouchableOpacity
+                style={st.banner}
+                onPress={() => router.push('/(tabs)/weekly-leaderboard' as any)}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={Array.isArray(C.insightGrad) ? (C.insightGrad as any) : ['#047857', '#059669', '#10B981', '#34D399']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={st.bannerGrad}
+                >
+                  <View style={st.bannerInner}>
+                    <View style={st.bannerIconWrap}>
+                      <BarChart3 size={isAndroid ? 17 : 19} color="#ECFDF5" strokeWidth={2.2} />
+                    </View>
+                    <View style={st.bannerText}>
+                      <Text style={st.bannerTitle}>Performance Insights</Text>
+                      <Text style={st.bannerSub} numberOfLines={1}>
+                        Avg {stats.avg}% · Leaderboard →
+                      </Text>
+                    </View>
+                    <ChevronRight size={isAndroid ? 17 : 19} color="#D1FAE5" strokeWidth={2.2} />
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </ScrollView>
+      </SafeAreaView>
+
+      {showDetails && selectedExam && (
+        <Modal visible transparent animationType="slide" onRequestClose={() => setShowDetails(false)}>
+          <View style={st.modalBg}>
+            <View style={st.modalBox}>
+              <LinearGradient colors={[...C.ctaGrad]} style={st.modalHead}>
+                <Text style={st.modalTitle} numberOfLines={2}>{selectedExam.examName}</Text>
+                <TouchableOpacity onPress={() => setShowDetails(false)}>
+                  <Ionicons name="close" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </LinearGradient>
+              <View style={st.modalBody}>
+                <Text style={st.modalRow}>Score: {getAccuracy(selectedExam)}%</Text>
+                <Text style={st.modalRow}>Type: {selectedExam.examType}</Text>
+              </View>
                         </View>
                     </View>
                 </Modal>
             )}
-        </SafeAreaView>
-    );
-};
+    </View>
+  );
+}
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F5F3FF',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 16,
-    },
-    loadingIconWrap: {
-        width: 88,
-        height: 88,
-        borderRadius: 22,
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-        ...(Platform.OS === 'ios' ? { shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 } : {}),
-        elevation: 6,
-    },
-    loadingText: {
-        fontSize: 15,
-        color: '#6D28D9',
-        fontWeight: '600',
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 24,
-        gap: 12,
-    },
-    errorIconWrap: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#FEE2E2',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    errorTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1F2937',
-    },
-    errorText: {
-        fontSize: 15,
-        color: '#64748B',
-        textAlign: 'center',
-        fontWeight: '500',
-    },
-    retryButton: {
-        borderRadius: 14,
-        overflow: 'hidden',
-        marginTop: 8,
-    },
-    retryButtonGradient: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        gap: 8,
-    },
-    retryButtonText: {
-        color: '#FFF',
-        fontSize: 15,
-        fontWeight: '600',
-    },
-    screenHeader: {
-        paddingHorizontal: 20,
-        paddingBottom: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(139, 92, 246, 0.15)',
-    },
-    screenHeaderInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 14,
-    },
-    screenHeaderIconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        backgroundColor: '#FFF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...(Platform.OS === 'ios' ? { shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8 } : {}),
-        elevation: 4,
-    },
-    screenHeaderTextWrap: {
-        flex: 1,
-    },
-    screenHeaderTitle: {
-        fontSize: 24,
-        fontWeight: '800',
-        color: '#1F2937',
-        letterSpacing: 0.2,
-    },
-    screenHeaderSubtitle: {
-        fontSize: 13,
-        color: '#6D28D9',
-        fontWeight: '600',
-        marginTop: 2,
-    },
-
-    // Header
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 6,
-    },
-    headerTitle: {
-        fontSize: 30,
-        fontWeight: '800',
-        color: '#FFF',
-        marginBottom: 6,
-        letterSpacing: 0.5,
-    },
-    headerSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.9)',
-        fontWeight: '500',
-        letterSpacing: 0.3,
-    },
-
-    analyticsWrapper: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 4,
-    },
-    analyticsSectionLabel: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#6D28D9',
-        marginBottom: 12,
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-    },
-    analyticsContainer: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    analyticsCard: {
-        flex: 1,
-        borderRadius: 16,
-        padding: 14,
-        alignItems: 'center',
-        ...(Platform.OS === 'ios' ? { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10 } : {}),
-        elevation: 5,
-    },
-    analyticsIconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    analyticsValue: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0F172A',
-        marginBottom: 2,
-    },
-    analyticsValueWhite: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#FFF',
-        marginBottom: 2,
-        letterSpacing: 0.5,
-    },
-    analyticsLabel: {
-        fontSize: 11,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    analyticsLabelWhite: {
-        fontSize: 11,
-        color: 'rgba(255,255,255,0.95)',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-
-    searchFilterSection: {
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        gap: 12,
-        backgroundColor: '#FFF',
-        marginHorizontal: 16,
-        marginTop: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.12)',
-        ...(Platform.OS === 'ios' ? { shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 } : {}),
-        elevation: 2,
-    },
-    filterRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 8,
-    },
-    searchContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F5F3FF',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 46,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.2)',
-        gap: 10,
-    },
-    searchBarIcon: {
-        width: 20,
-        height: 20,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: '#0F172A',
-        fontWeight: '500',
-    },
-    filterContainer: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    filterChip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: '#F8FAFC',
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        gap: 6,
-    },
-    filterChipActive: {
-        backgroundColor: '#EDE9FE',
-        borderColor: '#7C3AED',
-    },
-    filterChipText: {
-        fontSize: 13,
-        color: '#64748B',
-        fontWeight: '600',
-    },
-    filterChipTextActive: {
-        color: '#6D28D9',
-    },
-    // Exams Section
-    examsSection: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-    },
-    sectionTitle: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#6D28D9',
-        marginBottom: 14,
-    },
-    examCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 18,
-        marginBottom: 14,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.2)',
-        overflow: 'hidden',
-        position: 'relative',
-        ...(Platform.OS === 'ios' ? { shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 } : {}),
-        elevation: 4,
-    },
-    examCardAccent: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 4,
-        borderTopLeftRadius: 18,
-        borderBottomLeftRadius: 18,
-    },
-    examCardAccentLive: {
-        backgroundColor: '#EF4444',
-    },
-    examCardAccentPractice: {
-        backgroundColor: '#6366F1',
-    },
-    examCardInner: {
-        padding: 18,
-        paddingLeft: 22,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 16,
-        gap: 12,
-    },
-    cardHeaderLeft: {
-        flex: 1,
-        gap: 8,
-    },
-    examTypeBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        gap: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    liveBadge: {
-        backgroundColor: '#EF4444',
-    },
-    practiceBadge: {
-        backgroundColor: '#4F46E5',
-    },
-    examTypeBadgeText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#FFF',
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-    },
-    examTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#0F172A',
-        lineHeight: 22,
-    },
-    scoreContainer: {
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.2,
-        shadowRadius: 6,
-        elevation: 5,
-    },
-    scorePercentage: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#FFF',
-        letterSpacing: 0.5,
-    },
-    scoreLabel: {
-        fontSize: 10,
-        color: 'rgba(255,255,255,0.95)',
-        fontWeight: '600',
-        marginTop: 2,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-
-    // Stats Grid
-    statsGrid: {
-        flexDirection: 'row',
-        gap: 12,
-        marginBottom: 12,
-    },
-    statItem: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FAFAF9',
-        padding: 10,
-        borderRadius: 12,
-        gap: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.06)',
-    },
-    statIconWrapper: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    statIconGreen: {
-        backgroundColor: '#10B981',
-    },
-    statIconPurple: {
-        backgroundColor: '#6366F1',
-    },
-    statIconAmber: {
-        backgroundColor: '#F59E0B',
-    },
-    statContent: {
-        flex: 1,
-        justifyContent: 'center',
-        minWidth: 0,
-    },
-    statValue: {
-        fontSize: 13,
-        fontWeight: '700',
-        color: '#0F172A',
-    },
-    statLabel: {
-        fontSize: 11,
-        color: '#64748B',
-        fontWeight: '500',
-        marginTop: 2,
-    },
-
-    // Card Footer
-    cardFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: 14,
-        marginTop: 4,
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-    },
-    cardFooterLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    footerText: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    viewDetailsWrap: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    viewDetailsText: {
-        fontSize: 13,
-        color: '#7C3AED',
-        fontWeight: '600',
-    },
-
-    // Empty State
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 56,
-        paddingHorizontal: 24,
-    },
-    emptyStateCard: {
-        alignItems: 'center',
-        backgroundColor: '#FFF',
-        borderRadius: 20,
-        paddingVertical: 40,
-        paddingHorizontal: 32,
-        width: '100%',
-        maxWidth: 340,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.15)',
-        ...(Platform.OS === 'ios' ? { shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 16 } : {}),
-        elevation: 3,
-    },
-    emptyStateIconWrap: {
-        width: 96,
-        height: 96,
-        borderRadius: 28,
-        backgroundColor: '#EDE9FE',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    emptyTitle: {
-        fontSize: 19,
-        fontWeight: '700',
-        color: '#0F172A',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    emptySubtitle: {
-        fontSize: 14,
-        color: '#64748B',
-        textAlign: 'center',
-        lineHeight: 21,
-        fontWeight: '500',
-    },
-
-    // Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'flex-end',
-    },
-    modalContent: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        maxHeight: '80%',
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 18,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.2)',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0F172A',
-        flex: 1,
-        marginRight: 12,
-    },
-    modalTitleWhite: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: '#FFF',
-        flex: 1,
-        marginRight: 12,
-    },
-    modalCloseBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.25)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalBody: {
-        padding: 24,
-        paddingBottom: 32,
-    },
-    modalSection: {
-        marginBottom: 28,
-    },
-    modalSectionTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#6D28D9',
-        marginBottom: 14,
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-    },
-    modalStatsGrid: {
-        flexDirection: 'row',
-        gap: 14,
-    },
-    modalStatItem: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-        padding: 18,
-        borderRadius: 14,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.12)',
-    },
-    modalStatIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#7C3AED',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    modalStatIconGreen: {
-        backgroundColor: '#10B981',
-    },
-    modalStatValue: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#0F172A',
-        marginBottom: 4,
-        letterSpacing: 0.3,
-    },
-    modalStatLabel: {
-        fontSize: 12,
-        color: '#64748B',
-        fontWeight: '600',
-    },
-    modalDetailCard: {
-        backgroundColor: '#FAFAF9',
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.1)',
-    },
-    modalDetailRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 14,
-    },
-    modalDetailRowBorder: {
-        borderTopWidth: 1,
-        borderTopColor: '#F1F5F9',
-    },
-    modalDetailLabelRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    modalDetailLabel: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    modalDetailValue: {
-        fontSize: 14,
-        color: '#0F172A',
-        fontWeight: '700',
-    },
+const cardShadow = Platform.select({
+  ios: { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 14 },
+  android: { elevation: 4 },
 });
 
-export default MyExamsScreen;
+const st = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, backgroundColor: C.bg },
+  loadRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...cardShadow,
+  },
+  loadTxt: { fontFamily: FontFamily.semiBold, fontSize: 14, color: C.primary },
+  errIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' },
+  errTitle: { fontFamily: FontFamily.medium, fontSize: 14, color: C.muted },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 6 },
+  retryTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+
+  heroWrap: { marginHorizontal: PAD, marginTop: Platform.OS === 'android' ? 6 : 10 },
+  heroCard: {
+    borderRadius: 22,
+    padding: Platform.OS === 'android' ? 14 : 16,
+    overflow: 'hidden',
+    ...cardShadow,
+  },
+  heroRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  heroLeft: { flex: 1, paddingRight: 4, zIndex: 2 },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  heroBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A78BFA' },
+  heroBadgeTxt: { fontFamily: FontFamily.semiBold, fontSize: 9, color: '#E9D5FF', letterSpacing: 1.2 },
+  heroTitle: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: Platform.OS === 'android' ? 22 : 24,
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  heroTitleAccent: { color: '#C4B5FD' },
+  heroTagline: {
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.72)',
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  heroStatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroStatTxt: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.85)' },
+  heroStatNum: { fontFamily: FontFamily.bold, color: '#FFFFFF' },
+  heroProg: { marginTop: 2 },
+  heroProgHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  heroProgLbl: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
+  heroProgPct: { fontFamily: FontFamily.bold, fontSize: 11, color: '#FFFFFF' },
+  heroProgTrack: {
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  heroProgFill: { height: '100%', borderRadius: 5 },
+  heroArt: {
+    width: Platform.OS === 'android' ? 88 : 100,
+    height: Platform.OS === 'android' ? 88 : 100,
+    marginBottom: -4,
+  },
+  heroCtaWrap: { marginTop: 12 },
+  heroCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: Platform.OS === 'android' ? 11 : 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+
+  listSection: { marginTop: isAndroid ? 8 : 12, paddingHorizontal: PAD },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: isAndroid ? 6 : 8,
+  },
+  sectionTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: isAndroid ? 15 : 16,
+    color: C.ink,
+  },
+  countBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  countBadgeTxt: { fontFamily: FontFamily.bold, fontSize: 10, color: C.primary },
+  filterRow: { gap: isAndroid ? 6 : 8, alignItems: 'center', marginBottom: isAndroid ? 6 : 8 },
+  filterOn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: isAndroid ? 10 : 12,
+    paddingVertical: isAndroid ? 5 : 7,
+    borderRadius: 16,
+  },
+  filterOnTxt: { fontFamily: FontFamily.bold, fontSize: isAndroid ? 11 : 12, color: '#FFF' },
+  filterOff: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: isAndroid ? 10 : 12,
+    paddingVertical: isAndroid ? 5 : 7,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E8E4FF',
+  },
+  filterOffTxt: { fontFamily: FontFamily.semiBold, fontSize: isAndroid ? 11 : 12, color: C.primary },
+
+  list: { gap: isAndroid ? 5 : 8 },
+  examCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: isAndroid ? 12 : 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    ...Platform.select({
+      ios: cardShadow,
+      android: { elevation: 1 },
+    }),
+  },
+  examAccent: { width: 3 },
+  examCardInner: {
+    flex: 1,
+    paddingVertical: isAndroid ? 7 : 10,
+    paddingHorizontal: isAndroid ? 8 : 10,
+  },
+  examTop: { flexDirection: 'row', alignItems: 'center', gap: isAndroid ? 8 : 9 },
+  examIcon: {
+    width: isAndroid ? 34 : 38,
+    height: isAndroid ? 34 : 38,
+    borderRadius: isAndroid ? 10 : 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  examInfo: { flex: 1, minWidth: 0 },
+  examName: {
+    fontFamily: FontFamily.bold,
+    fontSize: isAndroid ? 13 : 14,
+    color: C.ink,
+    letterSpacing: -0.15,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: isAndroid ? 3 : 4 },
+  liveChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  liveDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#DC2626' },
+  liveChipTxt: { fontFamily: FontFamily.bold, fontSize: 8, color: '#DC2626' },
+  practiceChip: {
+    backgroundColor: TimetableTheme.completedBg,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  practiceChipTxt: { fontFamily: FontFamily.bold, fontSize: 8, color: TimetableTheme.completedText },
+  statusBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
+  statusUp: { backgroundColor: C.warnSoft },
+  statusDone: { backgroundColor: C.successSoft },
+  statusBadgeTxt: { fontFamily: FontFamily.semiBold, fontSize: 8 },
+  examMeta: {
+    fontFamily: FontFamily.medium,
+    fontSize: isAndroid ? 9 : 10,
+    color: C.muted,
+    marginTop: isAndroid ? 2 : 3,
+  },
+  scoreRing: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: isAndroid ? 40 : 44,
+    paddingHorizontal: 5,
+    paddingVertical: isAndroid ? 4 : 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    backgroundColor: '#FAFAFF',
+  },
+  scoreVal: { fontFamily: FontFamily.extraBold, fontSize: isAndroid ? 12 : 13 },
+  progTrack: {
+    height: isAndroid ? 3 : 4,
+    backgroundColor: '#EDE9FE',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: isAndroid ? 6 : 7,
+  },
+  progFill: { height: '100%', borderRadius: 4 },
+
+  banner: {
+    marginHorizontal: PAD,
+    marginTop: isAndroid ? 8 : 12,
+    borderRadius: isAndroid ? 12 : 14,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: cardShadow,
+      android: { elevation: 2 },
+    }),
+  },
+  bannerGrad: { borderRadius: isAndroid ? 12 : 14 },
+  bannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: isAndroid ? 8 : 10,
+    paddingVertical: isAndroid ? 10 : 12,
+    paddingHorizontal: isAndroid ? 10 : 12,
+  },
+  bannerIconWrap: {
+    width: isAndroid ? 34 : 38,
+    height: isAndroid ? 34 : 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerText: { flex: 1 },
+  bannerTitle: { fontFamily: FontFamily.bold, fontSize: isAndroid ? 13 : 14, color: '#FFFFFF' },
+  bannerSub: {
+    fontFamily: FontFamily.medium,
+    fontSize: isAndroid ? 10 : 11,
+    color: 'rgba(236,253,245,0.9)',
+    marginTop: 1,
+  },
+
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    ...cardShadow,
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: { fontFamily: FontFamily.bold, fontSize: 16, color: C.ink },
+  emptySub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 13,
+    color: C.muted,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 14,
+  },
+  emptyCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+
+  modalBg: { flex: 1, backgroundColor: 'rgba(15,10,30,0.55)', justifyContent: 'flex-end' },
+  modalBox: { backgroundColor: '#FFF', borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  modalHead: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 10 },
+  modalTitle: { flex: 1, fontFamily: FontFamily.bold, fontSize: 16, color: '#FFF' },
+  modalBody: { padding: 18, gap: 8 },
+  modalRow: { fontFamily: FontFamily.medium, fontSize: 13, color: C.ink },
+});

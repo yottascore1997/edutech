@@ -1,31 +1,41 @@
+import ExamScreenUI from '@/components/exam/ExamScreenUI';
 import { apiFetchAuth } from '@/constants/api';
-import { AppColors } from '@/constants/Colors';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useCategory } from '@/context/CategoryContext';
 import { applyExamFilters } from '@/utils/examFilter';
+import {
+    mergeJoinedLiveExamsIntoExamList,
+    syncJoinedLiveExamIds,
+} from '@/utils/joinedLiveExams';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Animated,
-    FlatList,
-    Image,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
+    StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import ExamCard from '../../components/ExamCard';
+
+const T = {
+    bg: '#FFFBF7',
+    bgGrad: ['#FFFCF8', '#FFFBF7', '#EFF6FF'] as const,
+    card: '#FFFFFF',
+    border: '#E8EEF8',
+    primary: '#2563EB',
+    live: '#DC2626',
+    ctaGrad: ['#60A5FA', '#2563EB', '#1D4ED8'] as const,
+    ink: '#0F172A',
+    muted: '#64748B',
+} as const;
 
 export default function ExamScreen() {
     const { user } = useAuth();
-    const router = useRouter();
     const { selectedCategory: globalCategory } = useCategory();
     const [exams, setExams] = useState<any[]>([]);
     const [joinedLiveExamIds, setJoinedLiveExamIds] = useState<string[]>([]);
@@ -37,29 +47,6 @@ export default function ExamScreen() {
     const [categories, setCategories] = useState<string[]>([]);
     const [remainingTime, setRemainingTime] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    
-    // Animation refs
-    const floatAnim = useRef(new Animated.Value(0)).current;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-
-    const fetchJoinedLiveExams = async () => {
-        if (!user?.token) return;
-        try {
-            const res = await apiFetchAuth('/student/my-exams', user.token);
-            if (res.ok && Array.isArray(res.data)) {
-                const ids = res.data
-                    .filter((e: any) => e.examType === 'LIVE' && e.status !== 'COMPLETED')
-                    .map((e: any) => e.examId || e.id)
-                    .filter(Boolean);
-                setJoinedLiveExamIds(ids);
-            } else {
-                setJoinedLiveExamIds([]);
-            }
-        } catch (error) {
-            console.error('❌ Error fetching joined live exams:', error);
-            setJoinedLiveExamIds([]);
-        }
-    };
 
     const fetchExams = async () => {
         if (!user?.token) {
@@ -69,28 +56,31 @@ export default function ExamScreen() {
         try {
             setLoading(true);
             const response = await apiFetchAuth('/student/exams', user.token);
+            const joinedIds =
+                user.id ? await syncJoinedLiveExamIds(user.token, String(user.id)) : [];
+            setJoinedLiveExamIds(joinedIds);
+
             if (response.ok) {
-                setExams(response.data);
-                setFilteredExams(response.data);
-                
-                // Extract unique categories from actual exam data only
+                const list = Array.isArray(response.data) ? response.data : [];
+                const merged = user.token
+                    ? await mergeJoinedLiveExamsIntoExamList(list, joinedIds, user.token)
+                    : list;
+                setExams(merged);
+
                 const uniqueCategories = [...new Set(
-                    response.data
+                    merged
                         .map((exam: any) => exam.category)
                         .filter((category: any) => category && typeof category === 'string')
                 )] as string[];
-                
-                // Debug: Log available categories from exam data
-                
-                // Check if there are any uncategorized exams
-                const hasUncategorized = response.data.some((exam: any) => !exam.category || exam.category === null);
+
+                const hasUncategorized = merged.some((exam: any) => !exam.category || exam.category === null);
                 const finalCategories = hasUncategorized ? [...uniqueCategories, 'Uncategorized'] : uniqueCategories;
-                
+
                 setCategories(finalCategories);
+                setError(null);
             } else {
                 setError(response.data?.message || 'Failed to fetch exams');
             }
-            await fetchJoinedLiveExams();
         } catch (err: any) {
             setError(err.data?.message || 'An unknown error occurred');
         } finally {
@@ -102,8 +92,8 @@ export default function ExamScreen() {
         setRefreshing(true);
         try {
             await fetchExams();
-        } catch (error) {
-            console.error('Error refreshing:', error);
+        } catch (e) {
+            console.error('Error refreshing:', e);
         } finally {
             setRefreshing(false);
         }
@@ -113,45 +103,6 @@ export default function ExamScreen() {
         fetchExams();
     }, [user]);
 
-    // Start header animations
-    useEffect(() => {
-        // Float animation
-        const floatAnimation = Animated.loop(
-            Animated.sequence([
-                Animated.timing(floatAnim, {
-                    toValue: 1,
-                    duration: 3000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(floatAnim, {
-                    toValue: 0,
-                    duration: 3000,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-
-        // Pulse animation
-        const pulseAnimation = Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.1,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 1500,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-
-        floatAnimation.start();
-        pulseAnimation.start();
-    }, []);
-
-    // Calculate remaining time for the earliest ending exam
     useEffect(() => {
         const calculateRemainingTime = () => {
             if (filteredExams.length === 0) {
@@ -162,7 +113,6 @@ export default function ExamScreen() {
             const now = new Date();
             let earliestEndTime: Date | null = null;
 
-            // Find the exam that ends earliest
             filteredExams.forEach((exam: any) => {
                 if (exam.endTime) {
                     const endTime = new Date(exam.endTime);
@@ -187,404 +137,146 @@ export default function ExamScreen() {
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            
+
             setRemainingTime(
                 `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
             );
         };
 
         const timer = setInterval(calculateRemainingTime, 1000);
-        calculateRemainingTime(); // Initial call
+        calculateRemainingTime();
         return () => clearInterval(timer);
     }, [filteredExams]);
 
-    // Filter exams based on global category, local category, and search query
     useEffect(() => {
-        // Use global category if available, otherwise use local selectedCategory
         const categoryToFilter = globalCategory || (selectedCategory !== 'all' ? selectedCategory : undefined);
-        
+
         const filtered = applyExamFilters(exams, {
             category: categoryToFilter,
             searchQuery: searchQuery,
-            includeExpired: false, // Filter out expired exams
-            userId: user?.id, // Pass userId to filter out exams user has joined
-            joinedExamIds: joinedLiveExamIds
+            includeExpired: false,
+            userId: user?.id,
+            joinedExamIds: joinedLiveExamIds,
         });
-        
+
         setFilteredExams(filtered);
-    }, [globalCategory, selectedCategory, exams, searchQuery, joinedLiveExamIds]);
-
-    const handleCategorySelect = (category: string) => {
-        setSelectedCategory(category);
-    };
-
-    const renderExamCard = ({ item }: { item: any }) => (
-        <ExamCard exam={item} navigation={router} />
-    );
-
-    const renderCategoryButton = (category: string) => {
-        const isSelected = selectedCategory === category;
-        const displayName = category === 'Uncategorized' ? 'Uncategorized' : category;
-        return (
-            <TouchableOpacity
-                key={category}
-                style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
-                onPress={() => handleCategorySelect(category)}
-            >
-                <LinearGradient
-                    colors={isSelected ? ['#8B5CF6', '#7C3AED'] : ['#FFFFFF', '#F8FAFC']}
-                    style={styles.categoryButtonGradient}
-                >
-                    <Text style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextSelected]}>
-                        {displayName}
-                    </Text>
-                </LinearGradient>
-            </TouchableOpacity>
-        );
-    };
+    }, [globalCategory, selectedCategory, exams, searchQuery, joinedLiveExamIds, user?.id]);
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={AppColors.primary} />
-                    <Text style={styles.loadingText}>Loading Exams...</Text>
+            <View style={styles.centered}>
+                <StatusBar barStyle="dark-content" />
+                <LinearGradient colors={[...T.bgGrad]} style={StyleSheet.absoluteFill} />
+                <View style={styles.loadCard}>
+                    <ActivityIndicator size="large" color={T.primary} />
+                    <Text style={styles.loadTitle}>Loading live exams</Text>
+                    <Text style={styles.loadSub}>Fetching battles for you…</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (error) {
         return (
-            <SafeAreaView style={styles.container}>
-                <View style={styles.errorContainer}>
-                    <Ionicons name="alert-circle-outline" size={64} color={AppColors.error} />
-                    <Text style={styles.errorText}>{error}</Text>
-                    <TouchableOpacity 
-                        style={styles.retryButton}
-                        onPress={() => {
-                            setError(null);
-                            setLoading(true);
-                            // Re-fetch exams
-                            fetchExams();
-                        }}
-                    >
-                        <Text style={styles.retryButtonText}>Retry</Text>
+            <View style={styles.centered}>
+                <StatusBar barStyle="dark-content" />
+                <LinearGradient colors={[...T.bgGrad]} style={StyleSheet.absoluteFill} />
+                <View style={styles.errCard}>
+                    <Ionicons name="cloud-offline-outline" size={48} color={T.live} />
+                    <Text style={styles.errTitle}>Could not load exams</Text>
+                    <Text style={styles.errSub}>{error}</Text>
+                    <TouchableOpacity onPress={fetchExams} activeOpacity={0.9}>
+                        <LinearGradient colors={[...T.ctaGrad]} style={styles.retryBtn}>
+                            <Text style={styles.retryTxt}>Try Again</Text>
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Enhanced Search Bar */}
-            <View style={styles.searchContainer}>
-                <LinearGradient
-                    colors={['rgba(139, 92, 246, 0.05)', 'rgba(124, 58, 237, 0.03)']}
-                    style={styles.searchGradient}
-                >
-                    <View style={styles.searchInputContainer}>
-                        <View style={styles.searchIconContainer}>
-                            <Image source={require('@/assets/images/icons/search.png')} style={styles.searchBarIcon} resizeMode="contain" />
-                        </View>
-                        <TextInput
-                            style={styles.searchInput}
-                            placeholder="Search for exams..."
-                            placeholderTextColor="#9CA3AF"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                        />
-                        {searchQuery.length > 0 && (
-                            <TouchableOpacity
-                                style={styles.clearButton}
-                                onPress={() => setSearchQuery('')}
-                            >
-                                <Ionicons name="close-circle" size={20} color="#8B5CF6" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </LinearGradient>
-            </View>
-
-            {/* Enhanced Category Filter */}
-            {categories.length > 0 && (
-                <View style={styles.categoryContainer}>
-                    <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.categoryScrollContainer}
-                    >
-                        <TouchableOpacity
-                            style={[styles.categoryButton, selectedCategory === 'all' && styles.categoryButtonSelected]}
-                            onPress={() => handleCategorySelect('all')}
-                        >
-                            <LinearGradient
-                                colors={selectedCategory === 'all' ? ['#8B5CF6', '#7C3AED'] : ['#FFFFFF', '#F8FAFC']}
-                                style={styles.categoryButtonGradient}
-                            >
-                                <Text style={[styles.categoryButtonText, selectedCategory === 'all' && styles.categoryButtonTextSelected]}>
-                                    All
-                                </Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                        {categories.map(renderCategoryButton)}
-                    </ScrollView>
-                </View>
-            )}
-
-            {/* Enhanced Exams List */}
-            {filteredExams.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <LinearGradient
-                        colors={['rgba(139, 92, 246, 0.1)', 'rgba(124, 58, 237, 0.05)']}
-                        style={styles.emptyIconContainer}
-                    >
-                        <Animated.View
-                            style={{
-                                transform: [{ scale: pulseAnim }]
-                            }}
-                        >
-                            <Ionicons name="library-outline" size={64} color="#8B5CF6" />
-                        </Animated.View>
-                    </LinearGradient>
-                    <Text style={styles.emptyTitle}>
-                        {searchQuery.trim() 
-                            ? 'No Matching Exams' 
-                            : selectedCategory === 'all' 
-                                ? 'No Exams Available' 
-                                : selectedCategory === 'uncategorized' 
-                                    ? 'No Uncategorized Exams' 
-                                    : `No ${selectedCategory} Exams`
-                        }
-                    </Text>
-                    <Text style={styles.emptySubtext}>
-                        {searchQuery.trim()
-                            ? `No exams found matching "${searchQuery}". Try a different search term.`
-                            : selectedCategory === 'all' 
-                                ? 'Check back later for new live exams.'
-                                : selectedCategory === 'uncategorized'
-                                ? 'No exams without categories available.'
-                                : `No exams available in ${selectedCategory} category.`
-                        }
-                    </Text>
-                </View>
-            ) : (
-                <FlatList
-                    data={filteredExams}
-                    renderItem={renderExamCard}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.examListContainer}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                    }
-                />
-            )}
+        <SafeAreaView style={styles.root} edges={[]}>
+            <StatusBar barStyle="dark-content" />
+            <ExamScreenUI
+                filteredExams={filteredExams}
+                joinedCount={joinedLiveExamIds.length}
+                remainingTime={remainingTime}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategorySelect={setSelectedCategory}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                renderExamCard={({ item }) => <ExamCard exam={item} />}
+            />
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
+    root: { flex: 1, backgroundColor: T.bg },
+    centered: {
         flex: 1,
-        backgroundColor: AppColors.lightGrey,
-    },
-    examListContainer: {
-        paddingBottom: 32,
-        paddingHorizontal: 16,
-    },
-    loadingContainer: {
-        flex: 1,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
+        padding: 24,
     },
-    loadingText: {
-        marginTop: 10,
-        fontSize: 16,
-        fontWeight: '600',
-        color: AppColors.darkGrey,
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
-    errorText: {
-        fontSize: 16,
-        color: AppColors.error,
-        marginTop: 16,
-        textAlign: 'center',
-    },
-    retryButton: {
-        marginTop: 20,
-        backgroundColor: AppColors.primary,
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    retryButtonText: {
-        color: AppColors.white,
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-
-    statsBadge: {
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        borderRadius: 15,
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    statsNumber: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: AppColors.white,
-    },
-    statsLabel: {
-        fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.8)',
-        marginTop: 2,
-    },
-    searchContainer: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E5E7EB',
-    },
-    searchGradient: {
-        borderRadius: 8,
-        backgroundColor: '#F9FAFB',
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    searchInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#FFFFFF',
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        minHeight: 34,
-        borderWidth: 1,
-        borderColor: '#D1D5DB',
-    },
-    searchIconContainer: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        marginRight: 6,
-    },
-    searchBarIcon: {
-        width: 18,
-        height: 18,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: '#374151',
-        paddingVertical: 0,
-        fontWeight: '400',
-    },
-    clearButton: {
-        padding: 6,
-        marginLeft: 8,
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 30,
-        backgroundColor: '#FAFBFF',
-    },
-    emptyIconContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 20,
-        // Shadow removed for better Android appearance
-    },
-    emptyTitle: {
-        fontSize: 22,
-        fontWeight: '800',
-        color: '#1E293B',
-        marginTop: 16,
-        textAlign: 'center',
-        letterSpacing: 0.5,
-    },
-    emptySubtext: {
-        fontSize: 16,
-        color: '#64748B',
-        marginTop: 12,
-        textAlign: 'center',
-        lineHeight: 24,
-        letterSpacing: 0.3,
-    },
-    listContainer: {
-        padding: 15,
-    },
-    categoryContainer: {
-        paddingVertical: 15,
-        paddingHorizontal: 15,
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    categoryTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: AppColors.darkGrey,
-        marginBottom: 10,
-        paddingHorizontal: 5,
-    },
-    categoryScrollContainer: {
-        paddingHorizontal: 10,
-    },
-    categoryButton: {
-        marginRight: 10,
+    loadCard: {
+        backgroundColor: T.card,
         borderRadius: 20,
-        overflow: 'hidden',
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    categoryButtonSelected: {
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 6,
-    },
-    categoryButtonGradient: {
-        borderRadius: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        minWidth: 80,
+        padding: 32,
         alignItems: 'center',
+        width: '100%',
+        maxWidth: 300,
         borderWidth: 1,
-        borderColor: 'rgba(139, 92, 246, 0.2)',
+        borderColor: T.border,
     },
-    categoryButtonText: {
+    loadTitle: {
+        fontFamily: FontFamily.bold,
+        fontSize: 17,
+        color: T.ink,
+        marginTop: 16,
+    },
+    loadSub: {
+        fontFamily: FontFamily.regular,
+        fontSize: 13,
+        color: T.muted,
+        marginTop: 6,
+    },
+    errCard: {
+        backgroundColor: T.card,
+        borderRadius: 20,
+        padding: 28,
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 320,
+        borderWidth: 1,
+        borderColor: T.border,
+    },
+    errTitle: {
+        fontFamily: FontFamily.bold,
+        fontSize: 18,
+        color: T.ink,
+        marginTop: 14,
+    },
+    errSub: {
+        fontFamily: FontFamily.regular,
         fontSize: 14,
-        color: AppColors.darkGrey,
-        fontWeight: '500',
+        color: T.muted,
+        textAlign: 'center',
+        marginTop: 8,
+        marginBottom: 20,
     },
-    categoryButtonTextSelected: {
-        fontWeight: 'bold',
-        color: AppColors.white,
+    retryBtn: {
+        paddingHorizontal: 28,
+        paddingVertical: 12,
+        borderRadius: 12,
     },
-}); 
+    retryTxt: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 15,
+        color: '#FFF',
+    },
+});

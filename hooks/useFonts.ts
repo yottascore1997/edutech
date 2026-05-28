@@ -1,4 +1,5 @@
 import { FontColors, Fonts, createFontStyle } from '@/constants/Fonts';
+import { FontFamily, fontFamilyForWeight } from '@/constants/Typography';
 
 // Custom hook to easily access font styles throughout the app
 export const useFonts = () => {
@@ -48,6 +49,10 @@ export const useFonts = () => {
     
     // Color constants
     colors: FontColors,
+
+    // Poppins families (use in StyleSheet or inline styles)
+    family: FontFamily,
+    familyForWeight: fontFamilyForWeight,
   };
 };
 

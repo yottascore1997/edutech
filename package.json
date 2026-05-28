@@ -3,8 +3,10 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start --lan --clear",
-    "start:lan": "expo start --lan --clear",
+    "start": "node scripts/start-lan.js",
+    "start:lan": "node scripts/start-lan.js",
+    "start:expo": "expo start --lan --go",
+    "start:clear": "node scripts/start-lan.js --clear",
     "start:ip": "expo start --lan",
     "start:tunnel": "expo start --tunnel",
     "reset-project": "node ./scripts/reset-project.js",
@@ -15,6 +17,7 @@
     "clean": "if exist node_modules\\.cache rmdir /s /q node_modules\\.cache && if exist .expo rmdir /s /q .expo && echo Cache cleared"
   },
   "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -36,7 +39,7 @@
     "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.21",
-    "expo-font": "~14.0.10",
+    "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-image-picker": "~17.0.9",

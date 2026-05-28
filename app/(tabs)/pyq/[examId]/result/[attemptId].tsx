@@ -403,7 +403,7 @@ export default function PYQResultScreen() {
               </>
             )}
 
-            <TouchableOpacity style={styles.doneBtn} onPress={() => router.push('/pyq')}>
+            <TouchableOpacity style={styles.doneBtn} onPress={() => router.push('/(tabs)/pyq' as any)}>
               <Text style={styles.doneBtnText}>Back to PYQ</Text>
             </TouchableOpacity>
           </Animated.View>

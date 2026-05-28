@@ -1,11 +1,18 @@
 import { AppColors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+  useFonts,
+} from '@expo-google-fonts/poppins';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import 'react-native-gesture-handler';
 import CustomDrawerContent from '../components/CustomDrawerContent';
@@ -21,6 +28,7 @@ import { ToastProvider } from '../context/ToastContext';
 import { WalletProvider, useWallet } from '../context/WalletContext';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import '../utils/errorHandler'; // Initialize global error handler
+import { applyGlobalFont } from '../utils/applyGlobalFont';
 
 // Header Right Component
 const HeaderRight = ({ navigation }: any) => {
@@ -125,13 +133,6 @@ function RootNavigator() {
                     name="privacy-policy"
                     options={{
                       title: '', // Remove the title for privacy-policy
-                    }}
-                />
-                <Drawer.Screen
-                    name="pyq"
-                    options={{
-                      title: 'PYQ',
-                      headerShown: false, // Use app's CommonHeader instead of navigator header
                     }}
                 />
                 <Drawer.Screen
@@ -270,12 +271,20 @@ const styles = StyleSheet.create({
 
 function RootLayout() {
   const [loaded] = useFonts({
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    Poppins_800ExtraBold,
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   const colorScheme = useColorScheme();
 
+  useEffect(() => {
+    if (loaded) applyGlobalFont();
+  }, [loaded]);
+
   if (!loaded) {
-    // Async font loading only occurs in development.
     return null;
   }
 

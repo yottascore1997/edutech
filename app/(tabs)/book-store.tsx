@@ -1,14 +1,47 @@
 import BookListingForm from '@/components/BookListingForm';
 import { apiFetchAuth, getImageUrl as getImageUrlFromApi } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { ShadowUtils } from '@/utils/shadowUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { BookOpen, Filter, MapPin, Plus, Search, ShoppingCart, Sparkles } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const PAD = 16;
+
+const C = {
+  bg: ['#EDE9FE', '#F5F3FF', '#FAFAFF'] as const,
+  primary: '#6344D4',
+  primaryLight: '#8E78E7',
+  ink: '#0F0A1E',
+  muted: '#64748B',
+  card: '#FFFFFF',
+  border: '#E8E8F0',
+  ctaGrad: ['#8E78E7', '#6344D4', '#5546C9'] as const,
+  filterGrad: ['#8E78E7', '#7C3AED', '#6344D4'] as const,
+};
 
 interface Book {
   id: string;
@@ -279,81 +312,81 @@ const BookStoreScreen = () => {
   };
 
   const BookCard = ({ book }: { book: Book }) => (
-    <TouchableOpacity 
-      style={styles.bookCard}
-      onPress={() => router.push(`/(tabs)/book-details?bookId=${book.id}`)}
-      activeOpacity={0.9}
-    >
-      <View style={styles.bookImageContainer}>
-        {book.coverImage && getImageUrl(book.coverImage) ? (
-          <Image 
-            source={{ uri: getImageUrl(book.coverImage)! }} 
-            style={styles.bookImage}
-            resizeMode="cover"
-            onError={() => {}}
-          />
-        ) : (
-          <View style={[styles.bookImage, styles.bookImagePlaceholder]}>
-            <Ionicons name="book" size={36} color="#94A3B8" />
-          </View>
-        )}
-        <View style={[styles.listingTypeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
-          <Text style={styles.listingTypeText}>{book.listingType}</Text>
-        </View>
-      </View>
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-        <View style={styles.bookMetaRow}>
-          <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '18' }]}>
-            <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>{book.condition}</Text>
-          </View>
-          {book.listingType === 'DONATE' ? (
-            <Text style={styles.bookPrice}>Free</Text>
+    <LinearGradient colors={['#E9E5FF', '#F3EEFF', '#FAF8FF']} style={styles.bookCardBorder}>
+      <TouchableOpacity
+        style={styles.bookCard}
+        onPress={() => router.push(`/(tabs)/book-details?bookId=${book.id}`)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.bookImageContainer}>
+          {book.coverImage && getImageUrl(book.coverImage) ? (
+            <Image
+              source={{ uri: getImageUrl(book.coverImage)! }}
+              style={styles.bookImage}
+              resizeMode="cover"
+              onError={() => {}}
+            />
           ) : (
-            <Text style={styles.bookPrice}>₹{book.price}{book.rentPrice ? ` · Rent ₹${book.rentPrice}` : ''}</Text>
+            <LinearGradient colors={['#EDE9FE', '#DDD6FE']} style={[styles.bookImage, styles.bookImagePlaceholder]}>
+              <BookOpen size={32} color={C.primaryLight} strokeWidth={1.8} />
+            </LinearGradient>
           )}
-        </View>
-        {locationEnabled && book.distance !== undefined && (
-          <View style={styles.bookDistanceRow}>
-            <Ionicons name="location" size={12} color="#6366F1" />
-            <Text style={styles.bookDistanceText}>{formatDistance(book.distance)} away</Text>
+          <View style={[styles.listingTypeBadge, { backgroundColor: getListingTypeColor(book.listingType) }]}>
+            <Text style={styles.listingTypeText}>{book.listingType}</Text>
           </View>
-        )}
-        <TouchableOpacity 
-          style={styles.listingAddToCartButton}
-          onPress={(e) => { e.stopPropagation(); handleAddToCart(book); }}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
-            colors={['#6366F1', '#8B5CF6']}
-            style={styles.listingAddToCartGradient}
+        </View>
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>{book.author}</Text>
+          <View style={styles.bookMetaRow}>
+            <View style={[styles.conditionBadge, { backgroundColor: getConditionColor(book.condition) + '18' }]}>
+              <Text style={[styles.conditionText, { color: getConditionColor(book.condition) }]}>{book.condition}</Text>
+            </View>
+            {book.listingType === 'DONATE' ? (
+              <Text style={styles.bookPrice}>Free</Text>
+            ) : (
+              <Text style={styles.bookPrice}>₹{book.price}{book.rentPrice ? ` · ₹${book.rentPrice}/mo` : ''}</Text>
+            )}
+          </View>
+          {locationEnabled && book.distance !== undefined && (
+            <View style={styles.bookDistanceRow}>
+              <MapPin size={11} color={C.primary} strokeWidth={2} />
+              <Text style={styles.bookDistanceText}>{formatDistance(book.distance)} away</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.listingAddToCartButton}
+            onPress={(e) => { e.stopPropagation(); handleAddToCart(book); }}
+            activeOpacity={0.85}
           >
-            <Ionicons name="cart-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.listingAddToCartText}>
-              {book.listingType === 'DONATE' ? 'Get Free' : 'Add to Cart'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+            <LinearGradient colors={[...C.ctaGrad]} style={styles.listingAddToCartGradient}>
+              <ShoppingCart size={14} color="#FFF" strokeWidth={2.2} />
+              <Text style={styles.listingAddToCartText}>
+                {book.listingType === 'DONATE' ? 'Get Free' : 'Add to Cart'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </LinearGradient>
   );
 
-  const FilterButton = ({ type, label }: { type: string; label: string }) => (
-    <TouchableOpacity
-      style={[
-        styles.filterButton,
-        filterType === type && styles.activeFilterButton
-      ]}
-      onPress={() => setFilterType(type as any)}
-    >
-      <Text style={[
-        styles.filterButtonText,
-        filterType === type && styles.activeFilterButtonText
-      ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const FilterButton = ({ type, label }: { type: string; label: string }) => {
+    const active = filterType === type;
+    return (
+      <TouchableOpacity onPress={() => setFilterType(type as typeof filterType)} activeOpacity={0.88}>
+        {active ? (
+          <LinearGradient colors={[...C.filterGrad]} style={styles.filterButtonActive}>
+            <Text style={styles.filterButtonTextActive}>{label}</Text>
+          </LinearGradient>
+        ) : (
+          <View style={styles.filterButton}>
+            <Text style={styles.filterButtonText}>{label}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const handleCreateBook = () => {
     setShowCreateModal(true);
@@ -420,73 +453,93 @@ const BookStoreScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading books...</Text>
-      </View>
+      <LinearGradient colors={[...C.bg]} style={[styles.loadingContainer, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={styles.loadingText}>Loading book store…</Text>
+      </LinearGradient>
     );
   }
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#F5F3FF', '#EDE9FE']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top }]}
-      >
-        {/* Header: icon + title block + cart */}
-        <View style={styles.headerTopRow}>
-          <View style={styles.headerLeftBlock}>
-            <Image source={require('@/assets/images/icons/book.png')} style={styles.headerBookIcon} resizeMode="contain" />
-            <View style={styles.headerTitleContainer}>
-              <Text style={styles.headerTitle}>Book Store</Text>
-              <Text style={styles.headerSubtitle}>Buy, rent & share study materials</Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.cartIconButton}
-            onPress={() => router.push('/(tabs)/cart')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cartIconContainer}>
-              <Image source={require('@/assets/images/icons/trolley.png')} style={styles.cartTrolleyIcon} resizeMode="contain" />
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={[...C.bg]} style={StyleSheet.absoluteFill} />
+      <View style={styles.orb1} />
+      <View style={styles.orb2} />
+
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <LinearGradient colors={['#C4B5FD', '#DDD6FE', '#EDE9FE']} style={styles.titleBorder}>
+              <View style={styles.titleCard}>
+                <Image source={require('@/assets/images/icons/book-shop.png')} style={styles.headerBookIcon} resizeMode="contain" />
+                <View style={styles.headerTitleContainer}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.headerTitle}>Book </Text>
+                    <Text style={styles.headerTitleAccent}>Store</Text>
+                  </View>
+                  <Text style={styles.headerSubtitle}>Buy, rent & share study materials</Text>
+                </View>
+              </View>
+            </LinearGradient>
+            <TouchableOpacity style={styles.cartBtn} onPress={() => router.push('/(tabs)/cart')} activeOpacity={0.88}>
+              <ShoppingCart size={20} color={C.ink} strokeWidth={2} />
               {cartCount > 0 && (
                 <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                  <Text style={styles.cartBadgeText}>{cartCount > 9 ? '9+' : cartCount}</Text>
                 </View>
               )}
-            </View>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Search Bar with Filter Icon */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Image source={require('@/assets/images/icons/search.png')} style={[styles.searchIcon, styles.searchBarIcon]} resizeMode="contain" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search books..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholderTextColor="#9CA3AF"
-            />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity 
-            style={styles.filterIconButton}
-            onPress={() => setShowFilterPanel(true)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.filterIconGradient}>
-              <Ionicons name="options" size={20} color="#6366F1" />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
 
-      <ScrollView 
+          <View style={styles.searchContainer}>
+            <View style={styles.searchInputContainer}>
+              <Search size={18} color={C.primary} strokeWidth={2.2} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by title, author, category…"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+            <TouchableOpacity onPress={() => setShowFilterPanel(true)} activeOpacity={0.88}>
+              <LinearGradient colors={[...C.filterGrad]} style={styles.filterBtn}>
+                <Filter size={18} color="#FFF" strokeWidth={2.2} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickStats}>
+            <View style={styles.quickStat}>
+              <BookOpen size={14} color={C.primary} strokeWidth={2} />
+              <Text style={styles.quickStatVal}>{filteredBooks.length}</Text>
+              <Text style={styles.quickStatLbl}>Listed</Text>
+            </View>
+            <View style={styles.quickStatDiv} />
+            <TouchableOpacity style={styles.quickStat} onPress={toggleLocation} activeOpacity={0.88}>
+              <MapPin size={14} color={locationEnabled ? '#059669' : C.muted} strokeWidth={2} />
+              <Text style={[styles.quickStatVal, locationEnabled && { color: '#059669' }]}>
+                {locationEnabled ? `${selectedRadius}km` : 'Nearby'}
+              </Text>
+              <Text style={styles.quickStatLbl}>{locationEnabled ? 'Active' : 'Off'}</Text>
+            </TouchableOpacity>
+            <View style={styles.quickStatDiv} />
+            <View style={styles.quickStat}>
+              <ShoppingCart size={14} color={C.primary} strokeWidth={2} />
+              <Text style={styles.quickStatVal}>{cartCount}</Text>
+              <Text style={styles.quickStatLbl}>In Cart</Text>
+            </View>
+          </ScrollView>
+        </View>
+
+      <ScrollView
         style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={C.primary} colors={[C.primary]} />
         }
       >
 
@@ -530,11 +583,13 @@ const BookStoreScreen = () => {
           </View>
         </View>
 
-        {/* Explore Categories - Enhanced educative / exam feel */}
+        {/* Explore Categories */}
         <View style={styles.categoriesContainer}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
-              <Image source={require('@/assets/images/icons/adventurer.png')} style={styles.exploreCategoriesIcon} resizeMode="contain" />
+              <LinearGradient colors={['#8E78E7', C.primary]} style={styles.sectionIcon}>
+                <Sparkles size={14} color="#FFF" strokeWidth={2.5} />
+              </LinearGradient>
               <Text style={styles.sectionTitle}>Explore Categories</Text>
             </View>
           </View>
@@ -682,15 +737,29 @@ const BookStoreScreen = () => {
           <FilterButton type="RENT" label="Rent" />
         </View>
 
-        {/* Books List - 2 Column Grid */}
+        {/* Books List */}
         <View style={styles.booksContainer}>
+          <View style={styles.booksSectionHeader}>
+            <Text style={styles.sectionTitle}>Available Books</Text>
+            <View style={styles.booksCountPill}>
+              <Text style={styles.booksCountTxt}>{filteredBooks.length}</Text>
+            </View>
+          </View>
           {filteredBooks.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={64} color="#D1D5DB" />
+              <LinearGradient colors={['#EDE9FE', '#F5F3FF']} style={styles.emptyIcon}>
+                <BookOpen size={40} color={C.primary} strokeWidth={1.8} />
+              </LinearGradient>
               <Text style={styles.emptyTitle}>No books found</Text>
               <Text style={styles.emptySubtitle}>
-                {searchQuery ? 'Try adjusting your search' : 'Be the first to list a book!'}
+                {searchQuery ? 'Try adjusting your search or filters' : 'Be the first to list a book!'}
               </Text>
+              <TouchableOpacity onPress={handleCreateBook} activeOpacity={0.9}>
+                <LinearGradient colors={[...C.ctaGrad]} style={styles.emptyCta}>
+                  <Plus size={18} color="#FFF" strokeWidth={2.5} />
+                  <Text style={styles.emptyCtaTxt}>List Your Book</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.booksGrid}>
@@ -702,12 +771,12 @@ const BookStoreScreen = () => {
         </View>
       </ScrollView>
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleCreateBook}
-      >
-        <Ionicons name="add" size={24} color="#FFFFFF" />
+      <TouchableOpacity style={styles.fabWrap} onPress={handleCreateBook} activeOpacity={0.92}>
+        <LinearGradient colors={[...C.ctaGrad]} style={styles.fab}>
+          <Plus size={26} color="#FFF" strokeWidth={2.5} />
+        </LinearGradient>
       </TouchableOpacity>
+      </SafeAreaView>
 
       {/* Book Creation Form Modal */}
       <BookListingForm
@@ -734,7 +803,7 @@ const BookStoreScreen = () => {
             onPress={(e) => e.stopPropagation()}
           >
             <LinearGradient
-              colors={['#4F46E5', '#7C3AED']}
+              colors={[...C.filterGrad]}
               style={styles.filterHeader}
             >
               <Text style={styles.filterHeaderTitle}>Filters</Text>
@@ -907,7 +976,7 @@ const BookStoreScreen = () => {
                 }}
               >
                 <LinearGradient
-                  colors={['#10B981', '#059669']}
+                  colors={[...C.ctaGrad]}
                   style={styles.applyFiltersGradient}
                 >
                   <Text style={styles.applyFiltersText}>Apply Filters</Text>
@@ -922,101 +991,124 @@ const BookStoreScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
+  container: { flex: 1 },
+  safe: { flex: 1 },
+  orb1: {
+    position: 'absolute',
+    width: SCREEN_W * 0.7,
+    height: SCREEN_W * 0.7,
+    borderRadius: SCREEN_W,
+    backgroundColor: 'rgba(142, 120, 231, 0.1)',
+    top: -SCREEN_W * 0.2,
+    right: -SCREEN_W * 0.22,
+  },
+  orb2: {
+    position: 'absolute',
+    width: SCREEN_W * 0.5,
+    height: SCREEN_W * 0.5,
+    borderRadius: SCREEN_W,
+    backgroundColor: 'rgba(236, 72, 153, 0.06)',
+    bottom: 100,
+    left: -SCREEN_W * 0.15,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
+    marginTop: 14,
+    fontFamily: FontFamily.medium,
+    fontSize: 15,
+    color: C.primary,
   },
   header: {
-    paddingBottom: 10,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(99, 102, 241, 0.15)',
+    paddingHorizontal: PAD,
+    paddingBottom: 8,
   },
   headerTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    gap: 10,
+    marginBottom: 12,
   },
-  headerLeftBlock: {
-    flex: 1,
+  titleBorder: { flex: 1, borderRadius: 18, padding: 1.5 },
+  titleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 16.5,
+    padding: 12,
   },
-  headerBookIcon: {
-    width: 48,
-    height: 48,
-  },
-  headerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6 } : {}),
-    elevation: 2,
-  },
-  headerTitleContainer: {
-    flex: 1,
-  },
+  headerBookIcon: { width: 44, height: 44 },
+  headerTitleContainer: { flex: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'baseline' },
   headerTitle: {
+    fontFamily: FontFamily.extraBold,
     fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 0,
-    letterSpacing: 0.2,
+    color: C.ink,
+  },
+  headerTitleAccent: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 20,
+    color: C.primary,
   },
   headerSubtitle: {
-    fontSize: 13,
-    color: '#6366F1',
-    fontWeight: '600',
+    fontFamily: FontFamily.medium,
+    fontSize: 11,
+    color: C.muted,
+    marginTop: 2,
   },
-  cartIconButton: {
-    marginLeft: 8,
-  },
-  cartIconContainer: {
-    position: 'relative',
-    justifyContent: 'center',
+  cartBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: C.card,
     alignItems: 'center',
-    padding: 8,
-  },
-  cartTrolleyIcon: {
-    width: 40,
-    height: 40,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: C.border,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 8 }
+      : { elevation: 3 }),
   },
   cartBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: '#FFF',
   },
   cartBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: '#FFF',
   },
+  quickStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  quickStat: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+  quickStatVal: { fontFamily: FontFamily.bold, fontSize: 13, color: C.ink },
+  quickStatLbl: { fontFamily: FontFamily.medium, fontSize: 10, color: C.muted },
+  quickStatDiv: { width: 1, height: 20, backgroundColor: C.border, marginHorizontal: 10 },
   content: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: PAD,
   },
   
   // Banner Carousel Styles
@@ -1082,35 +1174,43 @@ const styles = StyleSheet.create({
   },
   
   searchContainer: {
-    marginTop: 0,
-    marginBottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    marginBottom: 10,
   },
   searchInputContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 40,
+    backgroundColor: C.card,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 46,
+    gap: 8,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.18)',
+    borderColor: C.border,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 }
+      : { elevation: 1 }),
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchBarIcon: {
-    width: 20,
-    height: 20,
-  },
+  searchIcon: { marginRight: 4 },
+  searchBarIcon: { width: 18, height: 18 },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: '#1F2937',
+    fontFamily: FontFamily.medium,
+    fontSize: 14,
+    color: C.ink,
   },
+  filterBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterIconButton: {},
+  filterIconGradient: {},
   locationContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -1185,30 +1285,35 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     flexDirection: 'row',
-    marginTop: 16,
-    marginBottom: 20,
+    marginTop: 14,
+    marginBottom: 18,
     gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: C.border,
   },
-  activeFilterButton: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+  filterButtonActive: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
   },
   filterButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
+    fontFamily: FontFamily.semiBold,
+    fontSize: 13,
+    color: C.muted,
   },
-  activeFilterButtonText: {
-    color: '#FFFFFF',
+  filterButtonTextActive: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 13,
+    color: '#FFF',
   },
+  activeFilterButton: {},
+  activeFilterButtonText: {},
 
   // Creative Advertisement Banner Styles - light & attractive
   adBannerContainer: {
@@ -1369,12 +1474,31 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1F2937',
-    letterSpacing: 0.2,
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  sectionTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: 17,
+    color: C.ink,
+  },
+  booksSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  booksCountPill: {
+    backgroundColor: 'rgba(99, 68, 212, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  booksCountTxt: { fontFamily: FontFamily.bold, fontSize: 12, color: C.primary },
   trendingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1638,16 +1762,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  bookCardBorder: {
+    width: '47%',
+    borderRadius: 17,
+    padding: 1,
+    marginBottom: 6,
+  },
   bookCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: C.card,
     borderRadius: 16,
     overflow: 'hidden',
-    width: '47%',
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.08)',
-    ...(Platform.OS === 'ios' ? { shadowColor: '#6366F1', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 } : {}),
-    elevation: 3,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10 }
+      : { elevation: 2 }),
   },
   bookImageContainer: {
     position: 'relative',
@@ -1679,11 +1806,17 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   bookTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontFamily: FontFamily.bold,
+    fontSize: 13,
+    color: C.ink,
     marginBottom: 2,
-    lineHeight: 19,
+    lineHeight: 18,
+  },
+  bookAuthor: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: C.muted,
+    marginBottom: 6,
   },
   bookMetaRow: {
     flexDirection: 'row',
@@ -1703,9 +1836,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   bookPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6366F1',
+    fontFamily: FontFamily.bold,
+    fontSize: 13,
+    color: C.primary,
   },
   bookDistanceRow: {
     flexDirection: 'row',
@@ -1714,9 +1847,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bookDistanceText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#6366F1',
+    fontFamily: FontFamily.medium,
+    fontSize: 10,
+    color: C.primary,
   },
   listingAddToCartButton: {
     borderRadius: 10,
@@ -1730,8 +1863,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   listingAddToCartText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontFamily: FontFamily.bold,
+    fontSize: 11,
     color: '#FFFFFF',
   },
   bookStats: {
@@ -1744,35 +1877,55 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#6B7280',
-    marginTop: 16,
+    fontFamily: FontFamily.bold,
+    fontSize: 18,
+    color: C.ink,
     marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: 16,
-    color: '#9CA3AF',
+    fontFamily: FontFamily.regular,
+    fontSize: 14,
+    color: C.muted,
     textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  emptyCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 22,
+  },
+  emptyCtaTxt: { fontFamily: FontFamily.bold, fontSize: 14, color: '#FFF' },
+  fabWrap: {
+    position: 'absolute',
+    bottom: 96,
+    right: 20,
+    borderRadius: 28,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12 }
+      : { elevation: 8 }),
   },
   fab: {
-    position: 'absolute',
-    bottom: 100,
-    right: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FF8C00',
-    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
   },
   // Filter Icon and Panel Styles
   filterIconButton: {
@@ -1839,8 +1992,8 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
   },
   filterOptionActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   filterOptionText: {
     fontSize: 14,
@@ -1899,8 +2052,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   locationToggleFilterActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   locationToggleFilterText: {
     fontSize: 14,
@@ -1930,7 +2083,7 @@ const styles = StyleSheet.create({
   radiusValueText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: C.primary,
   },
   sliderTrack: {
     height: 6,
@@ -1941,7 +2094,7 @@ const styles = StyleSheet.create({
   },
   sliderFill: {
     height: '100%',
-    backgroundColor: '#4F46E5',
+    backgroundColor: C.primary,
     borderRadius: 3,
   },
   radiusOptionsScroll: {
@@ -1962,8 +2115,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   radiusChipActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: C.primary,
+    borderColor: C.primary,
   },
   radiusChipText: {
     fontSize: 14,

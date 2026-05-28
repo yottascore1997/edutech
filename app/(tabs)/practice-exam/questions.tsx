@@ -1,5 +1,6 @@
 import { AppColors } from '@/constants/Colors';
 import { apiFetchAuth } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useLiveExam } from '@/context/LiveExamContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -498,6 +499,10 @@ const PracticeExamQuestionsScreen = () => {
 
   return (
     <View style={styles.container}>
+      <LinearGradient colors={['#EDE9FE', '#FDF2F8', '#FAFAFF']} style={StyleSheet.absoluteFill} />
+      <View style={styles.orb1} pointerEvents="none" />
+      <View style={styles.orb2} pointerEvents="none" />
+
       {/* Timer and Side Panel Toggle */}
       <View style={styles.timerRow}>
         <TouchableOpacity 
@@ -550,9 +555,11 @@ const PracticeExamQuestionsScreen = () => {
           
           {/* Submit Test Button - Moved to bottom center */}
           <View style={styles.submitButtonContainer}>
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.submitBtnText}>Submit Test</Text>
+            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} activeOpacity={0.92}>
+              <LinearGradient colors={['#8B5CF6', '#6D28D9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.submitBtnGrad}>
+                <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                <Text style={styles.submitBtnText}>Submit Test</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -727,8 +734,28 @@ const PracticeExamQuestionsScreen = () => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#F6F8FB',
-    paddingTop: 10 
+    backgroundColor: '#FAFAFF',
+    paddingTop: 0,
+  },
+  orb1: {
+    position: 'absolute',
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#DDD6FE',
+    top: -80,
+    right: -60,
+    opacity: 0.45,
+  },
+  orb2: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#FBCFE8',
+    top: 420,
+    left: -70,
+    opacity: 0.35,
   },
   loadingContainer: { 
     flex: 1, 
@@ -798,20 +825,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 
-    paddingHorizontal: 16, 
-    marginBottom: 6 
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 8 : 10,
+    paddingBottom: 10,
+    marginBottom: 6,
   },
   sidePanelToggle: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     borderWidth: 1,
-    borderColor: AppColors.primary
+    borderColor: 'rgba(109, 40, 217, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   timerText: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: AppColors.primary 
+    fontSize: 16,
+    fontFamily: FontFamily.extraBold,
+    color: '#1A1A2E',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.16)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   pauseBtn: { 
     backgroundColor: '#fff', 
@@ -833,7 +872,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', 
     borderRadius: 12, 
     margin: 10, 
-    padding: 16, 
+    padding: 14, 
     shadowColor: '#000', 
     shadowOffset: { width: 0, height: 2 }, 
     shadowOpacity: 0.08, 
@@ -841,15 +880,17 @@ const styles = StyleSheet.create({
     elevation: 2 
   },
   qNumber: { 
-    fontWeight: 'bold', 
-    fontSize: 16, 
-    color: AppColors.primary, 
+    fontFamily: FontFamily.bold,
+    fontSize: 14,
+    color: '#6D28D9',
     marginBottom: 6 
   },
   qText: { 
-    fontSize: 16, 
-    color: AppColors.darkGrey, 
-    marginBottom: 16 
+    fontSize: 15,
+    fontFamily: FontFamily.medium,
+    color: '#0F172A', 
+    marginBottom: 12,
+    lineHeight: 22,
   },
   optionsList: { 
     marginBottom: 12 
@@ -857,15 +898,15 @@ const styles = StyleSheet.create({
   optionBtn: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#F6F8FB', 
-    borderRadius: 8, 
-    padding: 10, 
+    backgroundColor: 'rgba(109, 40, 217, 0.05)',
+    borderRadius: 12, 
+    padding: 12, 
     marginBottom: 8 
   },
   optionBtnSelected: { 
-    backgroundColor: '#E0F7FA', 
-    borderColor: AppColors.primary, 
-    borderWidth: 1 
+    backgroundColor: 'rgba(109, 40, 217, 0.10)',
+    borderColor: '#6D28D9',
+    borderWidth: 1,
   },
   radioOuter: { 
     width: 20, 
@@ -888,8 +929,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff' 
   },
   optionText: { 
-    fontSize: 15, 
-    color: AppColors.darkGrey 
+    fontSize: 14, 
+    fontFamily: FontFamily.medium,
+    color: '#111827',
   },
   qActionsRow: { 
     flexDirection: 'row', 
@@ -969,13 +1011,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10
   },
   submitBtn: { 
-    backgroundColor: '#FF6B6B', 
-    borderRadius: 16, 
-    paddingVertical: 16, 
-    paddingHorizontal: 40, 
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -984,10 +1021,19 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 300
   },
+  submitBtnGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+  },
   submitBtnText: { 
     color: '#fff', 
-    fontWeight: 'bold', 
-    fontSize: 16, 
+    fontFamily: FontFamily.bold,
+    fontSize: 14,
     marginLeft: 8 
   },
   bottomRow: { 

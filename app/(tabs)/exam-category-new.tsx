@@ -132,12 +132,12 @@ const ExamCategoryPage = () => {
 
   const handleStartExam = (exam: PracticeExam) => {
 
-    router.push(`/practice-exam/${exam.id}`);
+    router.push(`/(tabs)/practice-exam/${exam.id}` as any);
   };
 
   const handleReviewExam = (exam: PracticeExam) => {
 
-    router.push(`/practice-exam/${exam.id}/result`);
+    router.push(`/(tabs)/practice-exam/${exam.id}/result` as any);
   };
 
   const formatDate = (dateString: string) => {

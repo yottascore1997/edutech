@@ -20,18 +20,21 @@ function TabLayout() {
         name="home"
         options={{
           title: 'Home',
+          href: '/home',
         }}
       />
       <Tabs.Screen
         name="exam"
         options={{
           title: 'Exam',
+          href: '/exam',
         }}
       />
       <Tabs.Screen
         name="quiz"
         options={{
           title: 'Quiz',
+          href: '/quiz',
         }}
       />
       <Tabs.Screen
@@ -52,12 +55,14 @@ function TabLayout() {
         name="timetable"
         options={{
           title: 'Timetable',
+          href: '/timetable',
         }}
       />
       <Tabs.Screen
         name="wallet"
         options={{
           title: 'Wallet',
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -65,6 +70,13 @@ function TabLayout() {
         options={{
           title: 'My Exams',
           href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="pyq"
+        options={{
+          title: 'PYQ',
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -148,6 +160,7 @@ function TabLayout() {
         name="book-store"
         options={{
           title: 'Books',
+          href: '/book-store',
         }}
       />
       <Tabs.Screen

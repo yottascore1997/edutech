@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { AppColors } from '@/constants/Colors';
+import { FontFamily } from '@/constants/Typography';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - 56) / 2;
@@ -42,7 +43,7 @@ export default function HomeFeatureGrid() {
                   router.push('/(tabs)/book-store' as any);
                   break;
                 case 'pyp':
-                  router.push('/pyq' as any);
+                  router.push('/(tabs)/pyq' as any);
                   break;
                 case 'practice':
                   router.push('/(tabs)/practice-categories' as any);
@@ -110,8 +111,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFamily.bold,
+    fontSize: 16,
     color: '#0f172a',
     marginBottom: 12,
   },

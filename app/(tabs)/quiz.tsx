@@ -1,5 +1,6 @@
-import QuestionOfTheDayPreview from '@/components/QuestionOfTheDayPreview';
+﻿import QuizScreenUI from '@/components/quiz/QuizScreenUI';
 import { apiFetchAuth } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -133,7 +134,9 @@ export default function QuizScreen() {
         const categories: QuestionCategory[] = response.data;
 
         setQuestionCategories(categories);
-        // Remove automatic selection - no category should be preselected
+        if (categories.length > 0) {
+          setSelectedCategory((prev) => prev || categories[0].id);
+        }
       } else {
         console.error('Failed to fetch battle quiz categories - response not ok');
       }
@@ -676,7 +679,7 @@ export default function QuizScreen() {
           >
             <Zap size={52} color="#C4B5FD" />
           </Animated.View>
-          <Text style={styles.loadingText}>Loading Battle Arena...</Text>
+          <Text style={styles.loadingText}>Loading Quiz...</Text>
         </View>
       </LinearGradient>
     );
@@ -685,259 +688,18 @@ export default function QuizScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh}
-            tintColor="#5B21B6"
-            colors={['#5B21B6', '#7C3AED']}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        bounces={true}
-        overScrollMode="always"
-        keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        decelerationRate="fast"
-      >
-        <Animated.View 
-          style={[
-            styles.content,
-            { 
-              opacity: fadeAnim, 
-              transform: [
-                { translateY: slideAnim },
-                { scale: cardScaleAnim }
-              ]
-            }
-          ]}
-        >
-          {/* Daily Task style card - reference design */}
-          <View style={styles.dailyTaskCard}>
-            <LinearGradient
-              colors={['#F9A8D4', '#FBCFE8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.dailyTaskGradient}
-            >
-              <View style={styles.dailyTaskLeft}>
-                <View style={styles.dailyTaskIconWrap}>
-                  <Trophy size={36} color="#1A1A32" />
-                </View>
-              </View>
-              <View style={styles.dailyTaskCenter}>
-                <Text style={styles.dailyTaskTitle}>Battle Quiz</Text>
-                <View style={styles.progressRow}>
-                  <Text style={styles.progressLabel}>Progress</Text>
-                  <Text style={styles.progressCount}>
-                    {selectedCategory ? '1' : '0'}/{questionCategories.length || 5}
-                  </Text>
-                </View>
-                <View style={styles.progressBarBg}>
-                  <View style={[styles.progressBarFill, { width: `${Math.min(100, ((selectedCategory ? 1 : 0) / Math.max(1, questionCategories.length)) * 100)}%` }]} />
-                </View>
-              </View>
-              <TouchableOpacity style={styles.dailyTaskMenu} onPress={() => {}}>
-                <MoreVertical size={20} color="#1A1A32" />
-              </TouchableOpacity>
-            </LinearGradient>
-          </View>
 
-          {/* Quiz section - horizontal category circles */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.refSectionTitle}>Quiz</Text>
-              <TouchableOpacity onPress={() => {}}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quizScrollContent}
-            >
-              {questionCategories.slice(0, 5).map((category, index) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[styles.quizCircleWrap, selectedCategory === category.id && styles.quizCircleWrapActive]}
-                  onPress={() => handleCategoryPress(category)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.quizCircle}>
-                    {renderCategoryIcon(category.name, 28, '#7C3AED', index)}
-                  </View>
-                  <Text style={styles.quizCircleLabel} numberOfLines={1}>{category.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+      <QuizScreenUI
+        categories={questionCategories}
+        selectedCategoryId={selectedCategory}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onCategoryPress={handleCategoryPress}
+        onHeroStart={handleQuickMatch}
+        onQuickQuiz={handleQuickMatch}
+        onDailyQuiz={() => router.push('/(tabs)/live-quiz-categories' as any)}
+      />
 
-          {/* More Games - two white cards */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.refSectionTitle}>More Games</Text>
-              <TouchableOpacity onPress={() => {}}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.moreGamesRow}>
-              <TouchableOpacity
-                style={styles.moreGameCard}
-                onPress={handleQuickMatch}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#FF9F00', '#FFC107']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.moreGameCardInner}
-                >
-                  <View style={styles.moreGameIconWrap}>
-                    <Trophy size={32} color="#1F2937" />
-                  </View>
-                  <Text style={styles.moreGameTitle}>Battle Quiz</Text>
-                  <View style={styles.moreGameStats}>
-                    <View style={styles.moreGameStat}>
-                      <Crown size={16} color="#F59E0B" />
-                      <Text style={styles.moreGameStatText}>1.2K</Text>
-                    </View>
-                    <View style={styles.moreGameStat}>
-                      <Zap size={16} color="#F59E0B" />
-                      <View style={styles.energyBarBg}>
-                        <View style={styles.energyBarFill} />
-                      </View>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.moreGameCard}
-                onPress={() => router.push('/(tabs)/live-quiz-categories' as any)}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={['#29B6F6', '#4FC3F7']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.moreGameCardInner}
-                >
-                  <View style={styles.moreGameIconWrap}>
-                    <Map size={32} color="#0B1120" />
-                  </View>
-                  <Text style={styles.moreGameTitle}>Live Quiz</Text>
-                  <View style={styles.moreGameStats}>
-                    <View style={styles.moreGameStat}>
-                      <Crown size={16} color="#F59E0B" />
-                      <Text style={styles.moreGameStatText}>12.5K</Text>
-                    </View>
-                    <View style={styles.moreGameStat}>
-                      <Zap size={16} color="#F59E0B" />
-                      <View style={styles.energyBarBg}>
-                        <View style={styles.energyBarFill} />
-                      </View>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Question of the Day - below More Games */}
-          <QuestionOfTheDayPreview />
-
-          {/* Start Battle CTA - keep for quick access */}
-          <TouchableOpacity
-            style={styles.startBattleCta}
-            onPress={handleQuickMatch}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={['#7C3AED', '#5B21B6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.startBattleCtaGradient}
-            >
-              <Zap size={22} color="#fff" />
-              <Text style={styles.startBattleCtaText}>Start Battle</Text>
-              <ArrowRight size={20} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-
-            {/* TEMPORARILY COMMENTED OUT - Private Room and Join Section 
-            <View style={styles.section}>
-              <LinearGradient
-                colors={['rgba(102, 126, 234, 0.08)', 'rgba(118, 75, 162, 0.08)']}
-                style={styles.privateRoomContainer}
-              >
-                <View style={styles.privateRoomHeader}>
-                  <View style={styles.privateRoomInfo}>
-                    <View style={styles.privateRoomIconContainer}>
-                      <LinearGradient
-                        colors={['#667eea', '#764ba2']}
-                        style={styles.privateRoomIconGradient}
-                      >
-                        <Users size={28} color="#fff" />
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.privateRoomText}>
-                      <Text style={styles.privateRoomTitle}>Private Room</Text>
-                      <Text style={styles.privateRoomSubtitle}>Play with friends & family</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.createRoomButton}
-                    onPress={handleCreateRoom}
-                    activeOpacity={0.8}
-                  >
-                    <LinearGradient
-                      colors={['#667eea', '#764ba2']}
-                      style={styles.createRoomButtonGradient}
-                    >
-                      <Plus size={24} color="#fff" />
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.joinRoomSection}>
-                  <View style={styles.joinRoomHeader}>
-                    <View style={styles.joinRoomIconContainer}>
-                      <Key size={20} color="#667eea" />
-                    </View>
-                    <Text style={styles.joinRoomLabel}>Join existing room</Text>
-                  </View>
-                  <View style={styles.joinRoomInputContainer}>
-                    <TextInput
-                      style={styles.roomCodeInput}
-                      placeholder="Enter room code"
-                      placeholderTextColor="#9ca3af"
-                      value={roomCode}
-                      onChangeText={setRoomCode}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity
-                      style={styles.joinButton}
-                      onPress={handleJoinRoom}
-                      activeOpacity={0.8}
-                    >
-                      <LinearGradient
-                        colors={['#667eea', '#764ba2']}
-                        style={styles.joinButtonGradient}
-                      >
-                        <Text style={styles.joinButtonText}>Join</Text>
-                        <ArrowRight size={16} color="#fff" />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </LinearGradient>
-            </View>
-            */}
-        </Animated.View>
-      </ScrollView>
 
       {/* Enhanced Amount Selection Modal */}
       <Modal
@@ -988,7 +750,9 @@ export default function QuizScreen() {
                           style={[styles.compactTile, selectedAmount?.id === amount.id && styles.compactTileActive]}
                           onPress={() => handleAmountSelect(amount)}
                         >
-                          <Text style={[styles.compactAmount, selectedAmount?.id === amount.id && styles.compactAmountActive]}>₹{amount.amount}</Text>
+                          <Text style={[styles.compactAmount, selectedAmount?.id === amount.id && styles.compactAmountActive]}>
+                            ₹{amount.amount}
+                          </Text>
                           <Text style={styles.compactTier}>{amount.amount <= 25 ? 'Casual' : amount.amount <= 50 ? 'Pro' : 'Elite'}</Text>
                         </TouchableOpacity>
                       ))}
@@ -997,7 +761,7 @@ export default function QuizScreen() {
 
                   <View style={styles.compactFooter}>
                     <View>
-                      <Text style={styles.compactLabel}>You’ll join with</Text>
+                      <Text style={styles.compactLabel}>You'll join with</Text>
                       <Text style={styles.compactJoinAmount}>₹{selectedAmount ? selectedAmount.amount : '—'}</Text>
                     </View>
                     <TouchableOpacity style={[styles.compactCTA, !selectedAmount && styles.compactCTADisabled]} onPress={handlePlayNow} disabled={!selectedAmount}>
@@ -1021,7 +785,7 @@ export default function QuizScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EDE9FE',
+    backgroundColor: '#F5F3FF',
     paddingBottom: 0,
   },
   scrollView: {
@@ -2908,11 +2672,11 @@ const styles = StyleSheet.create({
    },
   /* Compact popup styles */
   compactCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
   compactHeader: {
     flexDirection: 'row',
@@ -2923,7 +2687,7 @@ const styles = StyleSheet.create({
   compactTitle: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: FontFamily.extraBold,
     letterSpacing: 0.4,
   },
   compactClose: { padding: 8 },
@@ -2932,7 +2696,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 14,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FontFamily.semiBold,
   },
   compactGrid: {
     flexDirection: 'row',
@@ -2957,7 +2721,7 @@ const styles = StyleSheet.create({
   },
   compactAmount: {
     color: 'rgba(255, 255, 255, 0.95)',
-    fontWeight: '800',
+    fontFamily: FontFamily.extraBold,
     fontSize: 16,
   },
   compactAmountActive: { color: '#FBBF24' },
@@ -2965,7 +2729,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 11,
     marginTop: 6,
-    fontWeight: '600',
+    fontFamily: FontFamily.semiBold,
   },
   compactFooter: {
     flexDirection: 'row',
@@ -2979,12 +2743,12 @@ const styles = StyleSheet.create({
   compactLabel: {
     color: 'rgba(255, 255, 255, 0.75)',
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FontFamily.semiBold,
   },
   compactJoinAmount: {
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: FontFamily.extraBold,
     marginTop: 4,
     letterSpacing: 0.3,
   },
@@ -2998,7 +2762,7 @@ const styles = StyleSheet.create({
   },
   compactCTAText: {
     color: '#1E293B',
-    fontWeight: '800',
+    fontFamily: FontFamily.extraBold,
     fontSize: 15,
     letterSpacing: 0.5,
   },
@@ -3012,7 +2776,7 @@ const styles = StyleSheet.create({
   compactLoadingText: {
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FontFamily.semiBold,
   },
    closeButtonGradient: {
      width: 28,
@@ -3062,10 +2826,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   loadingText: {
+    fontFamily: FontFamily.semiBold,
     fontSize: 16,
     color: 'rgba(255,255,255,0.9)',
     marginTop: 12,
-    fontWeight: '600',
     letterSpacing: 0.5,
   },
        enhancedPlayNowButton: {

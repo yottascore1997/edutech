@@ -2,15 +2,32 @@
  * Utility functions for filtering exams
  */
 
+export function hasUserJoinedExam(
+  exam: any,
+  userId?: string,
+  joinedExamIds?: string[]
+): boolean {
+  const examIds = [exam?.id, exam?.examId, exam?._id].filter(Boolean).map(String);
+  if (joinedExamIds?.length) {
+    if (joinedExamIds.some((jid) => examIds.includes(String(jid)))) {
+      return true;
+    }
+  }
+  if (userId && exam?.participants) {
+    return exam.participants.some(
+      (p: any) =>
+        String(p.userId) === String(userId) || String(p.user?.id) === String(userId)
+    );
+  }
+  return false;
+}
+
 /**
  * Filters live exams based on API requirements:
  * - isLive: true
  * - endTime: null OR endTime > now (upcoming + ongoing)
- * - spotsLeft > 0
- * - User hasn't joined (optional - can be checked separately)
- * @param exams - Array of exam objects
- * @param userId - Optional user ID to check if user has joined
- * @returns Array of active live exams
+ * - spotsLeft > 0 (except for joined users)
+ * - Hide started exams for users who haven't joined
  */
 export function filterActiveExams(
   exams: any[],
@@ -18,84 +35,82 @@ export function filterActiveExams(
   joinedExamIds?: string[]
 ): any[] {
   const now = new Date().getTime();
-  
-  return exams.filter(exam => {
-    // 1. Check isLive: true
+
+  return exams.filter((exam) => {
+    const joined = hasUserJoinedExam(exam, userId, joinedExamIds);
+
+    // Joined users keep seeing their exam until it ends (not when it merely starts)
+    if (joined) {
+      if (exam.endTime) {
+        const endTime = new Date(exam.endTime).getTime();
+        if (endTime <= now) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     if (exam.isLive !== true && exam.isLive !== undefined) {
       return false;
     }
-    
-    // 2. Check endTime: null OR endTime > now
+
     if (exam.endTime) {
       const endTime = new Date(exam.endTime).getTime();
       if (endTime <= now) {
-        return false; // Exam has ended
+        return false;
       }
     }
-    // If endTime is null, that's fine (ongoing exam)
 
-    // 2b. Hide started exams for users who haven't joined
     if (exam.startTime) {
       const startTime = new Date(exam.startTime).getTime();
       if (startTime <= now) {
-        if (joinedExamIds && joinedExamIds.includes(exam.id)) {
-          return true; // Joined exam should remain visible
-        }
         if (userId && exam.participants) {
-          const hasJoined = exam.participants.some((p: any) => 
-            p.userId === userId || p.user?.id === userId || p.userId === userId
+          const hasJoined = exam.participants.some(
+            (p: any) =>
+              String(p.userId) === String(userId) || String(p.user?.id) === String(userId)
           );
           if (!hasJoined) {
-            return false; // Exam started and user did not join
+            return false;
           }
         } else {
-          return false; // No user info; hide started exam
+          return false;
         }
       }
     }
-    
-    // 3. Check spotsLeft > 0
+
     if (exam.spotsLeft !== undefined && exam.spotsLeft !== null) {
       if (exam.spotsLeft <= 0) {
-        return false; // No spots left
+        return false;
       }
     }
-    
-    // 4. Do not hide joined exams; joined users should always see their exam
-    
+
     return true;
   });
 }
 
 /**
  * Filters exams by category
- * @param exams - Array of exam objects
- * @param category - Category to filter by ('all' for all categories)
- * @returns Filtered array of exams
  */
 export function filterExamsByCategory(exams: any[], category: string): any[] {
   if (category === 'all') {
     return exams;
-  } else if (category === 'uncategorized') {
-    return exams.filter(exam => !exam.category || exam.category === null);
-  } else {
-    return exams.filter(exam => exam.category === category);
   }
+  if (category === 'uncategorized') {
+    return exams.filter((exam) => !exam.category || exam.category === null);
+  }
+  return exams.filter((exam) => exam.category === category);
 }
 
 /**
  * Filters exams by search query
- * @param exams - Array of exam objects
- * @param searchQuery - Search term
- * @returns Filtered array of exams
  */
 export function filterExamsBySearch(exams: any[], searchQuery: string): any[] {
   if (!searchQuery.trim()) {
     return exams;
   }
-  
+
   const query = searchQuery.toLowerCase();
-  return exams.filter(exam => {
+  return exams.filter((exam) => {
     const examName = exam.name || exam.examName || exam.title || '';
     return examName.toLowerCase().includes(query);
   });
@@ -103,12 +118,9 @@ export function filterExamsBySearch(exams: any[], searchQuery: string): any[] {
 
 /**
  * Applies all filters to exams (active, category, search)
- * @param exams - Array of exam objects
- * @param filters - Filter options
- * @returns Filtered array of exams
  */
 export function applyExamFilters(
-  exams: any[], 
+  exams: any[],
   filters: {
     category?: string;
     searchQuery?: string;
@@ -118,21 +130,18 @@ export function applyExamFilters(
   }
 ): any[] {
   let filtered = exams;
-  
-  // Filter out expired exams unless explicitly included
+
   if (!filters.includeExpired) {
     filtered = filterActiveExams(filtered, filters.userId, filters.joinedExamIds);
   }
-  
-  // Apply category filter
+
   if (filters.category) {
     filtered = filterExamsByCategory(filtered, filters.category);
   }
-  
-  // Apply search filter
+
   if (filters.searchQuery) {
     filtered = filterExamsBySearch(filtered, filters.searchQuery);
   }
-  
+
   return filtered;
 }

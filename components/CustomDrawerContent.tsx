@@ -19,8 +19,8 @@ const CustomDrawerContent = (props: any) => {
 
     const navigateToTimetable = () => {
         setActiveMenu('timetable');
-        navigation.navigate('(tabs)', { screen: 'timetable' });
         navigation.closeDrawer();
+        router.push('/(tabs)/timetable' as const);
     };
 
     const navigateToRefer = () => {
@@ -37,19 +37,19 @@ const CustomDrawerContent = (props: any) => {
 
     const navigateToMyExams = () => {
         setActiveMenu('my-exams');
-        navigation.navigate('(tabs)', { screen: 'my-exams' });
         navigation.closeDrawer();
+        router.push('/(tabs)/my-exams' as const);
     };
 
     const navigateToPYQ = () => {
         setActiveMenu('pyq');
         // Use router.push to navigate to filesystem route, then close drawer
         try {
-            router.push('/pyq');
+            router.push('/(tabs)/pyq' as const);
         } catch (e) {
             // fallback to navigation.navigate if router fails
             try {
-                navigation.navigate('pyq');
+                navigation.navigate('(tabs)', { screen: 'pyq' });
             } catch {}
         }
         navigation.closeDrawer();
@@ -57,14 +57,15 @@ const CustomDrawerContent = (props: any) => {
     
     const navigateToCurrentAffairs = () => {
         setActiveMenu('current-affairs');
-        try {
-            router.push('/(tabs)/current-affairs');
-        } catch (e) {
-            try {
-                navigation.navigate('(tabs)', { screen: 'current-affairs' });
-            } catch {}
-        }
         navigation.closeDrawer();
+        try {
+            router.replace('/(tabs)/current-affairs' as const);
+        } catch {
+            navigation.navigate('(tabs)', {
+                screen: 'current-affairs',
+                params: { screen: 'index' },
+            });
+        }
     };
 
     const navigateToMyCertificates = () => {
@@ -171,6 +172,12 @@ const CustomDrawerContent = (props: any) => {
         setActiveMenu('follow-requests');
         navigation.navigate('(tabs)', { screen: 'follow-requests' });
         navigation.closeDrawer();
+    };
+
+    const navigateToDeactivateAccount = () => {
+        setActiveMenu('deactivate-account');
+        navigation.closeDrawer();
+        router.push('/deactivate-account' as const);
     };
 
 
@@ -332,7 +339,16 @@ const CustomDrawerContent = (props: any) => {
                                 isActive={activeMenu === 'leaderboard'}
                                 isDarkMode={isDarkMode}
                                 iconColor="#FF6348"
-                                iconImage={require('../assets/images/trophy.jpg')}
+                                iconImage={require('../assets/images/trophy.png')}
+                            />
+
+                            <MenuItem 
+                                icon="person-remove-outline" 
+                                label="Deactivate Account" 
+                                onPress={navigateToDeactivateAccount}
+                                isActive={activeMenu === 'deactivate-account'}
+                                isDarkMode={isDarkMode}
+                                iconColor="#EA580C"
                             />
                             
                             <MenuItem 

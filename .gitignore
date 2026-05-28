@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-tmp-check/
 dist/
 web-build/
 expo-env.d.ts
@@ -49,6 +50,7 @@ node_modules/
 
 # Expo
 .expo/
+.expo-tmp-check/
 dist/
 web-build/
 expo-env.d.ts

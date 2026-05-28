@@ -1,8 +1,11 @@
 import { apiFetchAuth } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
+import { HomeTheme } from '@/constants/HomeTheme';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { formatTimeUntilStart, formatDateTime, hasExamStarted } from '@/utils/timeUtils';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -458,21 +461,27 @@ const ExamDetailScreen = () => {
     }, [exam, examHasStarted, id, user?.token]);
 
     if (loading) {
-        return <ActivityIndicator size="large" color={AppColors.primary} style={styles.centered} />;
+        return (
+            <LinearGradient colors={[...HomeTheme.creamGrad]} style={styles.centered}>
+                <ActivityIndicator size="large" color={HomeTheme.primary} />
+                <Text style={styles.loadingText}>Loading exam details…</Text>
+            </LinearGradient>
+        );
     }
 
     if (error || !exam) {
         return (
-            <View style={styles.centered}>
+            <LinearGradient colors={[...HomeTheme.creamGrad]} style={styles.centered}>
+                <Ionicons name="alert-circle-outline" size={48} color={HomeTheme.primary} />
                 <Text style={styles.errorText}>{error || 'Exam not found.'}</Text>
-            </View>
+            </LinearGradient>
         );
     }
     
     const progress = exam.spots > 0 ? ((exam.spots - exam.spotsLeft) / exam.spots) * 100 : 0;
     
     return (
-        <View style={styles.container}>
+        <LinearGradient colors={[...HomeTheme.creamGrad]} style={styles.container}>
             <FlatList
                 data={[{ key: 'content' }]}
                 renderItem={() => (
@@ -852,7 +861,7 @@ const ExamDetailScreen = () => {
                                                 </View>
                                                 <TouchableOpacity style={styles.resultActionButton} onPress={openFullResult} activeOpacity={0.85}>
                                                     <Ionicons name="analytics" size={18} color="#FFF" />
-                                                    <Text style={styles.resultActionText}>View Full Result</Text>
+                                                    <Text style={styles.resultActionText}>View full result</Text>
                                                 </TouchableOpacity>
                                             </>
                                         ) : (
@@ -874,7 +883,7 @@ const ExamDetailScreen = () => {
                 )}
                 showsVerticalScrollIndicator={false}
             />
-        </View>
+        </LinearGradient>
     );
 };
 
@@ -919,28 +928,45 @@ const WinningRow = ({ rank, prize }: { rank: number, prize: number }) => (
 const InfoRow = ({ label, value, isCost = false }: any) => (
     <View style={styles.infoRow}>
         <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={[styles.infoValue, isCost && styles.infoValueCost]}>{value}</Text>
+        <Text style={[styles.infoValue, isCost && styles.infoValueCost]} numberOfLines={2}>
+            {value}
+        </Text>
     </View>
 );
 
 const styles = StyleSheet.create({
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    errorText: { color: 'red', fontSize: 16 },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+    loadingText: {
+        fontFamily: FontFamily.medium,
+        fontSize: 14,
+        color: HomeTheme.inkMuted,
+        marginTop: 12,
+    },
+    errorText: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 15,
+        color: '#DC2626',
+        marginTop: 12,
+        textAlign: 'center',
+    },
     container: {
         flex: 1,
-        backgroundColor: AppColors.lightGrey,
     },
     examCardWrapper: {
-        marginHorizontal: 16,
-        marginTop: 12,
-        marginBottom: 8,
-        borderRadius: 20,
+        marginHorizontal: 14,
+        marginTop: 10,
+        marginBottom: 10,
+        borderRadius: 18,
         overflow: 'hidden',
-        shadowColor: '#6366F1',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
-        elevation: 10,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#6344D4',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.12,
+                shadowRadius: 14,
+            },
+            android: { elevation: 6 },
+        }),
     },
     header: {
         flexDirection: 'row',
@@ -1066,101 +1092,99 @@ const styles = StyleSheet.create({
     },
     tabContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        backgroundColor: AppColors.white,
-        marginHorizontal: 16,
-        marginTop: 4,
-        marginBottom: 4,
-        borderRadius: 10,
-        padding: 3,
-        shadowColor: '#6366F1',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 6,
-        elevation: 4,
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 14,
+        marginBottom: 8,
+        borderRadius: 14,
+        padding: 4,
         borderWidth: 1,
-        borderColor: 'rgba(99, 102, 241, 0.1)',
+        borderColor: HomeTheme.border,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#6344D4',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 8,
+            },
+            android: { elevation: 3 },
+        }),
     },
     tab: {
-        paddingVertical: 5,
-        paddingHorizontal: 6,
-        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+        borderRadius: 10,
         flex: 1,
         alignItems: 'center',
         marginHorizontal: 2,
     },
     activeTab: {
-        backgroundColor: AppColors.primary,
-        shadowColor: AppColors.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.35,
-        shadowRadius: 6,
-        elevation: 4,
+        backgroundColor: HomeTheme.primary,
     },
     tabText: {
-        color: AppColors.grey,
-        fontWeight: '600',
+        fontFamily: FontFamily.semiBold,
+        color: HomeTheme.inkMuted,
         fontSize: 11,
         letterSpacing: 0.2,
     },
     activeTabText: {
-        color: AppColors.white,
-        fontWeight: '700',
+        color: '#FFFFFF',
+        fontFamily: FontFamily.bold,
         fontSize: 11,
-        letterSpacing: 0.2,
     },
     tabContent: {
-        backgroundColor: AppColors.white,
-        marginHorizontal: 15,
-        borderRadius: 16,
-        padding: 18,
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 14,
+        borderRadius: 18,
+        padding: 16,
         marginBottom: 100,
-        shadowColor: '#6366F1',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 16,
-        elevation: 8,
         borderWidth: 1,
-        borderColor: 'rgba(99, 102, 241, 0.1)',
+        borderColor: HomeTheme.border,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#6344D4',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.08,
+                shadowRadius: 12,
+            },
+            android: { elevation: 4 },
+        }),
     },
     infoTable: {
-        backgroundColor: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
-        borderRadius: 12,
-        padding: 12,
+        backgroundColor: HomeTheme.cream,
+        borderRadius: 14,
+        padding: 4,
         borderWidth: 1,
-        borderColor: 'rgba(99, 102, 241, 0.1)',
+        borderColor: HomeTheme.border,
+        overflow: 'hidden',
     },
     infoRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 10,
+        paddingVertical: 11,
+        paddingHorizontal: 12,
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(99, 102, 241, 0.08)',
-        backgroundColor: 'rgba(255, 255, 255, 0.6)',
-        borderRadius: 8,
-        marginBottom: 6,
+        borderBottomColor: HomeTheme.borderLight,
+        backgroundColor: '#FFFFFF',
     },
     infoLabel: {
-        color: '#374151',
-        fontSize: 14,
-        fontWeight: '600',
-        letterSpacing: 0.2,
+        fontFamily: FontFamily.medium,
+        color: HomeTheme.inkMuted,
+        fontSize: 13,
+        flex: 1,
     },
     infoValue: {
-        fontWeight: '700',
-        color: '#1F2937',
-        fontSize: 14,
+        fontFamily: FontFamily.semiBold,
+        color: HomeTheme.ink,
+        fontSize: 13,
         textAlign: 'right',
-        letterSpacing: 0.2,
+        flex: 1,
+        marginLeft: 8,
     },
     infoValueCost: {
-        color: '#059669',
-        fontWeight: '800',
+        color: '#16A34A',
+        fontFamily: FontFamily.bold,
         fontSize: 15,
-        textAlign: 'right',
-        letterSpacing: 0.3,
     },
     winningsHeader: {
         flexDirection: 'row',
@@ -1315,11 +1339,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         paddingVertical: 14,
         paddingHorizontal: 14,
-        marginHorizontal: 12,
-        marginBottom: 12,
+        marginHorizontal: 0,
+        marginTop: 10,
+        marginBottom: 0,
         borderRadius: 12,
         borderLeftWidth: 4,
         borderLeftColor: '#10B981',
+        borderWidth: 1,
+        borderColor: HomeTheme.border,
         ...(Platform.OS === 'android' ? {} : {
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 1 },

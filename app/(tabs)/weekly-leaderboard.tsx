@@ -1,23 +1,51 @@
 import { apiFetchAuth, getImageUrl } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { DrawerActions } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Calendar,
+  ChevronRight,
+  Menu,
+  Sparkles,
+  Trophy,
+  Users,
+} from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_W } = Dimensions.get('window');
+const PAD = 16;
+const WINNER_CARD_W = Math.min(148, SCREEN_W * 0.4);
+
+const C = {
+  bg: ['#EDE9FE', '#F5F3FF', '#FAFAFF'] as const,
+  primary: '#6344D4',
+  primaryLight: '#8E78E7',
+  ink: '#0F0A1E',
+  muted: '#64748B',
+  card: '#FFFFFF',
+  border: '#E8E8F0',
+  heroGrad: ['#7C3AED', '#6366F1', '#4B32AF'] as const,
+  gold: '#F59E0B',
+  silver: '#94A3B8',
+  bronze: '#D97706',
+};
 
 interface Winner {
   userId: string;
@@ -47,1454 +75,566 @@ interface WeeklyLeaderboardData {
   leaderboard: ExamLeaderboard[];
 }
 
-// Enhanced Avatar Component with proper image loading
-const WinnerAvatar = ({ userPhoto, userName }: { userPhoto: string | null; userName: string }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+function getCurrentWeek(): string {
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7;
+  const thursday = new Date(now);
+  thursday.setDate(now.getDate() + 4 - dayOfWeek);
+  const year = thursday.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const days = Math.floor((thursday.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
+  const weekNumber = Math.ceil((days + 1) / 7);
+  return `${year}-${weekNumber.toString().padStart(2, '0')}`;
+}
 
-  const getInitials = (name: string) => {
-    if (!name) return 'U';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
+function formatDate(dateString: string) {
+  const d = new Date(dateString);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
-  // Check if userPhoto is valid
-  const isValidPhoto = userPhoto && userPhoto.trim() !== '' && userPhoto !== 'null';
+function formatPrize(amount: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
 
-  // Get image URL
-  const getImageUri = () => {
-    if (!isValidPhoto) return null;
-    // If already a full URL, return as is
-    if (userPhoto.startsWith('http://') || userPhoto.startsWith('https://')) {
-      return userPhoto;
-    }
-    // Otherwise use getImageUrl
-    return getImageUrl(userPhoto);
-  };
+function getInitials(name: string) {
+  if (!name) return 'U';
+  const parts = name.trim().split(' ');
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
 
-  const imageUri = getImageUri();
-
-  if (!imageUri || imageError) {
+function WinnerAvatar({ userPhoto, userName, size = 52 }: { userPhoto: string | null; userName: string; size?: number }) {
+  const [err, setErr] = useState(false);
+  let uri: string | null = null;
+  if (userPhoto && userPhoto.trim() && userPhoto !== 'null') {
+    uri = userPhoto.startsWith('http') ? userPhoto : getImageUrl(userPhoto);
+  }
+  const r = size / 2;
+  if (!uri || err) {
     return (
-      <View style={styles.avatarPlaceholder}>
-        <LinearGradient
-          colors={['#6366F1', '#8B5CF6', '#A855F7']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarGradient}
-        >
-          <Text style={styles.avatarInitials}>{getInitials(userName)}</Text>
-        </LinearGradient>
-      </View>
+      <LinearGradient colors={['#8E78E7', C.primary]} style={{ width: size, height: size, borderRadius: r, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontFamily: FontFamily.bold, fontSize: size * 0.28, color: '#FFF' }}>{getInitials(userName)}</Text>
+      </LinearGradient>
     );
   }
-
   return (
-    <View style={styles.avatarContainer}>
-      {imageLoading && (
-        <View style={styles.avatarLoadingContainer}>
-          <ActivityIndicator size="small" color="#6366F1" />
+    <Image
+      source={{ uri }}
+      style={{ width: size, height: size, borderRadius: r, backgroundColor: '#F1F5F9' }}
+      onError={() => setErr(true)}
+    />
+  );
+}
+
+const PODIUM_META: Record<number, { h: number; colors: readonly [string, string]; medal: string }> = {
+  1: { h: 118, colors: ['#FEF3C7', '#FDE68A'], medal: C.gold },
+  2: { h: 96, colors: ['#F1F5F9', '#E2E8F0'], medal: C.silver },
+  3: { h: 82, colors: ['#FFEDD5', '#FED7AA'], medal: C.bronze },
+};
+
+function PodiumBlock({ winner, place }: { winner: Winner; place: 1 | 2 | 3 }) {
+  const meta = PODIUM_META[place];
+  return (
+    <View style={[st.podiumCol, { marginTop: place === 1 ? 0 : 18 }]}>
+      <View style={[st.podiumAvatarRing, { borderColor: meta.medal }]}>
+        <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} size={place === 1 ? 56 : 48} />
+      </View>
+      <Text style={st.podiumName} numberOfLines={1}>{winner.userName}</Text>
+      <Text style={st.podiumScore}>{winner.score} pts</Text>
+      <LinearGradient colors={[...meta.colors]} style={[st.podiumBar, { height: meta.h }]}>
+        <View style={[st.podiumMedal, { backgroundColor: meta.medal }]}>
+          <Text style={st.podiumRank}>{place}</Text>
         </View>
-      )}
-      <Image
-        source={{ uri: imageUri }}
-        style={styles.winnerImage}
-        onLoadStart={() => setImageLoading(true)}
-        onLoadEnd={() => {
-          setImageLoading(false);
-          setImageError(false);
-        }}
-        onError={(error) => {
-          console.log('Image load error:', error.nativeEvent.error);
-          setImageError(true);
-          setImageLoading(false);
-        }}
-        resizeMode="cover"
-        defaultSource={require('../../assets/images/avatar1.jpg')}
-      />
+      </LinearGradient>
     </View>
   );
-};
+}
 
-// Helper function to get current week in format YYYY-WW (ISO week)
-const getCurrentWeek = (): string => {
-  const now = new Date();
-  
-  // ISO week calculation
-  const dayOfWeek = now.getDay() || 7; // Make Sunday 7 instead of 0
-  now.setDate(now.getDate() + 4 - dayOfWeek); // Get Thursday of current week
-  
-  const year = now.getFullYear();
-  const jan1 = new Date(year, 0, 1);
-  const days = Math.floor((now.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
-  const weekNumber = Math.ceil((days + 1) / 7);
-  
-  // Format as YYYY-WW (e.g., 2025-49)
-  return `${year}-${weekNumber.toString().padStart(2, '0')}`;
-};
+function PodiumSection({ winners }: { winners: Winner[] }) {
+  const sorted = [...winners].sort((a, b) => a.rank - b.rank);
+  const first = sorted.find((w) => w.rank === 1) ?? sorted[0];
+  const second = sorted.find((w) => w.rank === 2) ?? sorted[1];
+  const third = sorted.find((w) => w.rank === 3) ?? sorted[2];
+  if (!first) return null;
+  return (
+    <View style={st.podiumRow}>
+      {second ? <PodiumBlock winner={second} place={2} /> : <View style={st.podiumSpacer} />}
+      <PodiumBlock winner={first} place={1} />
+      {third ? <PodiumBlock winner={third} place={3} /> : <View style={st.podiumSpacer} />}
+    </View>
+  );
+}
+
+function WinnerCard({ winner }: { winner: Winner }) {
+  const rankStyle =
+    winner.rank === 1 ? st.rankGold : winner.rank === 2 ? st.rankSilver : winner.rank === 3 ? st.rankBronze : st.rankDefault;
+  return (
+    <LinearGradient colors={['#E9E5FF', '#F5F3FF']} style={st.winnerCardBorder}>
+      <View style={st.winnerCard}>
+        <View style={[st.rankPill, rankStyle]}>
+          <Text style={st.rankPillTxt}>#{winner.rank}</Text>
+        </View>
+        <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} size={48} />
+        <Text style={st.winnerName} numberOfLines={1}>{winner.userName}</Text>
+        <Text style={st.winnerScore}>{winner.score} pts</Text>
+        <Text style={st.winnerPrize}>{formatPrize(winner.winnings)}</Text>
+      </View>
+    </LinearGradient>
+  );
+}
 
 export default function WeeklyLeaderboardScreen() {
   const { user } = useAuth();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [leaderboardData, setLeaderboardData] = useState<WeeklyLeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [podiumAnimation] = useState(new Animated.Value(0));
 
-  const fetchLeaderboardData = async (week?: string) => {
+  const fetchLeaderboardData = useCallback(async () => {
+    if (!user?.token) {
+      setLoading(false);
+      return;
+    }
     try {
-      if (!user?.token) return;
-      
-      // Always use current week if not specified
-      const weekToUse = week || getCurrentWeek();
-      
-      // Build URL with week parameter (always include current week)
-      const url = `/student/weekly-leaderboard?week=${weekToUse}`;
-      
-      const response = await apiFetchAuth(url, user.token);
-      
+      setLoading(true);
+      const week = getCurrentWeek();
+      const response = await apiFetchAuth(`/student/weekly-leaderboard?week=${week}`, user.token);
       if (response.ok) {
         setLeaderboardData(response.data);
-      } else {
-        console.error('Failed to fetch leaderboard data:', response.data);
       }
-    } catch (error) {
-      console.error('Error fetching leaderboard data:', error);
+    } catch (e) {
+      console.error('Leaderboard fetch error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user?.token]);
 
   useEffect(() => {
     fetchLeaderboardData();
-    
-    // Animate podium on load
-    Animated.timing(podiumAnimation, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  }, [fetchLeaderboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchLeaderboardData();
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatPrizeAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return { name: 'trophy', color: '#FFD700' };
-      case 2:
-        return { name: 'medal', color: '#C0C0C0' };
-      case 3:
-        return { name: 'ribbon', color: '#CD7F32' };
-      default:
-        return { name: 'star', color: '#8B5CF6' };
+  const openDrawer = () => {
+    try {
+      navigation.dispatch(DrawerActions.openDrawer());
+    } catch {
+      /* noop */
     }
   };
 
-  const getAchievementBadge = (score: number, rank: number) => {
-    if (rank === 1) return { name: 'crown', color: '#FFD700', text: 'Champion' };
-    if (rank <= 3) return { name: 'medal', color: '#C0C0C0', text: 'Top 3' };
-    if (score >= 90) return { name: 'star', color: '#4CAF50', text: 'Excellent' };
-    if (score >= 80) return { name: 'checkmark-circle', color: '#2196F3', text: 'Good' };
-    if (score >= 70) return { name: 'thumbs-up', color: '#FF9800', text: 'Average' };
-    return { name: 'trophy-outline', color: '#9E9E9E', text: 'Participant' };
-  };
+  const featured = leaderboardData?.leaderboard[0];
+  const totalWinners = leaderboardData?.leaderboard.reduce((n, e) => n + e.winners.length, 0) ?? 0;
 
-  const getStreakInfo = (userId: string) => {
-    // Generate streak data based on user's performance
-    const user = leaderboardData?.leaderboard
-      .flatMap(exam => exam.winners)
-      .find(winner => winner.userId === userId);
-    
-    if (!user) return { current: 1, longest: 1 };
-    
-    // Calculate streak based on score and rank
-    const baseStreak = Math.min(Math.floor(user.score / 10), 10);
-    const rankBonus = user.rank <= 3 ? 3 : user.rank <= 10 ? 2 : 1;
-    
-    return { 
-      current: baseStreak + rankBonus, 
-      longest: baseStreak + rankBonus + 2 
-    };
-  };
-
-  const getUserLevel = (userId: string) => {
-    // Generate user level based on existing data
-    const user = leaderboardData?.leaderboard
-      .flatMap(exam => exam.winners)
-      .find(winner => winner.userId === userId);
-    
-    if (!user) return 1;
-    
-    // Calculate level based on score and winnings
-    const scoreLevel = Math.floor(user.score / 20);
-    const winningsLevel = Math.floor(user.winnings / 100);
-    const rankLevel = user.rank <= 3 ? 5 : user.rank <= 10 ? 3 : 1;
-    
-    return Math.min(scoreLevel + winningsLevel + rankLevel, 25);
-  };
-
-  const getUserAchievements = (userId: string) => {
-    // Generate achievements based on existing data
-    const user = leaderboardData?.leaderboard
-      .flatMap(exam => exam.winners)
-      .find(winner => winner.userId === userId);
-    
-    if (!user) return [];
-    
-    const achievements = [];
-    
-    // Score-based achievements
-    if (user.score >= 90) achievements.push('perfect_score');
-    if (user.score >= 80) achievements.push('excellent_performance');
-    if (user.score >= 70) achievements.push('good_performance');
-    
-    // Rank-based achievements
-    if (user.rank === 1) achievements.push('first_place');
-    if (user.rank <= 3) achievements.push('top_three');
-    if (user.rank <= 10) achievements.push('top_ten');
-    
-    // Winnings-based achievements
-    if (user.winnings >= 500) achievements.push('high_earner');
-    if (user.winnings >= 100) achievements.push('earner');
-    
-    return achievements;
-  };
-
-  if (loading) {
+  if (loading && !leaderboardData) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
-          <Text style={styles.loadingText}>Loading Weekly Leaderboard...</Text>
-        </View>
-      </SafeAreaView>
+      <LinearGradient colors={[...C.bg]} style={[st.centered, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" />
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={st.loadTxt}>Loading leaderboard…</Text>
+      </LinearGradient>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#8B5CF6']}
-            tintColor="#8B5CF6"
-          />
-        }
-      >
-        {/* Week Info Card */}
-        {leaderboardData && (
-          <View style={styles.weekInfoCard}>
-            <LinearGradient
-              colors={['#6366F1', '#4F46E5', '#4338CA']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.weekInfoGradient}
-            >
-              <View style={styles.weekInfoContent}>
-                <View style={styles.weekInfoLeft}>
-                  <View style={styles.weekIconContainer}>
-                    <Ionicons name="calendar" size={24} color="#FFFFFF" />
-                  </View>
-                  <View style={styles.weekTextContainer}>
-                    <Text style={styles.weekTitle}>Current Week</Text>
-                    <Text style={styles.weekDates}>
-                      {formatDate(leaderboardData.weekStart)} - {formatDate(leaderboardData.weekEnd)}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.weekStatsContainer}>
-                  <View style={styles.weekStatItem}>
-                    <Text style={styles.weekStatValue}>{leaderboardData.totalExams}</Text>
-                    <Text style={styles.weekStatLabel}>Exams</Text>
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
-          </View>
-        )}
+    <View style={st.root}>
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={[...C.bg]} style={StyleSheet.absoluteFill} />
+      <View style={st.orb1} pointerEvents="none" />
+      <View style={st.orb2} pointerEvents="none" />
 
-        {/* Mega Exam Winner Section */}
-        <View style={styles.megaExamSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mega Exam Winner</Text>
-            <TouchableOpacity style={styles.filterButton}>
-              <Text style={styles.filterText}>Filter</Text>
-              <Ionicons name="menu" size={16} color="#1E40AF" />
-            </TouchableOpacity>
-          </View>
-          
-          {/* Exam Card - Show only if we have real data */}
-          {leaderboardData?.leaderboard[0] && (
-            <View style={styles.examCard}>
-              <View style={styles.examCardTop}>
-                <Text style={styles.examDay}>Today</Text>
-                <View style={styles.examInfo}>
-                  <View style={styles.examLogo}>
-                    <Text style={styles.examLogoText}>{leaderboardData.leaderboard[0].examTitle?.substring(0, 3).toUpperCase() || 'EXAM'}</Text>
-                  </View>
-                  <Text style={styles.examTitle}>{leaderboardData.leaderboard[0].examTitle || 'Weekly Exam'}</Text>
-                </View>
-                <Text style={styles.examDate}>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
+      <SafeAreaView style={st.safe} edges={[]}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+          contentContainerStyle={{
+            paddingTop: Platform.OS === 'android' ? 2 : 6,
+            paddingBottom: insets.bottom + 100,
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />
+          }
+        >
+          {/* Header */}
+          <LinearGradient colors={['#C4B5FD', '#DDD6FE', '#EDE9FE']} style={st.headerBorder}>
+            <View style={st.headerCard}>
+              <View style={st.headerTop}>
+                <TouchableOpacity style={st.menuBtn} onPress={openDrawer} activeOpacity={0.88}>
+                  <Menu size={20} color={C.ink} strokeWidth={2.5} />
+                </TouchableOpacity>
+                <LinearGradient colors={['#8E78E7', C.primary]} style={st.hubPill}>
+                  <Trophy size={11} color="#FFF" strokeWidth={2.5} />
+                  <Text style={st.hubPillTxt}>LEADERBOARD</Text>
+                </LinearGradient>
+                <Image source={require('@/assets/images/trophy.png')} style={st.trophyImg} resizeMode="contain" />
               </View>
-            <View style={styles.examCardBottom}>
-              <View style={styles.winningInfo}>
-                <Ionicons name="trophy" size={20} color="#FFD700" />
-                <Text style={styles.winningText}>Total Winning {formatPrizeAmount(leaderboardData.leaderboard[0].prizePool)}</Text>
-              </View>
+              <Text style={st.headerTitle}>
+                Weekly <Text style={st.headerAccent}>Leaderboard</Text>
+              </Text>
+              <Text style={st.headerSub}>Top performers & prize winners this week</Text>
             </View>
-            </View>
-          )}
-          
-          {/* Top 5 Winners - Horizontal Scrollable */}
-          {leaderboardData?.leaderboard[0]?.winners && leaderboardData.leaderboard[0].winners.length > 0 ? (
-            <View style={styles.topWinnersContainer}>
-              <Text style={styles.topWinnersTitle}>Top 5 Winners</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                style={styles.winnerCardsScroll}
-                contentContainerStyle={styles.winnerCardsContainer}
-              >
-                {leaderboardData.leaderboard[0].winners.slice(0, 5).map((winner, index) => (
-                  <View key={winner.userId} style={[
-                    styles.winnerCard,
-                    winner.rank === 1 && styles.firstPlaceCard,
-                    winner.rank === 2 && styles.secondPlaceCard,
-                    winner.rank === 3 && styles.thirdPlaceCard,
-                    winner.rank === 4 && styles.fourthPlaceCard,
-                    winner.rank === 5 && styles.fifthPlaceCard,
-                  ]}>
-                    <Text style={[
-                      styles.rankText,
-                      winner.rank === 1 && styles.firstPlaceRankText,
-                      winner.rank === 2 && styles.secondPlaceRankText,
-                      winner.rank === 3 && styles.thirdPlaceRankText,
-                      winner.rank === 4 && styles.fourthPlaceRankText,
-                      winner.rank === 5 && styles.fifthPlaceRankText,
-                    ]}>Rank #{winner.rank}</Text>
-                    <View style={styles.winnerAvatar}>
-                      <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} />
-                    </View>
-                    <Text style={styles.winnerName}>{winner.userName}</Text>
-                    <Text style={styles.winnerScore}>Score: {winner.score}</Text>
-                    <Text style={styles.winnerPrize}>Won {formatPrizeAmount(winner.winnings)}</Text>
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          ) : (
-            <View style={styles.noWinnersContainer}>
-              <Ionicons name="trophy-outline" size={48} color="#9CA3AF" />
-              <Text style={styles.noWinnersText}>No winners yet</Text>
-              <Text style={styles.noWinnersSubtext}>Be the first to participate!</Text>
-            </View>
-          )}
-        </View>
+          </LinearGradient>
 
-        {/* Leaderboard List */}
-        {leaderboardData?.leaderboard.map((exam, index) => (
-          <View key={exam.examId} style={styles.leaderboardCard}>
-            <LinearGradient
-              colors={['#FFFFFF', '#F8FAFC']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.leaderboardGradient}
-            >
-              <View style={styles.leaderboardHeader}>
-                <View style={styles.leaderboardHeaderLeft}>
-                  <View style={styles.examIconContainer}>
-                    <Ionicons name="school" size={20} color="#8B5CF6" />
-                  </View>
-                  <View style={styles.leaderboardTitleContainer}>
-                    <Text style={styles.leaderboardTitle}>{exam.examTitle}</Text>
-                    <Text style={styles.leaderboardDate}>{formatDate(exam.examDate)}</Text>
-                  </View>
+          {/* Week banner */}
+          {leaderboardData ? (
+            <LinearGradient colors={[...C.heroGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.weekBanner}>
+              <View style={st.weekOrb1} pointerEvents="none" />
+              <View style={st.weekOrb2} pointerEvents="none" />
+              <View style={st.weekLeft}>
+                <View style={st.weekIcon}>
+                  <Calendar size={18} color="#FFF" strokeWidth={2} />
                 </View>
-                <View style={styles.examStatsRow}>
-                  <View style={styles.examStatBlock}>
-                    <Text style={styles.examStatValue}>{exam.totalParticipants}</Text>
-                    <Text style={styles.examStatLabel}>Participants</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.examStatBlock}>
-                    <Text style={styles.prizeAmount}>{formatPrizeAmount(exam.prizePool)}</Text>
-                    <Text style={styles.examStatLabel}>Prize Pool</Text>
-                  </View>
-                </View>
-              </View>
-              
-              {exam.winners.length > 0 ? (
-                <View style={styles.examWinnersContainer}>
-                  <Text style={styles.examWinnersTitle}>Winners</Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.examWinnerCardsScroll}
-                    contentContainerStyle={styles.examWinnerCardsContainer}
-                  >
-                    {exam.winners.slice(0, 5).map((winner, winnerIndex) => (
-                      <View key={winner.userId} style={[
-                        styles.winnerCard,
-                        winner.rank === 1 && styles.firstPlaceCard,
-                        winner.rank === 2 && styles.secondPlaceCard,
-                        winner.rank === 3 && styles.thirdPlaceCard,
-                        winner.rank === 4 && styles.fourthPlaceCard,
-                        winner.rank === 5 && styles.fifthPlaceCard,
-                      ]}>
-                        <Text style={[
-                          styles.rankText,
-                          winner.rank === 1 && styles.firstPlaceRankText,
-                          winner.rank === 2 && styles.secondPlaceRankText,
-                          winner.rank === 3 && styles.thirdPlaceRankText,
-                          winner.rank === 4 && styles.fourthPlaceRankText,
-                          winner.rank === 5 && styles.fifthPlaceRankText,
-                        ]}>Rank #{winner.rank}</Text>
-                        <View style={styles.winnerAvatar}>
-                          <WinnerAvatar userPhoto={winner.userPhoto} userName={winner.userName} />
-                        </View>
-                        <Text style={styles.winnerName}>{winner.userName}</Text>
-                        <Text style={styles.winnerScore}>Score: {winner.score}</Text>
-                        <Text style={styles.winnerPrize}>Won {formatPrizeAmount(winner.winnings)}</Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              ) : (
-                <View style={styles.noWinnersSection}>
-                  <View style={styles.noWinnersIconContainer}>
-                    <Ionicons name="people-outline" size={48} color="#8B5CF6" />
-                  </View>
-                  <Text style={styles.noWinnersText}>No participants yet</Text>
-                  <Text style={styles.noWinnersSubtext}>
-                    Be the first to attempt this exam!
+                <View style={st.weekTextWrap}>
+                  <Text style={st.weekLbl}>Current Week</Text>
+                  <Text style={st.weekDates}>
+                    {formatDate(leaderboardData.weekStart)} – {formatDate(leaderboardData.weekEnd)}
                   </Text>
                 </View>
-              )}
+              </View>
+              <View style={st.weekStats}>
+                <View style={st.weekStatPill}>
+                  <Text style={st.weekStatVal}>{leaderboardData.totalExams}</Text>
+                  <Text style={st.weekStatLbl}>Exams</Text>
+                </View>
+                <View style={st.weekStatPill}>
+                  <Text style={st.weekStatVal}>{totalWinners}</Text>
+                  <Text style={st.weekStatLbl}>Winners</Text>
+                </View>
+              </View>
             </LinearGradient>
-          </View>
-        ))}
+          ) : null}
 
-        {/* Empty State */}
-        {leaderboardData?.leaderboard.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="trophy-outline" size={64} color="#CBD5E1" />
-            <Text style={styles.emptyStateTitle}>No Exams This Week</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Check back later for weekly competitions!
-            </Text>
+          {/* Featured exam + podium */}
+          {featured ? (
+            <View style={st.featuredSection}>
+              <LinearGradient colors={['#C4B5FD', '#DDD6FE', '#EDE9FE']} style={st.featuredBorder}>
+                <View style={st.featuredCard}>
+                  <View style={st.featuredHead}>
+                    <View style={st.featuredIcon}>
+                      <Sparkles size={18} color={C.primary} strokeWidth={2.5} />
+                    </View>
+                    <View style={st.featuredCopy}>
+                      <Text style={st.featuredTitle} numberOfLines={2}>{featured.examTitle}</Text>
+                      <Text style={st.featuredMeta}>{formatDate(featured.examDate)} · {featured.totalParticipants} joined</Text>
+                    </View>
+                  </View>
+                  <View style={st.prizeRow}>
+                    <Trophy size={16} color={C.gold} strokeWidth={2} fill={C.gold} />
+                    <Text style={st.prizeTxt}>Prize pool {formatPrize(featured.prizePool)}</Text>
+                  </View>
+                </View>
+              </LinearGradient>
+
+              {featured.winners.length >= 1 ? (
+                <>
+                  <Text style={st.podiumLbl}>Top Champions</Text>
+                  <PodiumSection winners={featured.winners} />
+                  <Text style={st.hScrollLbl}>All Winners</Text>
+                  <View style={st.hScrollWrap}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled contentContainerStyle={st.hScrollContent}>
+                      {featured.winners.slice(0, 10).map((w) => (
+                        <View key={w.userId} style={st.hScrollItem}>
+                          <WinnerCard winner={w} />
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </>
+              ) : (
+                <View style={st.emptySmall}>
+                  <Trophy size={32} color={C.primaryLight} strokeWidth={1.8} />
+                  <Text style={st.emptySmallTxt}>No winners yet — be the first!</Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+
+          {/* All exams */}
+          <View style={st.sectionHead}>
+            <Text style={st.sectionTitle}>Exam Rankings</Text>
+            <View style={st.countPill}>
+              <Text style={st.countPillTxt}>{leaderboardData?.leaderboard.length ?? 0}</Text>
+            </View>
           </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+
+          {leaderboardData?.leaderboard.length === 0 ? (
+            <View style={st.emptyBox}>
+              <LinearGradient colors={['#EDE9FE', '#F5F3FF']} style={st.emptyIcon}>
+                <Trophy size={40} color={C.primary} strokeWidth={1.8} />
+              </LinearGradient>
+              <Text style={st.emptyTitle}>No exams this week</Text>
+              <Text style={st.emptySub}>Check back soon for new competitions.</Text>
+            </View>
+          ) : (
+            leaderboardData.leaderboard.map((exam) => (
+              <TouchableOpacity key={exam.examId} activeOpacity={0.92} style={st.examWrap}>
+                <LinearGradient colors={['#E9E5FF', '#F3EEFF', '#FAF8FF']} style={st.examBorder}>
+                  <View style={st.examCard}>
+                    <View style={st.examHead}>
+                      <LinearGradient colors={['#8E78E7', C.primary]} style={st.examIcon}>
+                        <Ionicons name="school" size={18} color="#FFF" />
+                      </LinearGradient>
+                      <View style={st.examBody}>
+                        <Text style={st.examTitle} numberOfLines={1}>{exam.examTitle}</Text>
+                        <Text style={st.examDate}>{formatDate(exam.examDate)}</Text>
+                      </View>
+                      <ChevronRight size={18} color="#CBD5E1" strokeWidth={2} />
+                    </View>
+                    <View style={st.examStats}>
+                      <View style={st.examStat}>
+                        <Users size={12} color={C.muted} strokeWidth={2} />
+                        <Text style={st.examStatTxt}>{exam.totalParticipants}</Text>
+                      </View>
+                      <View style={st.examStat}>
+                        <Trophy size={12} color={C.gold} strokeWidth={2} />
+                        <Text style={st.examStatPrize}>{formatPrize(exam.prizePool)}</Text>
+                      </View>
+                      <Text style={st.examWinnersLbl}>{exam.winners.length} winners</Text>
+                    </View>
+                    {exam.winners.length > 0 ? (
+                      <View style={st.miniWinners}>
+                        {exam.winners.slice(0, 5).map((w) => (
+                          <View key={w.userId} style={st.miniWinner}>
+                            <WinnerAvatar userPhoto={w.userPhoto} userName={w.userName} size={28} />
+                            <Text style={st.miniRank}>#{w.rank}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  // Mega Exam Section Styles
-  megaExamSection: {
-    padding: 24,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 24,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1E293B',
-    letterSpacing: 0.3,
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  filterText: {
-    fontSize: 14,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  // Exam Card Styles
-  examCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  examCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  examDay: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '600',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  examInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  examLogo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  examLogoText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  examTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    letterSpacing: 0.2,
-  },
-  examDate: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '600',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  examCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  winningInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  winningText: {
-    fontSize: 16,
-    color: '#059669',
-    fontWeight: '700',
-  },
-  viewResultsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  viewResultsText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  // Bottom View Results Button
-  viewResultsButtonBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
-    gap: 8,
-    marginHorizontal: 20,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  viewResultsTextBottom: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  // Contest Title Styles
-  contestTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFF7ED',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FB923C',
-    shadowColor: '#FB923C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  contestTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#EA580C',
-    letterSpacing: 0.3,
-  },
-  // Top Winners Container
-  topWinnersContainer: {
-    marginBottom: 16,
-  },
-  topWinnersTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 16,
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  // Exam Winners Container (for all exams in leaderboard list)
-  examWinnersContainer: {
-    marginBottom: 20,
-    paddingHorizontal: 4,
-  },
-  examWinnersTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 12,
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  examWinnerCardsScroll: {
-    marginBottom: 16,
-  },
-  examWinnerCardsContainer: {
-    paddingRight: 16,
-    paddingLeft: 4,
-  },
-  // Winner Cards Styles
-  winnerCardsScroll: {
-    marginBottom: 20,
-  },
-  winnerCardsContainer: {
-    paddingRight: 20,
-    paddingLeft: 4,
-  },
-  winnerCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginRight: 16,
-    width: 170,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1.5,
-    borderColor: '#F1F5F9',
-  },
-  rankText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6366F1',
-    marginBottom: 12,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  winnerAvatar: {
-    marginBottom: 16,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  winnerImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#F3F4F6',
-  },
-  avatarContainer: {
-    position: 'relative',
-    width: 72,
-    height: 72,
-  },
-  avatarLoadingContainer: {
+const st = StyleSheet.create({
+  root: { flex: 1 },
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadTxt: { marginTop: 14, fontFamily: FontFamily.medium, fontSize: 15, color: C.primary },
+  orb1: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
+    width: SCREEN_W * 0.65,
+    height: SCREEN_W * 0.65,
+    borderRadius: SCREEN_W,
+    backgroundColor: 'rgba(142, 120, 231, 0.09)',
+    top: -SCREEN_W * 0.18,
+    right: -SCREEN_W * 0.2,
+  },
+  orb2: {
+    position: 'absolute',
+    width: SCREEN_W * 0.4,
+    height: SCREEN_W * 0.4,
+    borderRadius: SCREEN_W,
+    backgroundColor: 'rgba(245, 158, 11, 0.06)',
+    bottom: 80,
+    left: -SCREEN_W * 0.1,
+  },
+  headerBorder: {
+    marginHorizontal: PAD,
+    marginTop: Platform.OS === 'android' ? 0 : 4,
+    borderRadius: 22,
+    padding: 1.5,
+    marginBottom: Platform.OS === 'android' ? 10 : 12,
+  },
+  headerCard: { backgroundColor: C.card, borderRadius: 20.5, padding: Platform.OS === 'android' ? 12 : 14 },
+  headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: Platform.OS === 'android' ? 6 : 8 },
+  menuBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F3FF',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 36,
-    zIndex: 1,
-  },
-  avatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  avatarGradient: {
-    width: '100%',
-    height: '100%',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarInitials: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  winnerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: 0.2,
-    numberOfLines: 1,
-    ellipsizeMode: 'tail',
-  },
-  winnerScore: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 6,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  winnerPrize: {
-    fontSize: 14,
-    color: '#059669',
-    fontWeight: '700',
-    textAlign: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#D1FAE5',
+    borderColor: C.border,
   },
-  // Rank-specific Card Backgrounds
-  firstPlaceCard: {
-    backgroundColor: '#FFF7ED', // Beautiful light orange background for Rank 1
-    borderWidth: 1,
-    borderColor: '#FB923C',
-    shadowColor: '#FB923C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  secondPlaceCard: {
-    backgroundColor: '#F8FAFC', // Clean light gray background for Rank 2
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    shadowColor: '#CBD5E1',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  thirdPlaceCard: {
-    backgroundColor: '#FEF3C7', // Warm light yellow background for Rank 3
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  fourthPlaceCard: {
-    backgroundColor: '#EEF2FF', // Soft light blue background for Rank 4
-    borderWidth: 1,
-    borderColor: '#A5B4FC',
-    shadowColor: '#A5B4FC',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  fifthPlaceCard: {
-    backgroundColor: '#F0FDF4', // Fresh light green background for Rank 5
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-    shadowColor: '#86EFAC',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  // Rank-specific Text Colors
-  firstPlaceRankText: {
-    color: '#EA580C',
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#FB923C',
-  },
-  secondPlaceRankText: {
-    color: '#475569',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  thirdPlaceRankText: {
-    color: '#D97706',
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  fourthPlaceRankText: {
-    color: '#6366F1',
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: '#A5B4FC',
-  },
-  fifthPlaceRankText: {
-    color: '#059669',
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: '#8B5CF6',
-    marginTop: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  weekInfoCard: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 20,
-    borderWidth: 2.5,
-    borderColor: 'rgba(99, 102, 241, 0.4)',
-  },
-  weekInfoGradient: {
-    padding: 20,
-  },
-  weekInfoContent: {
+  hubPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, marginLeft: 10 },
+  hubPillTxt: { fontFamily: FontFamily.bold, fontSize: 9, color: '#FFF', letterSpacing: 0.6 },
+  trophyImg: { width: 56, height: 56, marginLeft: 'auto' },
+  headerTitle: { fontFamily: FontFamily.extraBold, fontSize: 24, color: C.ink, lineHeight: 30 },
+  headerAccent: { color: C.primary },
+  headerSub: { fontFamily: FontFamily.regular, fontSize: 13, color: C.muted, marginTop: 4 },
+  weekBanner: {
+    marginHorizontal: PAD,
+    borderRadius: 20,
+    padding: Platform.OS === 'android' ? 12 : 14,
+    marginBottom: Platform.OS === 'android' ? 12 : 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  weekInfoLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  weekIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 16,
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  weekTextContainer: {
-    flex: 1,
-  },
-  weekStatsContainer: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  weekStatItem: {
-    alignItems: 'center',
-  },
-  noWinnersSection: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    marginTop: 12,
-  },
-  noWinnersIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 80,
-    backgroundColor: 'rgba(139, 92, 246, 0.02)',
-    borderRadius: 20,
-    marginTop: 20,
-  },
-  weekTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  weekDates: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  weekStatValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  weekStatLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#64748B',
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  emptyStateSubtext: {
-    fontSize: 18,
-    color: '#94A3B8',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  // Top Performers Section
-  topPerformersSection: {
-    marginBottom: 24,
-    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#059669',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 12,
-  },
-  topPerformersGradient: {
-    padding: 24,
-  },
-  championsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  topPerformersTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    flex: 1,
-    textAlign: 'center',
-  },
-  prizePoolBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255, 215, 0, 0.4)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 12 }
+      : { elevation: 6 }),
   },
-  prizePoolText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFD700',
-    marginLeft: 4,
+  weekOrb1: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    top: -60,
+    right: -40,
   },
-  // Podium Styles
-  podiumContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-  },
-  podiumCard: {
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  podium: {
-    width: 70,
+  weekOrb2: {
+    position: 'absolute',
+    width: 90,
     height: 90,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 45,
+    backgroundColor: 'rgba(253, 230, 138, 0.16)',
+    bottom: -40,
+    left: 10,
   },
-  firstPodium: {
-    height: 100,
-    backgroundColor: 'rgba(255, 215, 0, 0.9)',
-    borderWidth: 2,
-    borderColor: '#FFD700',
-  },
-  secondPodium: {
-    height: 80,
-    backgroundColor: 'rgba(192, 192, 192, 0.9)',
-    borderWidth: 2,
-    borderColor: '#C0C0C0',
-  },
-  thirdPodium: {
-    height: 70,
-    backgroundColor: 'rgba(205, 127, 50, 0.9)',
-    borderWidth: 2,
-    borderColor: '#CD7F32',
-  },
-  podiumNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  podiumContent: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 18,
-    padding: 18,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  podiumAvatar: {
-    marginBottom: 12,
-    position: 'relative',
-  },
-  podiumImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  achievementBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 24,
-    height: 24,
+  weekLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  weekIcon: {
+    width: Platform.OS === 'android' ? 36 : 40,
+    height: Platform.OS === 'android' ? 36 : 40,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'center',
   },
-  championBadge: {
-    width: 28,
-    height: 28,
+  weekTextWrap: { flex: 1 },
+  weekLbl: { fontFamily: FontFamily.semiBold, fontSize: 12, color: 'rgba(255,255,255,0.78)', letterSpacing: 0.4 },
+  weekDates: { fontFamily: FontFamily.bold, fontSize: 14, color: '#FFF', marginTop: 2 },
+  weekStats: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  weekStatPill: {
+    minWidth: Platform.OS === 'android' ? 70 : 78,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: Platform.OS === 'android' ? 6 : 7,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 215, 0, 0.9)',
-    borderColor: '#FFD700',
   },
-  streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 107, 53, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.3)',
-  },
-  streakText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#FF6B35',
-    marginLeft: 4,
-  },
-  levelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(76, 175, 80, 0.3)',
-  },
-  levelText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  podiumName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  podiumScore: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  podiumPrize: {
-    fontSize: 13,
-    color: '#FFD700',
-    fontWeight: 'bold',
-  },
-  // Leaderboard Card
-  leaderboardCard: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1.5,
-    borderColor: 'rgba(139, 92, 246, 0.15)',
-  },
-  leaderboardGradient: {
-    padding: 0,
-  },
-  leaderboardHeader: {
-    padding: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(139, 92, 246, 0.1)',
-  },
-  leaderboardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  examIconContainer: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 16,
-  },
-  leaderboardTitleContainer: {
-    flex: 1,
-  },
-  leaderboardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  leaderboardDate: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  examStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    marginTop: 12,
-  },
-  examStatBlock: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#E5E7EB',
-  },
-  examStatValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#8B5CF6',
-    textShadowColor: 'rgba(139, 92, 246, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  examStatLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  prizeAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#10B981',
-    textShadowColor: 'rgba(16, 185, 129, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  leaderboardList: {
-    padding: 20,
-  },
-  winnerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  winnerRankBadge: {
+  weekStatVal: { fontFamily: FontFamily.extraBold, fontSize: Platform.OS === 'android' ? 16 : 17, color: '#FFF' },
+  weekStatLbl: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
+  featuredSection: { marginBottom: 8 },
+  featuredBorder: { marginHorizontal: PAD, borderRadius: 18, padding: 1, marginBottom: 14 },
+  featuredCard: { backgroundColor: C.card, borderRadius: 17, padding: 14 },
+  featuredHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  featuredIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  firstPlaceBadge: {
-    backgroundColor: 'rgba(255, 215, 0, 0.9)',
-    shadowColor: '#FFD700',
-    borderWidth: 2,
-    borderColor: '#FFA500',
-  },
-  secondPlaceBadge: {
-    backgroundColor: 'rgba(192, 192, 192, 0.9)',
-    shadowColor: '#C0C0C0',
-    borderWidth: 2,
-    borderColor: '#A0A0A0',
-  },
-  thirdPlaceBadge: {
-    backgroundColor: 'rgba(205, 127, 50, 0.9)',
-    shadowColor: '#CD7F32',
-    borderWidth: 2,
-    borderColor: '#B8860B',
-  },
-  winnerProfileContainer: {
-    marginRight: 16,
-  },
-  winnerProfileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-  },
-  winnerInfo: {
-    flex: 1,
-  },
-  winnerNameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  winnerDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  winnerDetailText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-  },
-  winnerRight: {
-    alignItems: 'flex-end',
-    backgroundColor: 'rgba(5, 150, 105, 0.1)',
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  winnerRankText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  winnerScore: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  // No Winners Styles
-  noWinnersContainer: {
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    marginHorizontal: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
-  noWinnersText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#475569',
-    marginTop: 16,
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  noWinnersSubtext: {
+  featuredCopy: { flex: 1, minWidth: 0 },
+  featuredTitle: { fontFamily: FontFamily.bold, fontSize: 16, color: C.ink },
+  featuredMeta: { fontFamily: FontFamily.regular, fontSize: 12, color: C.muted, marginTop: 2 },
+  prizeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFBEB', padding: 10, borderRadius: 12 },
+  prizeTxt: { fontFamily: FontFamily.semiBold, fontSize: 13, color: '#B45309' },
+  podiumLbl: {
+    fontFamily: FontFamily.bold,
     fontSize: 15,
-    color: '#64748B',
-    textAlign: 'center',
-    fontWeight: '500',
-    lineHeight: 22,
+    color: C.ink,
+    marginHorizontal: PAD,
+    marginBottom: 10,
   },
+  podiumRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingHorizontal: PAD,
+    marginBottom: 16,
+    gap: 8,
+  },
+  podiumCol: { alignItems: 'center', width: (SCREEN_W - PAD * 2 - 16) / 3 },
+  podiumSpacer: { width: (SCREEN_W - PAD * 2 - 16) / 3 },
+  podiumAvatarRing: { borderWidth: 3, borderRadius: 32, padding: 2, marginBottom: 6 },
+  podiumName: { fontFamily: FontFamily.semiBold, fontSize: 11, color: C.ink, maxWidth: 100 },
+  podiumScore: { fontFamily: FontFamily.medium, fontSize: 10, color: C.muted, marginBottom: 6 },
+  podiumBar: {
+    width: '88%',
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 8,
+  },
+  podiumMedal: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  podiumRank: { fontFamily: FontFamily.extraBold, fontSize: 14, color: '#FFF' },
+  hScrollLbl: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.muted, marginHorizontal: PAD, marginBottom: 8 },
+  hScrollWrap: { height: 168, marginBottom: 8 },
+  hScrollContent: { paddingHorizontal: PAD, gap: 10 },
+  hScrollItem: { width: WINNER_CARD_W },
+  winnerCardBorder: { borderRadius: 16, padding: 1 },
+  winnerCard: {
+    backgroundColor: C.card,
+    borderRadius: 15,
+    padding: 12,
+    alignItems: 'center',
+    width: WINNER_CARD_W,
+  },
+  rankPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginBottom: 8 },
+  rankGold: { backgroundColor: '#FEF3C7' },
+  rankSilver: { backgroundColor: '#F1F5F9' },
+  rankBronze: { backgroundColor: '#FFEDD5' },
+  rankDefault: { backgroundColor: '#EDE9FE' },
+  rankPillTxt: { fontFamily: FontFamily.bold, fontSize: 10, color: C.ink },
+  winnerName: { fontFamily: FontFamily.bold, fontSize: 12, color: C.ink, marginTop: 6, maxWidth: WINNER_CARD_W - 24 },
+  winnerScore: { fontFamily: FontFamily.medium, fontSize: 11, color: C.muted, marginTop: 2 },
+  winnerPrize: { fontFamily: FontFamily.bold, fontSize: 12, color: C.primary, marginTop: 4 },
+  emptySmall: { alignItems: 'center', paddingVertical: 24, gap: 8 },
+  emptySmallTxt: { fontFamily: FontFamily.medium, fontSize: 13, color: C.muted },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PAD,
+    marginBottom: 10,
+    marginTop: 8,
+  },
+  sectionTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: C.ink },
+  countPill: { backgroundColor: 'rgba(99, 68, 212, 0.12)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  countPillTxt: { fontFamily: FontFamily.bold, fontSize: 12, color: C.primary },
+  examWrap: { marginHorizontal: PAD, marginBottom: 10 },
+  examBorder: { borderRadius: 16, padding: 1 },
+  examCard: { backgroundColor: C.card, borderRadius: 15, padding: 12 },
+  examHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  examIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  examBody: { flex: 1, minWidth: 0 },
+  examTitle: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink },
+  examDate: { fontFamily: FontFamily.regular, fontSize: 11, color: C.muted, marginTop: 2 },
+  examStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    flexWrap: 'wrap',
+  },
+  examStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  examStatTxt: { fontFamily: FontFamily.medium, fontSize: 11, color: C.muted },
+  examStatPrize: { fontFamily: FontFamily.bold, fontSize: 11, color: '#B45309' },
+  examWinnersLbl: { fontFamily: FontFamily.medium, fontSize: 11, color: C.primary, marginLeft: 'auto' },
+  miniWinners: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  miniWinner: { alignItems: 'center', gap: 2 },
+  miniRank: { fontFamily: FontFamily.bold, fontSize: 9, color: C.muted },
+  emptyBox: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: PAD },
+  emptyIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
+  emptyTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: C.ink },
+  emptySub: { fontFamily: FontFamily.regular, fontSize: 13, color: C.muted, marginTop: 6, textAlign: 'center' },
 });
-

@@ -1,3 +1,5 @@
+import { QuizTheme } from '@/constants/QuizTheme';
+import { FontFamily } from '@/constants/Typography';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { SoundManager } from '@/utils/sounds';
@@ -19,6 +21,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { io, Socket } from 'socket.io-client';
 
 const { width, height } = Dimensions.get('window');
@@ -37,6 +40,17 @@ interface MatchmakingState {
   category?: string;
   estimatedWait: number;
 }
+
+const HYPE_TIPS = [
+  '⚡ Fast fingers win — lock answers before the clock runs out!',
+  '🎯 Read all options once — traps hide in similar choices.',
+  '🏆 Beat your rival and climb the weekly leaderboard.',
+  '🔥 Peak battle hour — strongest players are online now.',
+  '💡 Unsure? Mark & move — comeback in the final seconds.',
+  '🧠 Stay calm — one great streak can flip the whole match.',
+];
+
+const RIVAL_HINTS = ['QuizAce', 'BrainRush', 'TopperX', 'SwiftMind', 'Champ99', 'NovaIQ'];
 
 export default function MatchmakingScreen() {
   const { user } = useAuth();
@@ -73,6 +87,12 @@ export default function MatchmakingScreen() {
   const [radarAnim] = useState(new Animated.Value(0));
   const [scanAnim] = useState(new Animated.Value(0));
   const [gradientAnim] = useState(new Animated.Value(0));
+  const [tipFadeAnim] = useState(new Animated.Value(1));
+  const [vsPulseAnim] = useState(new Animated.Value(1));
+  const [countdownScale] = useState(new Animated.Value(1));
+
+  const [tipIndex, setTipIndex] = useState(0);
+  const [rivalHintIdx, setRivalHintIdx] = useState(0);
   
   // Refs
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -363,8 +383,10 @@ export default function MatchmakingScreen() {
               clearInterval(countdownRef.current);
               countdownRef.current = null;
             }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             return 0;
           }
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           return prev - 1;
         });
       }, 1000);
@@ -648,10 +670,71 @@ export default function MatchmakingScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getCategoryName = (categoryId?: string | null) => {
-    if (!categoryId || categoryId === 'any') return 'Any Category';
-    return categoryId;
-  };
+  const waitPct = Math.min(
+    100,
+    Math.round((matchmakingState.timeElapsed / Math.max(matchmakingState.estimatedWait, 1)) * 100)
+  );
+  const userInitial =
+    (user?.name?.charAt(0) || user?.handle?.charAt(0) || 'Y').toUpperCase();
+  const userDisplayName = user?.name?.split(' ')[0] || 'You';
+  const rivalHint = RIVAL_HINTS[rivalHintIdx % RIVAL_HINTS.length];
+
+  useEffect(() => {
+    if (matchmakingState.status !== 'searching') return;
+    const tipTimer = setInterval(() => {
+      Animated.timing(tipFadeAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }).start(() => {
+        setTipIndex((i) => (i + 1) % HYPE_TIPS.length);
+        Animated.timing(tipFadeAnim, {
+          toValue: 1,
+          duration: 320,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 4200);
+    return () => clearInterval(tipTimer);
+  }, [matchmakingState.status, tipFadeAnim]);
+
+  useEffect(() => {
+    if (matchmakingState.status !== 'searching') return;
+    const rivalTimer = setInterval(() => {
+      setRivalHintIdx((i) => (i + 1) % RIVAL_HINTS.length);
+    }, 1800);
+    return () => clearInterval(rivalTimer);
+  }, [matchmakingState.status]);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(vsPulseAnim, {
+          toValue: 1.12,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(vsPulseAnim, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [vsPulseAnim]);
+
+  useEffect(() => {
+    if (matchmakingState.status !== 'starting') return;
+    countdownScale.setValue(0.6);
+    Animated.spring(countdownScale, {
+      toValue: 1,
+      friction: 4,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  }, [countdown, matchmakingState.status, countdownScale]);
 
 
 
@@ -668,9 +751,7 @@ export default function MatchmakingScreen() {
     
     return (
       <LinearGradient
-        colors={isInsufficientBalance ? ['#4F46E5', '#7C3AED', '#8B5CF6'] : 
-                isNoOpponentError ? ['#4F46E5', '#7C3AED', '#8B5CF6'] : 
-                ['#0f172a', '#1e293b', '#334155']}
+        colors={[...QuizTheme.heroGradient]}
         style={styles.container}
       >
         <View style={styles.errorContainer}>
@@ -795,442 +876,296 @@ export default function MatchmakingScreen() {
 
   return (
     <View style={styles.container}>
-      {/* animated background gradients matching app header */}
-      <Animated.View style={[styles.animatedGradient, { opacity: gradientAnim }]}>
-        <LinearGradient
-          colors={['#070610', '#0f1230', '#1b153f', '#2b0f5a']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.animatedGradientInner}
-        />
-      </Animated.View>
-      <Animated.View style={[styles.animatedGradient, { opacity: gradientAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-        <LinearGradient
-          colors={['#070610', '#0f1230', '#1b153f', '#2b0f5a']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.animatedGradientInner}
-        />
-      </Animated.View>
-      
+      <LinearGradient
+        colors={[...QuizTheme.heroGradient]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Animated.View
+        style={[
+          styles.mmOrb,
+          styles.mmOrbTop,
+          {
+            opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.55] }),
+            transform: [{ scale: pulseAnim }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.mmOrb,
+          styles.mmOrbBottom,
+          {
+            opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.4] }),
+            transform: [{ scale: pulseAnim }],
+          },
+        ]}
+      />
 
-             {/* Animated Background Elements */}
-       <View style={styles.backgroundContainer}>
-         {/* Floating Particles */}
-         <Animated.View 
-           style={[
-             styles.floatingParticle1,
-             {
-               transform: [{
-                 translateY: particleAnim1.interpolate({
-                   inputRange: [0, 1],
-                   outputRange: [0, -100]
-                 })
-               }],
-               opacity: particleAnim1.interpolate({
-                 inputRange: [0, 0.5, 1],
-                 outputRange: [0, 1, 0]
-               })
-             }
-           ]}
-         />
-         <Animated.View 
-           style={[
-             styles.floatingParticle2,
-             {
-               transform: [{
-                 translateY: particleAnim2.interpolate({
-                   inputRange: [0, 1],
-                   outputRange: [0, -80]
-                 })
-               }],
-               opacity: particleAnim2.interpolate({
-                 inputRange: [0, 0.5, 1],
-                 outputRange: [0, 1, 0]
-               })
-             }
-           ]}
-         />
-         <Animated.View 
-           style={[
-             styles.floatingParticle3,
-             {
-               transform: [{
-                 translateY: particleAnim3.interpolate({
-                   inputRange: [0, 1],
-                   outputRange: [0, -120]
-                 })
-               }],
-               opacity: particleAnim3.interpolate({
-                 inputRange: [0, 0.5, 1],
-                 outputRange: [0, 1, 0]
-               })
-             }
-           ]}
-         />
-         
-         {/* Glowing Orbs */}
-         <Animated.View 
-           style={[
-             styles.glowOrb1,
-             {
-               transform: [{ scale: pulseAnim }],
-               opacity: glowAnim.interpolate({
-                 inputRange: [0, 1],
-                 outputRange: [0.3, 0.8]
-               })
-             }
-           ]}
-         />
-         <Animated.View 
-           style={[
-             styles.glowOrb2,
-             {
-               transform: [{ scale: pulseAnim }],
-               opacity: glowAnim.interpolate({
-                 inputRange: [0, 1],
-                 outputRange: [0.2, 0.6]
-               })
-             }
-           ]}
-         />
-         
-         {/* Animated Waves */}
-         <Animated.View 
-           style={[
-             styles.animatedWave1,
-             {
-               transform: [{
-                 scale: waveAnim.interpolate({
-                   inputRange: [0, 1],
-                   outputRange: [1, 1.5]
-                 })
-               }],
-               opacity: waveAnim.interpolate({
-                 inputRange: [0, 0.5, 1],
-                 outputRange: [0.4, 0.8, 0.2]
-               })
-             }
-           ]}
-         />
-         <Animated.View 
-           style={[
-             styles.animatedWave2,
-             {
-               transform: [{
-                 scale: waveAnim.interpolate({
-                   inputRange: [0, 1],
-                   outputRange: [1.2, 1.8]
-                 })
-               }],
-               opacity: waveAnim.interpolate({
-                 inputRange: [0, 0.5, 1],
-                 outputRange: [0.2, 0.6, 0.1]
-               })
-             }
-           ]}
-         />
-       </View>
+      <SafeAreaView style={styles.mmSafe} edges={['top', 'bottom']}>
+        <View style={styles.mmTopBar}>
+          <TouchableOpacity
+            style={styles.mmBack}
+            onPress={handleCancelSearch}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="chevron-back" size={22} color="#F5F3FF" />
+          </TouchableOpacity>
+          <View style={styles.mmTopCenter}>
+            <Text style={styles.mmTopTitle}>
+              {matchmakingState.status === 'found'
+                ? 'Opponent Found'
+                : matchmakingState.status === 'starting'
+                  ? 'Battle Starting'
+                  : 'Finding Opponent'}
+            </Text>
+            <Text style={styles.mmTopSub}>
+              {matchmakingState.status === 'searching'
+                ? 'Matching you with a worthy rival'
+                : matchmakingState.status === 'found'
+                  ? 'Get ready — battle begins soon'
+                  : 'Sharpen your mind…'}
+            </Text>
+          </View>
+          <View style={styles.mmTopSpacer} />
+        </View>
 
-       {/* Exciting Main Content */}
-       <View style={styles.content}>
-         {/* Exciting Searching State */}
+        <View style={styles.content}>
          {matchmakingState.status === 'searching' && (
            <View style={styles.searchingContainer}>
-             {/* Amazing Animated Background */}
-             <View style={styles.animatedBackground}>
-              {/* Exciting Glowing Orbs */}
-              <Animated.View 
-                style={[
-                  styles.bgCircle1,
-                  { 
-                    transform: [{ scale: pulseAnim }],
-                    opacity: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.4, 0.9]
-                    })
-                  }
-                ]} 
-              />
-              <Animated.View 
-                style={[
-                  styles.bgCircle2,
-                  { 
-                    transform: [{ scale: pulseAnim }],
-                    opacity: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.3, 0.7]
-                    })
-                  }
-                ]} 
-              />
-              
-              {/* Exciting Radar Scan */}
-              <Animated.View 
-                style={[
-                  styles.radarScan,
-                  {
-                    transform: [{
-                      scale: radarAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.4, 2.8]
-                      })
-                    }],
-                    opacity: radarAnim.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [0.9, 0.5, 0]
-                    })
-                  }
-                ]}
-              />
-              
-              {/* Exciting Scanning Wave */}
-              <Animated.View 
-                style={[
-                  styles.scanWave,
-                  {
-                    transform: [{
-                      scale: scanAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [1.2, 2.5]
-                      })
-                    }],
-                    opacity: scanAnim.interpolate({
-                      inputRange: [0, 0.5, 1],
-                      outputRange: [0.8, 0.4, 0]
-                    })
-                  }
-                ]}
-              />
-              
-              {/* Exciting Floating Elements */}
-              <Animated.View 
-                style={[
-                  styles.particle1,
-                  {
-                    opacity: particleAnim1,
-                    transform: [{
-                      translateY: particleAnim1.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -80]
-                      })
-                    }]
-                  }
-                ]}
-              />
-              <Animated.View 
-                style={[
-                  styles.particle2,
-                  {
-                    opacity: particleAnim2,
-                    transform: [{
-                      translateY: particleAnim2.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -70]
-                      })
-                    }]
-                  }
-                ]}
-              />
-              <Animated.View 
-                style={[
-                  styles.particle3,
-                  {
-                    opacity: particleAnim3,
-                    transform: [{
-                      translateY: particleAnim3.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -90]
-                      })
-                    }]
-                  }
-                ]}
-              />
-            </View>
-            
-                         {/* Exciting Match Animation */}
-             <View style={styles.matchAnimation}>
-               {/* You - Exciting Design */}
-               <View style={[styles.playerContainer, { left: -20 }]}>
-                <Animated.View 
-                  style={[
-                    styles.playerGlow,
-                    {
-                      opacity: glowAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.5, 1]
-                      })
-                    }
-                  ]}
-                >
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
-                    style={styles.playerGlowGradient}
-                  />
-                </Animated.View>
-                <View style={styles.playerAvatar}>
-                  <LinearGradient
-                    colors={['#FF6B6B', '#FF8E53']}
-                    style={styles.playerAvatarGradient}
-                  >
-                    <Text style={styles.playerInitial}>Y</Text>
-                  </LinearGradient>
-                </View>
-                <Text style={styles.playerName}>You</Text>
-                <View style={styles.statusBadge}>
-                  <LinearGradient
-                    colors={['#10B981', '#059669']}
-                    style={styles.statusBadgeGradient}
-                  >
-                    <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                    <Text style={styles.statusText}>Ready</Text>
-                  </LinearGradient>
-                </View>
-              </View>
-              
-                             {/* Fixed VS Badge */}
-               <View style={styles.vsContainer}>
-                                 <LinearGradient
-                   colors={['#FF6B6B', '#FF8E53', '#FFD93D']}
-                   style={styles.vsGradient}
-                 >
-                   <Text style={styles.vsText}>⚔️ VS</Text>
-                 </LinearGradient>
-               </View>
-              
-                                            {/* Exciting Opponent Search */}
-               <Animated.View 
+             <View style={styles.mmArenaTag}>
+               <LinearGradient
+                 colors={['rgba(139,92,246,0.5)', 'rgba(99,102,241,0.25)']}
+                 style={styles.mmArenaTagGrad}
+               >
+                 <Ionicons name="game-controller" size={14} color="#E9D5FF" />
+                 <Text style={styles.mmArenaTagText}>BATTLE ARENA</Text>
+               </LinearGradient>
+             </View>
+
+             <View style={styles.mmGlassCard}>
+               <Animated.View
                  style={[
-                   styles.playerContainer,
-                   { right: -20 },
+                   styles.mmSpark,
+                   styles.mmSparkA,
                    {
-                     transform: [
-                       {
+                     opacity: particleAnim1,
+                     transform: [{
+                       translateY: particleAnim1.interpolate({
+                         inputRange: [0, 1],
+                         outputRange: [0, -24],
+                       }),
+                     }],
+                   },
+                 ]}
+               />
+               <Animated.View
+                 style={[
+                   styles.mmSpark,
+                   styles.mmSparkB,
+                   {
+                     opacity: particleAnim2,
+                     transform: [{
+                       translateY: particleAnim2.interpolate({
+                         inputRange: [0, 1],
+                         outputRange: [0, -18],
+                       }),
+                     }],
+                   },
+                 ]}
+               />
+               <View style={styles.mmRadarWrap}>
+                 <Animated.View
+                   style={[
+                     styles.mmRadarRing,
+                     {
+                       transform: [{
+                         scale: radarAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: [0.5, 2.4],
+                         }),
+                       }],
+                       opacity: radarAnim.interpolate({
+                         inputRange: [0, 0.5, 1],
+                         outputRange: [0.65, 0.35, 0],
+                       }),
+                     },
+                   ]}
+                 />
+                 <Animated.View
+                   style={[
+                     styles.mmRadarRing,
+                     styles.mmRadarRingMid,
+                     {
+                       transform: [{
+                         scale: scanAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: [0.7, 2],
+                         }),
+                       }],
+                       opacity: scanAnim.interpolate({
+                         inputRange: [0, 0.5, 1],
+                         outputRange: [0.45, 0.2, 0],
+                       }),
+                     },
+                   ]}
+                 />
+                 <Animated.View style={[styles.mmRadarCore, { transform: [{ scale: pulseAnim }] }]}>
+                   <LinearGradient colors={[...QuizTheme.quickPlay]} style={styles.mmRadarCoreGrad}>
+                     <Ionicons name="radio" size={30} color="#fff" />
+                   </LinearGradient>
+                 </Animated.View>
+               </View>
+
+               <View style={styles.mmMatchup}>
+                 <View style={styles.mmPlayer}>
+                   <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                     <LinearGradient colors={['#FB7185', '#F97316']} style={styles.mmAvatar}>
+                       <Text style={styles.mmAvatarLetter}>{userInitial}</Text>
+                     </LinearGradient>
+                   </Animated.View>
+                   <Text style={styles.mmPlayerName}>{userDisplayName}</Text>
+                   <View style={styles.mmBadgeReady}>
+                     <Ionicons name="checkmark-circle" size={12} color="#6EE7B7" />
+                     <Text style={styles.mmBadgeText}>Ready</Text>
+                   </View>
+                 </View>
+
+                 <Animated.View style={[styles.mmVs, { transform: [{ scale: vsPulseAnim }] }]}>
+                   <LinearGradient colors={['#FBBF24', '#F59E0B', '#D97706']} style={styles.mmVsGrad}>
+                     <Text style={styles.mmVsEmoji}>⚔️</Text>
+                     <Text style={styles.mmVsText}>VS</Text>
+                   </LinearGradient>
+                 </Animated.View>
+
+                 <Animated.View
+                   style={[
+                     styles.mmPlayer,
+                     {
+                       transform: [{
                          translateY: searchAnim.interpolate({
                            inputRange: [0, 1],
-                           outputRange: [-20, 20]
-                         })
-                       }
-                     ]
-                   }
-                 ]}
-               >
-                 <Animated.View 
-                   style={[
-                     styles.playerGlow,
-                     {
-                       opacity: glowAnim.interpolate({
-                         inputRange: [0, 1],
-                         outputRange: [0.5, 1]
-                       })
-                     }
+                           outputRange: [-5, 5],
+                         }),
+                       }],
+                     },
                    ]}
                  >
-                   <LinearGradient
-                     colors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
-                     style={styles.playerGlowGradient}
-                   />
+                   <Animated.View
+                     style={{
+                       transform: [{
+                         rotate: rotateAnim.interpolate({
+                           inputRange: [0, 1],
+                           outputRange: ['0deg', '360deg'],
+                         }),
+                       }],
+                     }}
+                   >
+                     <LinearGradient colors={['#818CF8', '#4F46E5']} style={styles.mmAvatar}>
+                       <Ionicons name="person" size={24} color="#fff" />
+                     </LinearGradient>
+                   </Animated.View>
+                   <Text style={styles.mmPlayerName} numberOfLines={1}>{rivalHint}…</Text>
+                   <View style={styles.mmBadgeSearch}>
+                     <Animated.View style={{ opacity: searchAnim }}>
+                       <Ionicons name="search" size={10} color="#C4B5FD" />
+                     </Animated.View>
+                     <Text style={styles.mmBadgeTextSearch}>Scanning</Text>
+                   </View>
                  </Animated.View>
-                 <View style={styles.playerAvatar}>
-                  <Animated.View
-                    style={{
-                      transform: [{
-                        rotate: rotateAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0deg', '360deg']
-                        })
-                      }]
-                    }}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.5)', 'rgba(255,255,255,0.2)']}
-                      style={styles.opponentAvatarGradient}
-                    >
-                      <Ionicons name="person" size={36} color="#fff" />
-                    </LinearGradient>
-                  </Animated.View>
-                </View>
-                <Text style={styles.playerName}>Opponent</Text>
-                <View style={styles.searchingBadge}>
-                  <Animated.View
-                    style={{
-                      opacity: searchAnim
-                    }}
-                  >
-                    <Ionicons name="radio" size={16} color="#fff" />
-                  </Animated.View>
-                  <Text style={styles.searchingText}>Finding</Text>
-                </View>
-              </Animated.View>
-            </View>
-            
-            {/* Premium Status Info */}
-            <View style={styles.statusInfo}>
-              <Animated.Text 
-                style={[
-                  styles.statusTitle,
-                  {
-                    opacity: fadeAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1]
-                    })
-                  }
-                ]}
-              >
-                Searching for Opponent
-              </Animated.Text>
-              <Text style={styles.statusSubtitleText}>
-                Finding the perfect match for you...
-              </Text>
+               </View>
+             </View>
 
-                {/* Premium Time Display */}
-                <Animated.View
-                  style={[
-                    styles.largeTimeContainer,
-                    {
-                      opacity: fadeAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1]
-                      })
-                    }
-                  ]}
-                >
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0.05)']}
-                    style={styles.largeTimeGradient}
-                  >
-                    <View style={styles.timeIconContainer}>
-                      <Ionicons name="time-outline" size={28} color="rgba(255,255,255,0.95)" />
-                    </View>
-                    <Text style={styles.largeTimeText}>
-                      {formatTime(matchmakingState.timeElapsed)}
-                    </Text>
-                    <Text style={styles.largeTimeLabel}>Time Elapsed</Text>
-                  </LinearGradient>
-                </Animated.View>
-            </View>
-            
-            {/* Premium Cancel Button */}
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancelSearch}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['rgba(239, 68, 68, 0.9)', 'rgba(220, 38, 38, 0.9)', 'rgba(185, 28, 28, 0.9)']}
-                style={styles.cancelButtonGradient}
-              >
-                <Ionicons name="close-circle-outline" size={20} color="#fff" />
-                <Text style={styles.cancelButtonText}>Cancel Search</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
+             <Animated.View style={[styles.mmTipCard, { opacity: tipFadeAnim }]}>
+               <Ionicons name="bulb" size={16} color="#FDE68A" />
+               <Text style={styles.mmTipText}>{HYPE_TIPS[tipIndex]}</Text>
+             </Animated.View>
 
-                          {/* Premium Opponent Found State */}
+             <Text style={styles.statusTitle}>Hunting your rival…</Text>
+             <Text style={styles.statusSubtitleText}>
+               {waitPct < 40
+                 ? 'Scanning the arena for a perfect match'
+                 : waitPct < 75
+                   ? 'Almost there — a challenger is nearby'
+                   : 'Hold on — securing the best opponent for you'}
+             </Text>
+
+             <View style={styles.mmTimerRow}>
+               <View style={styles.mmTimerBox}>
+                 <Ionicons name="time-outline" size={17} color="#C4B5FD" />
+                 <Text style={styles.mmTimerVal}>{formatTime(matchmakingState.timeElapsed)}</Text>
+                 <Text style={styles.mmTimerLbl}>Elapsed</Text>
+               </View>
+               <View style={styles.mmTimerDivider} />
+               <View style={styles.mmTimerBox}>
+                 <Ionicons name="hourglass-outline" size={17} color="#C4B5FD" />
+                 <Text style={styles.mmTimerVal}>~{matchmakingState.estimatedWait}s</Text>
+                 <Text style={styles.mmTimerLbl}>Typical wait</Text>
+               </View>
+             </View>
+
+             <View style={styles.mmProgressTrack}>
+               <LinearGradient
+                 colors={['#C4B5FD', '#8B5CF6', '#6D28D9']}
+                 start={{ x: 0, y: 0 }}
+                 end={{ x: 1, y: 0 }}
+                 style={[styles.mmProgressFill, { width: `${Math.max(waitPct, 8)}%` }]}
+               />
+             </View>
+             <Text style={styles.mmProgressHint}>{waitPct}% match confidence</Text>
+
+             <View style={styles.mmScanRow}>
+               <Animated.View style={[styles.mmScanDot, { opacity: searchAnim }]} />
+               <Animated.View
+                 style={[
+                   styles.mmScanDot,
+                   {
+                     opacity: searchAnim.interpolate({
+                       inputRange: [0, 0.5, 1],
+                       outputRange: [0.35, 1, 0.35],
+                     }),
+                   },
+                 ]}
+               />
+               <Animated.View
+                 style={[
+                   styles.mmScanDot,
+                   {
+                     opacity: searchAnim.interpolate({
+                       inputRange: [0, 1],
+                       outputRange: [0.5, 1],
+                     }),
+                   },
+                 ]}
+               />
+               <Text style={styles.mmScanLabel}>Scanning active players…</Text>
+             </View>
+
+             <TouchableOpacity
+               style={styles.mmCancelBtn}
+               onPress={handleCancelSearch}
+               activeOpacity={0.85}
+             >
+               <Ionicons name="close-circle-outline" size={18} color="#FCA5A5" />
+               <Text style={styles.mmCancelText}>Cancel search</Text>
+             </TouchableOpacity>
+           </View>
+         )}
+
+         {/* Opponent found */}
          {matchmakingState.status === 'found' && matchmakingState.opponent && (
            <View style={styles.foundContainer}>
-             {/* Premium Success Animation */}
+             <LinearGradient
+               colors={['#10B981', '#059669']}
+               start={{ x: 0, y: 0 }}
+               end={{ x: 1, y: 0 }}
+               style={styles.mmLockedRibbon}
+             >
+               <Ionicons name="lock-closed" size={14} color="#ECFDF5" />
+               <Text style={styles.mmLockedText}>MATCH LOCKED</Text>
+             </LinearGradient>
+
              <Animated.View 
                style={[
                  styles.successIcon,
@@ -1245,10 +1180,10 @@ export default function MatchmakingScreen() {
                </LinearGradient>
              </Animated.View>
              
-             <Text style={styles.foundTitle}>Opponent Found!</Text>
-             <Text style={styles.foundSubtitle}>Get ready for battle</Text>
-             
-            {/* Compact Matchup */}
+             <Text style={styles.foundTitle}>Rival spotted!</Text>
+             <Text style={styles.foundSubtitle}>Battle starts in moments — bring your A-game</Text>
+
+            <View style={[styles.mmGlassCard, styles.foundGlass]}>
             <View style={styles.foundMatchupContainer}>
               {/* You */}
               <View style={styles.playerCard}>
@@ -1261,10 +1196,10 @@ export default function MatchmakingScreen() {
                       colors={['#FF6B6B', '#FF8E53']}
                       style={styles.playerAvatarGradient}
                     >
-                      <Text style={[styles.playerInitial, styles.foundPlayerInitial]}>Y</Text>
+                      <Text style={[styles.playerInitial, styles.foundPlayerInitial]}>{userInitial}</Text>
                     </LinearGradient>
                   </View>
-                  <Text style={[styles.playerName, styles.foundPlayerName]}>You</Text>
+                  <Text style={[styles.playerName, styles.foundPlayerName]}>{userDisplayName}</Text>
                   <View style={styles.readyBadge}>
                     <LinearGradient
                       colors={['#10B981', '#059669']}
@@ -1316,12 +1251,14 @@ export default function MatchmakingScreen() {
                 </LinearGradient>
               </View>
             </View>
+            </View>
            </View>
          )}
 
         {/* Premium Match Starting State */}
         {matchmakingState.status === 'starting' && (
           <View style={styles.startingContainer}>
+            <Text style={styles.mmGoLabel}>⚡ GET READY ⚡</Text>
             <Animated.View 
               style={[
                 styles.gameIcon,
@@ -1329,7 +1266,7 @@ export default function MatchmakingScreen() {
               ]}
             >
               <LinearGradient
-                colors={['#ef4444', '#dc2626', '#b91c1c', '#991b1b']}
+                colors={['#F59E0B', '#EF4444', '#DC2626']}
                 style={styles.gameIconGradient}
               >
                 <Ionicons name="flash" size={Platform.OS === 'android' ? 44 : 64} color="#fff" />
@@ -1337,27 +1274,42 @@ export default function MatchmakingScreen() {
             </Animated.View>
             
             <LinearGradient
-              colors={['rgba(239, 68, 68, 0.9)', 'rgba(220, 38, 38, 0.9)', 'rgba(185, 28, 28, 0.9)']}
+              colors={['rgba(245, 158, 11, 0.95)', 'rgba(239, 68, 68, 0.95)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
               style={styles.battleTitleGradient}
             >
-              <Text style={styles.battleTitleText}>Battle Starting!</Text>
+              <Text style={styles.battleTitleText}>Battle ignites now!</Text>
             </LinearGradient>
-            <Text style={styles.statusSubtitle}>Prepare yourself...</Text>
+            <Text style={styles.statusSubtitle}>Focus up — every second counts</Text>
             
             <View style={styles.countdownCard}>
               <LinearGradient
-                colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.12)']}
+                colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.08)']}
                 style={styles.countdownGradient}
               >
-                <Text style={styles.countdownNumber}>{countdown}</Text>
+                <Animated.Text
+                  style={[
+                    styles.countdownNumber,
+                    { transform: [{ scale: countdownScale }] },
+                  ]}
+                >
+                  {countdown > 0 ? countdown : '🚀'}
+                </Animated.Text>
                 <Text style={styles.countdownText}>
-                  {countdown > 0 ? 'Starting in' : 'GO!'}
+                  {countdown > 0 ? 'Starting in' : 'FIGHT!'}
                 </Text>
               </LinearGradient>
             </View>
+            {matchmakingState.opponent && (
+              <Text style={styles.mmVsOpponentHint}>
+                vs {matchmakingState.opponent.name}
+              </Text>
+            )}
           </View>
         )}
-      </View>
+        </View>
+      </SafeAreaView>
     </View>
   );
 }
@@ -1366,6 +1318,491 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  mmSafe: {
+    flex: 1,
+  },
+  mmOrb: {
+    position: 'absolute',
+    borderRadius: 999,
+    backgroundColor: 'rgba(139, 92, 246, 0.35)',
+  },
+  mmOrbTop: {
+    width: width * 0.7,
+    height: width * 0.7,
+    top: -width * 0.2,
+    right: -width * 0.15,
+  },
+  mmOrbBottom: {
+    width: width * 0.55,
+    height: width * 0.55,
+    bottom: height * 0.08,
+    left: -width * 0.2,
+    backgroundColor: 'rgba(99, 102, 241, 0.28)',
+  },
+  mmTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingBottom: 8,
+  },
+  mmBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mmTopCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  mmTopSpacer: {
+    width: 40,
+  },
+  mmTopTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: Platform.OS === 'android' ? 17 : 19,
+    color: '#FAF5FF',
+    letterSpacing: 0.2,
+  },
+  mmTopSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: 'rgba(237, 233, 254, 0.78)',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  mmChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 6,
+  },
+  mmChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    maxWidth: width * 0.42,
+  },
+  mmChipGold: {
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderColor: 'rgba(251, 191, 36, 0.35)',
+  },
+  mmChipText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 11,
+    color: '#EDE9FE',
+  },
+  mmChipGoldText: {
+    color: '#FDE68A',
+  },
+  mmLiveRow: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mmLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.35)',
+  },
+  mmLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#34D399',
+  },
+  mmLiveText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 12,
+    color: '#A7F3D0',
+  },
+  mmPrizeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 251, 235, 0.35)',
+  },
+  mmPrizeIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mmPrizeTextWrap: {
+    flex: 1,
+  },
+  mmPrizeLabel: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: 'rgba(255, 251, 235, 0.85)',
+    letterSpacing: 1.2,
+  },
+  mmPrizeAmount: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 16,
+    color: '#FFFBEB',
+    marginTop: 2,
+  },
+  mmFreeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.35)',
+  },
+  mmFreeBannerText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 13,
+    color: '#DDD6FE',
+  },
+  mmArenaTag: {
+    alignSelf: 'center',
+    marginBottom: 10,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  mmArenaTagGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(196, 181, 253, 0.35)',
+    borderRadius: 20,
+  },
+  mmArenaTagText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 11,
+    color: '#EDE9FE',
+    letterSpacing: 1.4,
+  },
+  mmSpark: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FDE68A',
+  },
+  mmSparkA: {
+    top: 12,
+    right: 24,
+  },
+  mmSparkB: {
+    top: 28,
+    left: 20,
+    backgroundColor: '#C4B5FD',
+  },
+  mmTipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    width: '100%',
+    maxWidth: 340,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.28)',
+    marginBottom: 12,
+  },
+  mmTipText: {
+    flex: 1,
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
+    color: '#FEF3C7',
+    lineHeight: 18,
+  },
+  mmProgressHint: {
+    fontFamily: FontFamily.regular,
+    fontSize: 10,
+    color: 'rgba(196, 181, 253, 0.75)',
+    marginTop: -6,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  mmLockedRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 14,
+  },
+  mmLockedText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 12,
+    color: '#ECFDF5',
+    letterSpacing: 1.5,
+  },
+  mmGoLabel: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 14,
+    color: '#FDE68A',
+    letterSpacing: 2,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  mmVsOpponentHint: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 15,
+    color: 'rgba(237, 233, 254, 0.85)',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  mmGlassCard: {
+    width: '100%',
+    borderRadius: 22,
+    paddingVertical: Platform.OS === 'android' ? 16 : 20,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    marginBottom: 14,
+  },
+  mmRadarWrap: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  mmRadarRing: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: 'rgba(167, 139, 250, 0.55)',
+  },
+  mmRadarRingMid: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderColor: 'rgba(196, 181, 253, 0.4)',
+  },
+  mmRadarCore: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+  },
+  mmRadarCoreGrad: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mmMatchup: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  mmPlayer: {
+    flex: 1,
+    alignItems: 'center',
+    maxWidth: '38%',
+  },
+  mmAvatar: {
+    width: Platform.OS === 'android' ? 52 : 58,
+    height: Platform.OS === 'android' ? 52 : 58,
+    borderRadius: Platform.OS === 'android' ? 26 : 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  mmAvatarLetter: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 22,
+    color: '#fff',
+  },
+  mmPlayerName: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 13,
+    color: '#FAF5FF',
+    marginTop: 8,
+  },
+  mmBadgeReady: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  mmBadgeText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 10,
+    color: '#6EE7B7',
+  },
+  mmBadgeSearch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+  },
+  mmBadgeTextSearch: {
+    fontFamily: FontFamily.medium,
+    fontSize: 10,
+    color: '#C4B5FD',
+  },
+  mmVs: {
+    paddingTop: 14,
+    paddingHorizontal: 4,
+  },
+  mmVsGrad: {
+    width: 48,
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  mmVsEmoji: {
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  mmVsText: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 12,
+    color: '#1C1917',
+    marginTop: 1,
+  },
+  mmTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginBottom: 10,
+  },
+  mmTimerBox: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  mmTimerDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  mmTimerVal: {
+    fontFamily: FontFamily.bold,
+    fontSize: 18,
+    color: '#FAF5FF',
+  },
+  mmTimerLbl: {
+    fontFamily: FontFamily.regular,
+    fontSize: 10,
+    color: 'rgba(237, 233, 254, 0.65)',
+  },
+  mmProgressTrack: {
+    width: '100%',
+    maxWidth: 320,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  mmProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  mmScanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+  },
+  mmScanDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#C4B5FD',
+  },
+  mmScanLabel: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: 'rgba(237, 233, 254, 0.7)',
+    marginLeft: 4,
+  },
+  mmCancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+    width: '100%',
+    maxWidth: 280,
+  },
+  mmCancelText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 14,
+    color: '#FCA5A5',
+  },
+  foundGlass: {
+    marginBottom: 0,
+    maxWidth: 360,
   },
   header: {
     flexDirection: 'row',
@@ -1432,18 +1869,18 @@ const styles = StyleSheet.create({
      content: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 18 : 0,
+    paddingTop: Platform.OS === 'android' ? 4 : 8,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
    },
   searchingContainer: {
-    flex: Platform.OS === 'android' ? 0.65 : 1,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: Platform.OS === 'android' ? 4 : 12,
+    paddingVertical: Platform.OS === 'android' ? 8 : 16,
     width: '100%',
-    maxWidth: '100%',
-    paddingHorizontal: 10,
+    maxWidth: 360,
   },
   searchAnimationContainer: {
     width: Platform.OS === 'android' ? 64 : 110,
@@ -1544,18 +1981,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorTitle: {
+    fontFamily: FontFamily.bold,
     fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
+    color: '#FAF5FF',
     marginBottom: 6,
     textAlign: 'center',
   },
   errorMessage: {
+    fontFamily: FontFamily.regular,
     fontSize: 14,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(237, 233, 254, 0.88)',
     marginBottom: 18,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 21,
+    paddingHorizontal: 8,
   },
   errorButtons: {
     flexDirection: 'column',
@@ -1948,22 +2387,20 @@ const styles = StyleSheet.create({
      paddingHorizontal: 20,
    },
    statusTitle: {
-    fontSize: Platform.OS === 'android' ? 20 : 24,
-     fontWeight: '800',
-     color: '#fff',
-     marginBottom: 8,
+    fontFamily: FontFamily.bold,
+    fontSize: Platform.OS === 'android' ? 18 : 20,
+     color: '#FAF5FF',
+     marginBottom: 6,
      textAlign: 'center',
-     letterSpacing: 0.5,
-     textShadowColor: 'rgba(0,0,0,0.5)',
-     textShadowOffset: { width: 0, height: 2 },
-     textShadowRadius: 4,
+     letterSpacing: 0.3,
    },
    statusSubtitleText: {
-     fontSize: 14,
-     fontWeight: '500',
-     color: 'rgba(255,255,255,0.7)',
+     fontFamily: FontFamily.regular,
+     fontSize: 13,
+     color: 'rgba(237, 233, 254, 0.72)',
      textAlign: 'center',
-     marginTop: 4,
+     marginBottom: 14,
+     paddingHorizontal: 12,
    },
   statusBadge: {
     // Make Ready badge visually match the "Finding" pill but green
@@ -2578,26 +3015,19 @@ const styles = StyleSheet.create({
        },
        // Premium Opponent Found Styles
        foundTitle: {
-         fontSize: 28,
-         fontWeight: '900',
-         color: '#fff',
-         marginBottom: 6,
+         fontFamily: FontFamily.extraBold,
+         fontSize: Platform.OS === 'android' ? 22 : 26,
+         color: '#FAF5FF',
+         marginBottom: 4,
          textAlign: 'center',
-         textShadowColor: 'rgba(0,0,0,0.6)',
-         textShadowOffset: { width: 0, height: 3 },
-         textShadowRadius: 6,
-         letterSpacing: 0.8,
+         letterSpacing: 0.4,
        },
        foundSubtitle: {
-         fontSize: 15,
-         color: 'rgba(255,255,255,0.75)',
-         marginBottom: 32,
+         fontFamily: FontFamily.regular,
+         fontSize: 14,
+         color: 'rgba(237, 233, 254, 0.75)',
+         marginBottom: 20,
          textAlign: 'center',
-         fontWeight: '500',
-         textShadowColor: 'rgba(0,0,0,0.3)',
-         textShadowOffset: { width: 0, height: 1 },
-         textShadowRadius: 3,
-         letterSpacing: 0.3,
        },
        enhancedMatchupContainer: {
          flexDirection: 'row',

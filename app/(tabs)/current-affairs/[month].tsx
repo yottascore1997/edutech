@@ -92,7 +92,7 @@ export default function CurrentAffairsMonthScreen() {
       <TouchableOpacity
         style={styles.entryCard}
         activeOpacity={0.85}
-        onPress={() => router.push({ pathname: '/current-affairs/note', params: { entry: JSON.stringify(item) } })}
+        onPress={() => router.push({ pathname: '/(tabs)/current-affairs/note' as any, params: { entry: JSON.stringify(item) } })}
       >
         <View style={styles.entryHeader}>
           <LinearGradient colors={['#EEF2FF', '#E0E7FF']} style={styles.entryIcon}>

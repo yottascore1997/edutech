@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Yottascore",
-    "slug": "yottascore",
+    "slug": "Exam-frontend",
     "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -23,7 +23,7 @@
         "ACCESS_NETWORK_STATE",
         "INTERNET"
       ],
-     "package": "com.yottascore.closedbook",
+      "package": "com.yottascore.closedbook",
       "versionCode": 1,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.anonymous.Examfrontend"
     },
@@ -34,7 +34,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

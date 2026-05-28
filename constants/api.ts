@@ -3,9 +3,14 @@
 import { getApiAuthHandler } from '@/utils/apiAuthHandler';
 
 // export const API_BASE_URL = 'https://www.yottascore.com/api';
-// Local backend runs on :3001 (frontend/next runs on :3000). Point API to backend.
-export const API_BASE_URL = 'http://192.168.1.9:3000/api';
+// Local: set EXPO_PUBLIC_API_URL in .env to your PC's LAN IP (ipconfig → IPv4).
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.12:3000/api';
 export const SITE_BASE_URL = API_BASE_URL.replace('/api', '');
+
+if (__DEV__) {
+  console.log('[API] BASE_URL =', API_BASE_URL);
+}
 
 /** Image/uploads base URL – use score.yottascore.com for images */
 export const IMAGE_BASE_URL = 'https://score.yottascore.com';

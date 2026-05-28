@@ -1,11 +1,50 @@
+import TimetableScreenUI from '@/components/timetable/TimetableScreenUI';
+import { QuizTheme } from '@/constants/QuizTheme';
+import { FontFamily } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, LayoutAnimation, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, UIManager, View, Image } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
+} from 'react-native';
+
+const { width: SCREEN_W } = Dimensions.get('window');
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiFetchAuth } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
+
+function getSlotProgress(startTime: string, endTime: string): number {
+  const now = Date.now();
+  const start = new Date(startTime).getTime();
+  const end = new Date(endTime).getTime();
+  if (now <= start) return 0;
+  if (now >= end) return 100;
+  return Math.min(100, Math.round(((now - start) / (end - start)) * 100));
+}
+
+function getSlotStatus(startTime: string, endTime: string): 'upcoming' | 'in_progress' | 'completed' {
+  const now = Date.now();
+  const start = new Date(startTime).getTime();
+  const end = new Date(endTime).getTime();
+  if (now < start) return 'upcoming';
+  if (now > end) return 'completed';
+  return 'in_progress';
+}
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -78,9 +117,11 @@ const scheduleBackgroundColors = [
 
 export default function TimetableScreen() {
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const scheduleSectionY = useRef(0);
   const [timetables, setTimetables] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<{ [id: string]: boolean }>({});
   const [modalVisible, setModalVisible] = useState(false);
@@ -153,8 +194,9 @@ export default function TimetableScreen() {
     }).start();
   }, []);
 
-  const fetchTimetable = async () => {
-    setLoading(true);
+  const fetchTimetable = async (isPullRefresh = false) => {
+    if (isPullRefresh) setRefreshing(true);
+    else setLoading(true);
     setError('');
     try {
       const res = await apiFetchAuth('/student/timetable', user?.token || '');
@@ -166,7 +208,8 @@ export default function TimetableScreen() {
     } catch (e) {
       setError('Failed to load timetable');
     } finally {
-      setLoading(false);
+      if (isPullRefresh) setRefreshing(false);
+      else setLoading(false);
     }
   };
 
@@ -339,13 +382,6 @@ export default function TimetableScreen() {
     setSelectedSlot(null);
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
-
   const isToday = (date: Date) => {
     const today = new Date();
     return date.toDateString() === today.toDateString();
@@ -377,196 +413,86 @@ export default function TimetableScreen() {
     }));
   };
 
+  const todaySlots = timetables.flatMap(t => t.slots.filter((s: any) => {
+    const slotDate = new Date(s.startTime);
+    const today = new Date();
+    return slotDate.toDateString() === today.toDateString();
+  }));
+
+  const completedTodayCount = todaySlots.filter(
+    s => getSlotStatus(s.startTime, s.endTime) === 'completed'
+  ).length;
+
+  const studyHoursToday = todaySlots.reduce((acc, s) => {
+    const start = new Date(s.startTime).getTime();
+    const end = new Date(s.endTime).getTime();
+    return acc + (end - start) / (1000 * 60 * 60);
+  }, 0);
+
+  const showSlotMenu = (slot: any) => {
+    Alert.alert(slot.subject || 'Study Session', 'Choose an action', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteSlot(slot) },
+    ]);
+  };
+
+  const scrollToSchedule = () => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, scheduleSectionY.current - 12), animated: true });
+  };
+
   if (loading) {
     return (
-      <LinearGradient colors={['#E0F2FE', '#F0F9FF', '#FFFFFF']} style={styles.loadingContainer}>
+      <LinearGradient colors={['#EDE9FE', QuizTheme.bg, '#FFFFFF']} style={styles.loadingContainer}>
         <View style={styles.loadingIcon3D}>
           <View style={styles.loadingIcon3DInner}>
-            <Ionicons name="calendar" size={48} color="#7C3AED" />
+            <Ionicons name="calendar" size={48} color={QuizTheme.primary} />
           </View>
         </View>
-        <ActivityIndicator size="large" color="#7C3AED" />
+        <ActivityIndicator size="large" color={QuizTheme.primary} />
         <Text style={styles.loadingText}>Loading your schedule...</Text>
       </LinearGradient>
     );
   }
 
+  const scheduleTitle = isToday(selectedDate)
+    ? "Today's Schedule"
+    : selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
   return (
     <SafeAreaView style={styles.container} edges={[]}>
-      {/* Light Education Header - Premium 3D feel */}
-      <LinearGradient
-        colors={['#EDE9FE', '#F5F3FF', '#FAF5FF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.appHeaderGradient, { paddingTop: insets.top + 2 }]}
-      >
-        <View style={styles.appHeader}>
-          <View style={styles.appHeaderLeft}>
-            <Image source={require('../../assets/images/icons/schedule.png')} style={styles.timetableHeaderIcon} resizeMode="contain" />
-            <View>
-              <Text style={styles.appTitle}>Timetable</Text>
-              <Text style={styles.appSubtitle}>Plan study time • Stay exam-ready</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.headerAddButton}
-            onPress={() => setModalVisible(true)}
-            activeOpacity={0.85}
-          >
-            <Image source={require('../../assets/images/icons/plus.png')} style={styles.headerAddIcon} resizeMode="contain" />
-          </TouchableOpacity>
-        </View>
-        {/* Why Timetable matters - education CTA */}
-        <View style={styles.importanceBanner}>
-          <Image source={require('../../assets/images/icons/clock.png')} style={styles.importanceBannerIcon} resizeMode="contain" />
-          <Text style={styles.importanceBannerText}>A good timetable is key to exam success — plan revision & stay on track.</Text>
-        </View>
-      </LinearGradient>
-
-      {/* Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchTimetable} />}>
-          <Animated.View style={[styles.calendarContent, { opacity: fadeAnim }]}>
-            {/* Calendar Section - Premium card */}
-            <View style={styles.calendarCard}>
-              {/* Calendar Header */}
-              <View style={styles.calendarHeaderNew}>
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={() => {
-                    const newMonth = new Date(currentMonth);
-                    newMonth.setMonth(newMonth.getMonth() - 1);
-                    setCurrentMonth(newMonth);
-                  }}
-                >
-                  <Ionicons name="chevron-back" size={20} color="#374151" />
-                </TouchableOpacity>
-                <Text style={styles.monthYearText}>
-                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </Text>
-                <TouchableOpacity 
-                  style={styles.navButton}
-                  onPress={() => {
-                    const newMonth = new Date(currentMonth);
-                    newMonth.setMonth(newMonth.getMonth() + 1);
-                    setCurrentMonth(newMonth);
-                  }}
-                >
-                  <Ionicons name="chevron-forward" size={20} color="#374151" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Day Headers */}
-              <View style={styles.dayHeadersRow}>
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                  <View key={index} style={styles.dayHeader}>
-                    <Text style={styles.dayHeaderText}>{day}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Calendar Grid */}
-              <View style={styles.calendarGridNew}>
-                {calendarDays.map((date, index) => {
-                  const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-                  const isTodayDate = isToday(date);
-                  const isSelectedDateValue = isSelectedDate(date);
-                  const hasEventsOnDay = hasEvents(date);
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.calendarDayNew,
-                        isCurrentMonth && styles.calendarDayCurrentMonthNew,
-                        isTodayDate && styles.calendarDayTodayNew,
-                        isSelectedDateValue && styles.calendarDaySelectedNew,
-                      ]}
-                      onPress={() => setSelectedDate(date)}
-                      activeOpacity={0.7}
-                    >
-                      <Text
-                        style={[
-                          styles.calendarDayTextNew,
-                          isCurrentMonth && styles.calendarDayTextCurrentMonthNew,
-                          isTodayDate && styles.calendarDayTextTodayNew,
-                          isSelectedDateValue && styles.calendarDayTextSelectedNew,
-                          !isCurrentMonth && styles.calendarDayTextOtherMonthNew,
-                        ]}
-                      >
-                        {date.getDate()}
-                      </Text>
-                      {hasEventsOnDay && !isSelectedDateValue && !isTodayDate && (
-                        <View style={styles.calendarDayDot} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-
-            {/* Today's Events Section - Education premium */}
-            <View style={styles.eventsSection}>
-              <View style={styles.eventsSectionHeader}>
-                <Image source={require('../../assets/images/icons/calendar.png')} style={styles.todayScheduleIcon} resizeMode="contain" />
-                <Text style={styles.eventsSectionTitle}>Today's schedule</Text>
-              </View>
-              
-              {selectedDateSlots.length === 0 ? (
-                <View style={styles.emptySchedule}>
-                  <View style={styles.emptyScheduleIcon3D}>
-                    <View style={styles.emptyScheduleIcon3DInner}>
-                      <Ionicons name="calendar-outline" size={40} color="#7C3AED" />
-                    </View>
-                  </View>
-                  <Text style={styles.emptyScheduleText}>No events for this day</Text>
-                  <Text style={styles.emptyScheduleSubtext}>Tap + to add a study slot</Text>
-                </View>
-              ) : (
-                <View style={styles.eventsList}>
-                  {selectedDateSlots.map((slot, index) => {
-                    const eventColors = [
-                      { bg: '#E0F2FE', iconBg: '#0EA5E9', text: '#0C4A6E', time: '#0369A1' },
-                      { bg: '#D1FAE5', iconBg: '#059669', text: '#064E3B', time: '#047857' },
-                      { bg: '#FEF3C7', iconBg: '#D97706', text: '#78350F', time: '#B45309' },
-                      { bg: '#EDE9FE', iconBg: '#7C3AED', text: '#4C1D95', time: '#6D28D9' },
-                      { bg: '#FCE7F3', iconBg: '#DB2777', text: '#831843', time: '#BE185D' },
-                      { bg: '#CCFBF1', iconBg: '#0D9488', text: '#134E4A', time: '#0F766E' },
-                    ];
-                    const eventColor = eventColors[index % eventColors.length];
-                    const subjectIcon = (() => {
-                      const s = (slot.subject || '').toLowerCase();
-                      if (s.includes('programming') || s.includes('coding')) return 'code-slash';
-                      if (s.includes('math') || s.includes('mathematics')) return 'calculator';
-                      if (s.includes('physics')) return 'nuclear';
-                      if (s.includes('chemistry')) return 'flask';
-                      if (s.includes('biology')) return 'leaf';
-                      if (s.includes('english') || s.includes('literature')) return 'book';
-                      if (s.includes('history')) return 'time';
-                      if (s.includes('art') || s.includes('design')) return 'brush';
-                      return 'school';
-                    })();
-                    return (
-                      <View key={index} style={[styles.eventCard, styles.eventCardShadow, { backgroundColor: eventColor.bg }]}>
-                        <View style={[styles.eventIcon3D, { backgroundColor: eventColor.iconBg }]}>
-                          <View style={styles.eventIcon3DInner}>
-                            <Ionicons name={subjectIcon as any} size={24} color="#FFFFFF" />
-                          </View>
-                        </View>
-                        <View style={styles.eventContent}>
-                          <Text style={[styles.eventTitle, { color: eventColor.text }]}>{slot.subject || 'Study Session'}</Text>
-                          <Text style={[styles.eventTime, { color: eventColor.time }]}>{formatTime(slot.startTime)} - {formatTime(slot.endTime)}</Text>
-                        </View>
-                        <TouchableOpacity style={styles.eventDeleteButton} onPress={() => handleDeleteSlot(slot)}>
-                          <Ionicons name="trash-outline" size={20} color="#DC2626" />
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  })}
-              </View>
-            )}
-            </View>
-          </Animated.View>
-      </ScrollView>
+      <TimetableScreenUI
+        fadeAnim={fadeAnim}
+        scrollRef={scrollRef}
+        scheduleSectionY={scheduleSectionY}
+        currentMonth={currentMonth}
+        calendarDays={calendarDays}
+        selectedDateSlots={selectedDateSlots}
+        scheduleTitle={scheduleTitle}
+        completedTodayCount={completedTodayCount}
+        studyHoursToday={studyHoursToday}
+        refreshing={refreshing}
+        isToday={isToday}
+        isSelectedDate={isSelectedDate}
+        hasEvents={hasEvents}
+        formatTime={formatTime}
+        getSlotProgress={getSlotProgress}
+        getSlotStatus={getSlotStatus}
+        onRefresh={() => fetchTimetable(true)}
+        onAddStudy={() => setModalVisible(true)}
+        onPrevMonth={() => {
+          const m = new Date(currentMonth);
+          m.setMonth(m.getMonth() - 1);
+          setCurrentMonth(m);
+        }}
+        onNextMonth={() => {
+          const m = new Date(currentMonth);
+          m.setMonth(m.getMonth() + 1);
+          setCurrentMonth(m);
+        }}
+        onSelectDate={setSelectedDate}
+        onScrollToSchedule={scrollToSchedule}
+        onSlotMenu={showSlotMenu}
+      />
 
 
       {/* Add Timetable Modal */}
@@ -578,7 +504,7 @@ export default function TimetableScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <LinearGradient colors={['#EDE9FE', '#F5F3FF']} style={styles.modalHeaderGradient}>
+            <LinearGradient colors={['#312E81', '#4338CA', '#6D28D9']} style={styles.modalHeaderGradient}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitleDark}>Create New Schedule</Text>
                 <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }} style={styles.modalCloseBtnLight}>
@@ -877,10 +803,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#7C3AED',
   },
   loadingText: {
-    color: '#0369A1',
+    color: QuizTheme.primary,
     fontSize: 16,
     marginTop: 12,
-    fontWeight: '600',
+    fontFamily: FontFamily.semiBold,
   },
   header: {
     backgroundColor: 'transparent',
@@ -1059,11 +985,87 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: QuizTheme.bg,
   },
   calendarContent: {
-    paddingTop: 24,
     paddingBottom: Platform.OS === 'ios' ? 120 : 140,
+  },
+  heroCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 20,
+    padding: 16,
+    paddingRight: 0,
+    minHeight: 148,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.12)',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 14 }
+      : { elevation: 4 }),
+  },
+  heroAddBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 2,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: QuizTheme.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 6 }
+      : { elevation: 5 }),
+  },
+  heroTextBlock: {
+    flex: 1,
+    maxWidth: SCREEN_W * 0.58,
+    paddingRight: 8,
+  },
+  heroTitle: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 24,
+    color: QuizTheme.ink,
+    letterSpacing: -0.3,
+  },
+  heroSubtitle: {
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
+    color: QuizTheme.primary,
+    marginTop: 4,
+  },
+  heroTipBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.1)',
+  },
+  heroTipIcon: {
+    width: 18,
+    height: 18,
+    marginTop: 1,
+  },
+  heroTipText: {
+    flex: 1,
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: QuizTheme.inkMuted,
+    lineHeight: 16,
+  },
+  heroIllustration: {
+    position: 'absolute',
+    right: -4,
+    bottom: -6,
+    width: SCREEN_W * 0.38,
+    height: 120,
   },
   calendarSection: {
     marginTop: 0,
@@ -1649,17 +1651,17 @@ const styles = StyleSheet.create({
     paddingVertical: 25,
   },
   emptyScheduleText: {
+    fontFamily: FontFamily.bold,
     fontSize: 16,
-    color: '#0C4A6E',
+    color: QuizTheme.ink,
     marginTop: 6,
-    fontWeight: 'bold',
   },
   emptyScheduleSubtext: {
+    fontFamily: FontFamily.regular,
     fontSize: 13,
-    color: '#0369A1',
+    color: QuizTheme.inkMuted,
     marginTop: 4,
     textAlign: 'center',
-    opacity: 0.9,
   },
   scheduleCards: {
     backgroundColor: 'transparent',
@@ -2049,9 +2051,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTitleDark: {
-    fontWeight: 'bold',
+    fontFamily: FontFamily.bold,
     fontSize: 20,
-    color: '#1F2937',
+    color: '#FFFFFF',
     flex: 1,
     textAlign: 'center',
   },
@@ -2726,23 +2728,17 @@ const styles = StyleSheet.create({
     height: 42,
   },
   
-  // Calendar Card - Premium
   calendarCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    marginHorizontal: 20,
-    marginTop: 0,
-    marginBottom: 20,
+    marginHorizontal: 16,
+    marginBottom: 16,
     padding: 18,
     borderWidth: 1,
-    borderColor: 'rgba(14, 165, 233, 0.2)',
-    ...(Platform.OS === 'ios' ? {
-      shadowColor: '#0284C7',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-    } : {}),
-    elevation: 4,
+    borderColor: 'rgba(109, 40, 217, 0.1)',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14 }
+      : { elevation: 4 }),
   },
   calendarHeaderNew: {
     flexDirection: 'row',
@@ -2754,16 +2750,16 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#EDE9FE',
     borderWidth: 1,
-    borderColor: '#BAE6FD',
+    borderColor: '#DDD6FE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   monthYearText: {
+    fontFamily: FontFamily.bold,
     fontSize: 17,
-    fontWeight: 'bold',
-    color: '#0C4A6E',
+    color: QuizTheme.ink,
   },
   
   // Day Headers
@@ -2777,66 +2773,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayHeaderText: {
+    fontFamily: FontFamily.semiBold,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0369A1',
   },
-
+  calendarFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  calendarLegend: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 11,
+    color: QuizTheme.inkMuted,
+  },
+  viewScheduleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  viewScheduleText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: QuizTheme.primary,
+  },
   calendarDayDot: {
-    position: 'absolute',
-    bottom: 4,
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#0EA5E9',
+    backgroundColor: QuizTheme.primaryLight,
+    marginTop: 2,
   },
-  
-  // Calendar Grid
   calendarGridNew: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  calendarDayNew: {
+  calendarDayWrap: {
     width: '14.28%',
-    height: 32,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  calendarDayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 2,
-  },
-  calendarDayCurrentMonthNew: {
-    // Current month styling
   },
   calendarDayTodayNew: {
     backgroundColor: '#F97316',
-    borderRadius: 12,
   },
   calendarDaySelectedNew: {
-    backgroundColor: '#0284C7',
-    borderRadius: 12,
+    backgroundColor: QuizTheme.primary,
   },
   calendarDayTextNew: {
+    fontFamily: FontFamily.medium,
     fontSize: 13,
-    fontWeight: '500',
-    color: '#000000',
+    color: QuizTheme.ink,
   },
-  calendarDayTextCurrentMonthNew: {
-    // Current month text styling
-  },
-  calendarDayTextTodayNew: {
+  calendarDayTextHighlighted: {
+    fontFamily: FontFamily.bold,
     color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  calendarDayTextSelectedNew: {
-    color: '#FFFFFF',
-    fontWeight: '600',
   },
   calendarDayTextOtherMonthNew: {
-    color: '#D1D5DB',
+    color: '#CBD5E1',
   },
   
-  // Events Section
   eventsSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   eventsSectionHeader: {
     flexDirection: 'row',
@@ -2844,9 +2872,35 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
+  eventsSectionTitles: {
+    flex: 1,
+  },
+  eventsSectionSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: QuizTheme.inkMuted,
+    marginTop: 2,
+  },
+  addStudyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: QuizTheme.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 }
+      : { elevation: 4 }),
+  },
+  addStudyBtnText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: '#FFFFFF',
+  },
   todayScheduleIcon: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
   },
   eventsSectionIcon3D: {
     ...(Platform.OS === 'ios' ? {
@@ -2871,9 +2925,125 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   eventsSectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0C4A6E',
+    fontFamily: FontFamily.bold,
+    fontSize: 18,
+    color: QuizTheme.ink,
+  },
+  scheduleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(109, 40, 217, 0.08)',
+  },
+  scheduleCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  scheduleSubjectIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleCardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  scheduleSubject: {
+    fontFamily: FontFamily.bold,
+    fontSize: 15,
+    color: QuizTheme.ink,
+  },
+  scheduleTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  scheduleTimeText: {
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
+    color: QuizTheme.inkMuted,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginRight: 2,
+  },
+  statusPillText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 10,
+  },
+  menuBtn: {
+    padding: 4,
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: '#EDE9FE',
+    borderRadius: 6,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  progressLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: 11,
+    color: QuizTheme.primary,
+    marginTop: 6,
+    textAlign: 'right',
+  },
+  motivationCard: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  motivationTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  motivationTitle: {
+    fontFamily: FontFamily.bold,
+    fontSize: 15,
+    color: QuizTheme.ink,
+  },
+  motivationSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: QuizTheme.inkMuted,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  motivationStats: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 10,
+  },
+  motivationStat: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: QuizTheme.inkMuted,
+  },
+  motivationStatBold: {
+    fontFamily: FontFamily.bold,
+    color: QuizTheme.ink,
+  },
+  motivationTrophy: {
+    width: 72,
+    height: 72,
   },
   eventsList: {
     gap: 12,

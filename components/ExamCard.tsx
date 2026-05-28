@@ -1,7 +1,9 @@
 import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
+import { HomeTheme } from '@/constants/HomeTheme';
 import { useAuth } from '@/context/AuthContext';
 import { useFonts } from '@/hooks/useFonts';
+import { addJoinedLiveExamId } from '@/utils/joinedLiveExams';
 import { formatTimeUntilStart, formatDateTime, hasExamStarted } from '@/utils/timeUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -65,6 +67,9 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
             const response = await apiFetchAuth(`/student/live-exams/${exam.id}/participant`, user.token);
             if (response.ok) {
                 setIsParticipant(true);
+                if (user?.id && exam?.id) {
+                    await addJoinedLiveExamId(String(user.id), String(exam.id));
+                }
             } else {
                 setIsParticipant(false);
             }
@@ -195,6 +200,10 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
             
             if (!joinRes.ok) {
                 throw new Error(joinRes.data?.message || 'Failed to join exam');
+            }
+
+            if (user?.id && exam.id) {
+                await addJoinedLiveExamId(String(user.id), String(exam.id));
             }
 
             // 3. Update wallet balance locally
@@ -465,13 +474,18 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
 
     return (
         <>
-        <TouchableOpacity style={styles.card} onPress={handleCardPress} activeOpacity={0.8}>
+        <TouchableOpacity
+            style={[styles.card, isDetailsPage && styles.cardDetails]}
+            onPress={handleCardPress}
+            activeOpacity={isDetailsPage ? 1 : 0.88}
+            disabled={isDetailsPage}
+        >
             {/* Enhanced Header with Logo */}
             <View style={styles.header}>
                 <View style={styles.headerContent}>
                     {/* Exam Image Logo */}
                     {exam.imageUrl && getImageUrl(exam.imageUrl) ? (
-                        <View style={styles.imageContainer}>
+                        <View style={[styles.imageContainer, isDetailsPage && styles.imageContainerDetails]}>
                             <Image 
                                 source={{ uri: getImageUrl(exam.imageUrl) }} 
                                 style={styles.examImage}
@@ -479,11 +493,13 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                             />
                         </View>
                     ) : null}
-                    <View style={styles.titleContainer}>
-                        <Text style={fonts.subheaderLarge} numberOfLines={2}>{exam.title}</Text>
+                    <View style={[styles.titleContainer, isDetailsPage && styles.titleContainerDetails]}>
+                        <Text style={[fonts.subheaderLarge, !isDetailsPage && styles.titleList, isDetailsPage && styles.titleDetails]} numberOfLines={isDetailsPage ? 2 : 1}>
+                            {exam.title}
+                        </Text>
                         <View style={styles.categoryContainer}>
-                            <View style={styles.categoryBadge}>
-                                <Text style={fonts.captionSmall} numberOfLines={3}>
+                            <View style={[styles.categoryBadge, isDetailsPage && styles.categoryBadgeDetails]}>
+                                <Text style={fonts.captionSmall} numberOfLines={1}>
                                     {exam.category || 'General Knowledge'}
                                 </Text>
                             </View>
@@ -530,7 +546,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
 
             {/* Enhanced Spots Section - hidden when opened from My Exams */}
             {!hideSpotsSection && (
-                <View style={styles.spotsContainer}>
+                <View style={[styles.spotsContainer, isDetailsPage && styles.spotsContainerDetails]}>
                     <View style={styles.spotsHeader}>
                         <View style={styles.spotsLeftSection}>
                             <Text style={fonts.bodySmall}>Available Spots</Text>
@@ -564,9 +580,17 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                         </View>
                         <View style={styles.progressBarContainer}>
                             <View style={styles.progressBar}>
-                                <View style={[styles.progress, { width: `${progress}%` }]} />
+                                <View
+                                    style={[
+                                        styles.progress,
+                                        { width: `${progress}%` },
+                                        isDetailsPage && styles.progressDetails,
+                                    ]}
+                                />
                             </View>
-                            <Text style={styles.progressPercentage}>{Math.round(progress)}% filled</Text>
+                            {isDetailsPage && (
+                                <Text style={styles.progressPercentage}>{Math.round(progress)}% filled</Text>
+                            )}
                         </View>
                     </View>
                 </View>
@@ -576,7 +600,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
             {/* Removed tags section as requested */}
 
             {/* Start Time Display */}
-            {exam.startTime && examStatus === 'UPCOMING' && (
+            {isDetailsPage && exam.startTime && examStatus === 'UPCOMING' && (
                 <View style={styles.startTimeContainer}>
                     <View style={styles.startTimeContent}>
                         <Ionicons name="calendar-outline" size={14} color="#6B7280" />
@@ -587,11 +611,11 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
             )}
 
             {/* Enhanced Footer */}
-            <View style={styles.footer}>
-                <View style={styles.prizePoolContainer}>
+            <View style={[styles.footer, isDetailsPage && styles.footerDetails]}>
+                <View style={[styles.prizePoolContainer, isDetailsPage && styles.prizePoolContainerDetails]}>
                     <Text style={styles.prizePoolLabel}>Prize Pool</Text>
                     <Text style={styles.prizePoolAmount}>₹{exam.prizePool?.toFixed(2) || '0.00'}</Text>
-                    <Text style={styles.prizePoolSubtext}>*Up to this amount</Text>
+                    {isDetailsPage && <Text style={styles.prizePoolSubtext}>*Up to this amount</Text>}
                 </View>
                 
                 {!hideAttemptButton && (
@@ -1006,16 +1030,71 @@ const styles = StyleSheet.create({
     card: {
         backgroundColor: AppColors.white,
         borderRadius: 12,
-        padding: 12,
-        marginVertical: 8,
+        padding: 8,
+        marginVertical: 4,
         marginHorizontal: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 4,
         elevation: 2,
-        width: '100%', // Full width within parent container
-        alignSelf: 'center', // Center the card
+        width: '100%',
+        alignSelf: 'center',
+    },
+    cardDetails: {
+        marginVertical: 0,
+        marginHorizontal: 0,
+        borderRadius: 18,
+        padding: 10,
+        backgroundColor: '#FFFBF7',
+        borderWidth: 1,
+        borderColor: HomeTheme.border,
+        shadowColor: '#6344D4',
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 4,
+    },
+    titleContainerDetails: {
+        backgroundColor: 'transparent',
+        padding: 0,
+        marginRight: 10,
+    },
+    titleDetails: {
+        color: HomeTheme.ink,
+        fontSize: 16,
+    },
+    titleList: {
+        fontSize: 14,
+        lineHeight: 18,
+    },
+    categoryBadgeDetails: {
+        backgroundColor: '#FACC15',
+        borderWidth: 1,
+        borderColor: '#EAB308',
+    },
+    spotsContainerDetails: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: HomeTheme.border,
+        marginTop: 6,
+    },
+    progressDetails: {
+        backgroundColor: '#16A34A',
+    },
+    footerDetails: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: HomeTheme.border,
+    },
+    prizePoolContainerDetails: {
+        backgroundColor: HomeTheme.primarySoft,
+        borderRadius: 12,
+        padding: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(99, 68, 212, 0.15)',
     },
     header: {
         flexDirection: 'row',
@@ -1023,7 +1102,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         borderRadius: 10,
         overflow: 'visible',
-        marginBottom: 6,
+        marginBottom: 4,
     },
     headerGradient: {
         padding: 12,
@@ -1038,14 +1117,14 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 0,
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        padding: 6,
+        padding: 4,
         borderRadius: 6,
-        marginRight: 8,
+        marginRight: 6,
     },
     categoryContainer: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginTop: 4,
+        marginTop: 1,
     },
     categoryBadge: {
         alignSelf: 'flex-start',
@@ -1053,8 +1132,8 @@ const styles = StyleSheet.create({
         marginBottom: 2,
         backgroundColor: 'rgba(230, 81, 0, 0.1)',
         borderRadius: 6,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        paddingHorizontal: 5,
+        paddingVertical: 1,
         maxWidth: '100%',
     },
     endTimeContainer: {
@@ -1130,13 +1209,13 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
     },
     spotsContainer: {
-        marginTop: 8,
+        marginTop: 4,
     },
     spotsHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 6,
+        marginBottom: 2,
     },
     spotsLeftSection: {
         flex: 1,
@@ -1163,7 +1242,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     spotsProgressContainer: {
-        marginTop: 8, // Reduced from 10
+        marginTop: 4, // Reduced from 10
     },
     spotsTextContainer: {
         flexDirection: 'row',
@@ -1175,7 +1254,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     progressBar: {
-        height: 6, // Reduced from 8
+        height: 5, // Reduced from 8
         backgroundColor: '#EAEAEA',
         borderRadius: 3, // Reduced from 4
         overflow: 'hidden',
@@ -1191,10 +1270,10 @@ const styles = StyleSheet.create({
         marginTop: 4, // Reduced from 5
     },
     startTimeContainer: {
-        marginTop: 10,
-        marginBottom: 8,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
+        marginTop: 8,
+        marginBottom: 6,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
         backgroundColor: '#FEF3C7',
         borderRadius: 8,
         borderWidth: 1,
@@ -1268,10 +1347,10 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingTop: 12, // Reduced from 15
+        paddingTop: 6, // Reduced from 15
     },
     prizePoolContainer: {
-        marginRight: 16,
+        marginRight: 12,
     },
     prizePoolLabel: {
         fontSize: 11,
@@ -1279,7 +1358,7 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     prizePoolAmount: {
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '700',
         color: AppColors.primary,
         letterSpacing: 0.3,
@@ -1300,8 +1379,8 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     attemptButtonGradient: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
+        paddingVertical: 7,
+        paddingHorizontal: 10,
         borderRadius: 8,
     },
     attemptButtonContent: {
@@ -1313,7 +1392,7 @@ const styles = StyleSheet.create({
     attemptButtonText: {
         color: '#FFFFFF', // White text on green background
         fontWeight: '700',
-        fontSize: 14,
+        fontSize: 12,
         letterSpacing: 0.3,
         textShadowColor: 'rgba(0, 0, 0, 0.2)',
         textShadowOffset: { width: 0, height: 1 },
@@ -1729,14 +1808,22 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     imageContainer: {
-        width: 50,
-        height: 50,
+        width: 36,
+        height: 36,
         marginBottom: 0,
         borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: '#F3F4F6',
         alignSelf: 'flex-start',
-        marginRight: 10,
+        marginRight: 6,
+    },
+    imageContainerDetails: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: HomeTheme.primarySoft,
+        backgroundColor: '#FFFFFF',
     },
     examImage: {
         width: '100%',

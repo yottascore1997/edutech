@@ -1,4 +1,7 @@
+import { QuizTheme } from '@/constants/QuizTheme';
+import { FontFamily } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
+import { Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -17,7 +20,7 @@ import QuestionOfTheDay from './QuestionOfTheDay';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const QuestionOfTheDayPreview = () => {
+const QuestionOfTheDayPreview = ({ variant = 'default' }: { variant?: 'default' | 'quiz' }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timerElement, setTimerElement] = useState<React.ReactNode>(null);
   
@@ -323,6 +326,35 @@ const QuestionOfTheDayPreview = () => {
 
   return (
     <>
+      {variant === 'quiz' ? (
+        <TouchableOpacity activeOpacity={0.92} onPress={openModal}>
+          <LinearGradient
+            colors={[...QuizTheme.qotd]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={quizBannerStyles.card}
+          >
+            <View style={quizBannerStyles.shine} />
+            <LinearGradient colors={['#FDE68A', '#FBBF24']} style={quizBannerStyles.iconWrap}>
+              <Calendar size={20} color="#78350F" strokeWidth={2.2} />
+            </LinearGradient>
+            <View style={quizBannerStyles.textCol}>
+              <Text style={quizBannerStyles.title} numberOfLines={1}>
+                Question of the Day
+              </Text>
+              <Text style={quizBannerStyles.sub} numberOfLines={2}>
+                Test your knowledge daily and earn bonus points!
+              </Text>
+            </View>
+            <View style={quizBannerStyles.outlineBtn}>
+              <Text style={quizBannerStyles.outlineBtnText} numberOfLines={1}>
+                View
+              </Text>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : (
+      <>
       {/* Compact Enhanced Preview Section */}
       <View style={styles.previewContainer}>
                         <LinearGradient
@@ -605,6 +637,8 @@ const QuestionOfTheDayPreview = () => {
           </View>
         </LinearGradient>
       </View>
+      </>
+      )}
 
       {/* Enhanced Modal */}
       <Modal
@@ -1154,6 +1188,75 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     transform: [{ skewX: '-20deg' }],
+  },
+});
+
+const quizBannerStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 4,
+    overflow: 'hidden',
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(147, 197, 253, 0.35)',
+  },
+  shine: {
+    position: 'absolute',
+    top: -20,
+    right: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    flexShrink: 0,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  textCol: { flex: 1, minWidth: 0, paddingRight: 6 },
+  title: {
+    fontFamily: FontFamily.bold,
+    fontSize: 14,
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  sub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.88)',
+    lineHeight: 14,
+  },
+  outlineBtn: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 0,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  outlineBtnText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: '#FFFFFF',
   },
 });
 

@@ -255,6 +255,17 @@ const Login = () => {
                   <Text style={styles.signUpLink}>Create one Now!</Text>
                 </TouchableOpacity>
               </View>
+
+              <TouchableOpacity
+                onPress={() => router.push('/deactivate-account')}
+                activeOpacity={0.8}
+                style={{ marginTop: 10 }}
+              >
+                <Text style={[styles.signUpLabel, { textAlign: 'center' }]}>
+                  Need to deactivate/delete your account?{' '}
+                  <Text style={styles.signUpLink}>Open this page</Text>
+                </Text>
+              </TouchableOpacity>
             </View>
           </TouchableOpacity>
         </ScrollView>

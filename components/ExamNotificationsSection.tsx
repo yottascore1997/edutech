@@ -1,10 +1,13 @@
 import { apiFetchAuth } from '@/constants/api';
 import { AppColors } from '@/constants/Colors';
+import { HomeTheme } from '@/constants/HomeTheme';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useCategory } from '@/context/CategoryContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { ArrowRight } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Dimensions, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -232,126 +235,93 @@ const ExamNotificationsSection = () => {
     };
 
     const displayNotifications = getDummyNotifications();
-    // Filter out expired notifications and apply category filter
-    let activeNotifications = displayNotifications.filter(item => {
-        const daysRemaining = getDaysRemaining(item.applyLastDate);
-        return daysRemaining >= 0; // Only show non-expired notifications
-    });
-    
-    // Apply global category filter if selected
+    let activeNotifications = displayNotifications.filter((item) => getDaysRemaining(item.applyLastDate) >= 0);
+
     if (selectedCategory) {
-        activeNotifications = activeNotifications.filter(item =>
-            item.title.toLowerCase().includes(selectedCategory.toLowerCase()) ||
-            item.description?.toLowerCase().includes(selectedCategory.toLowerCase())
+        activeNotifications = activeNotifications.filter(
+            (item) =>
+                item.title.toLowerCase().includes(selectedCategory.toLowerCase()) ||
+                item.description?.toLowerCase().includes(selectedCategory.toLowerCase())
         );
     }
-    const monthYear = getMonthYear(notifications.length > 0 ? notifications : displayNotifications);
-    const examCount = activeNotifications.length;
 
-
+    const upcomingCount = activeNotifications.length;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+    const todayCount = activeNotifications.filter((item) => {
+        const d = new Date(item.applyLastDate);
+        return d >= todayStart && d < todayEnd;
+    }).length;
+    const weekCount = activeNotifications.filter((item) => {
+        const days = getDaysRemaining(item.applyLastDate);
+        return days >= 0 && days <= 7;
+    }).length;
 
     return (
         <View style={styles.container}>
-            {/* Header Section */}
             <LinearGradient
-                colors={['#2563EB', '#4F46E5', '#7C3AED']}
+                colors={['#4C1D95', '#6D28D9', '#DB2777']}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.header}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradientShell}
             >
-                <View style={styles.headerContent}>
+                <View style={styles.headerRow}>
                     <View style={styles.headerLeft}>
-                        <LinearGradient
-                            colors={['#DB2777', '#BE185D']}
-                            style={styles.headerIcon}
-                        >
-                            <Ionicons name="notifications" size={16} color="#FFFFFF" />
-                        </LinearGradient>
-                        <View>
-                            <Text style={styles.headerTitle}>Exam Notifications</Text>
+                        <View style={styles.headerIconBox}>
+                            <Ionicons name="notifications" size={18} color={HomeTheme.primary} />
                         </View>
+                        <Text style={styles.headerTitle}>Exam Notifications</Text>
                     </View>
-                    <TouchableOpacity 
-                        style={styles.headerViewAllButton}
-                        onPress={() => router.push('/exam-notifications')}
-                        activeOpacity={0.7}
+                    <TouchableOpacity
+                        style={styles.viewAllBtn}
+                        onPress={() => router.push('/exam-notifications' as any)}
+                        activeOpacity={0.85}
                     >
-                        <LinearGradient
-                            colors={['#F59E0B', '#D97706']}
-                            style={styles.headerViewAllGradient}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                        >
-                            <Text style={styles.headerViewAllText}>View All</Text>
-                            <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
-                        </LinearGradient>
+                        <Text style={styles.viewAllText}>View All</Text>
+                        <ArrowRight size={13} color="#FFF" strokeWidth={2.5} />
                     </TouchableOpacity>
                 </View>
-            </LinearGradient>
-            
-            {/* Dynamic Notifications (Max 5) */}
-            <View style={styles.notificationsList}>
-                {activeNotifications.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="notifications-off-outline" size={48} color="#9CA3AF" />
-                        <Text style={styles.emptyText}>No active notifications</Text>
+
+                <View style={styles.innerCard}>
+                    <View style={styles.innerTop}>
+                        <View style={styles.bellWrap}>
+                            <Ionicons name="notifications" size={28} color={HomeTheme.primary} />
+                            {upcomingCount > 0 && <View style={styles.bellDot} />}
+                        </View>
+                        <View style={styles.innerTextCol}>
+                            <Text style={styles.innerTitle}>
+                                {upcomingCount === 0
+                                    ? 'No active notifications'
+                                    : `${upcomingCount} active notification${upcomingCount > 1 ? 's' : ''}`}
+                            </Text>
+                            <Text style={styles.innerSub}>
+                                {upcomingCount === 0
+                                    ? "You're all caught up!"
+                                    : 'Tap View All for exam updates'}
+                            </Text>
+                        </View>
                     </View>
-                ) : (
-                    activeNotifications.slice(0, Math.min(5, activeNotifications.length)).map((item, index) => {
-                    const daysRemaining = getDaysRemaining(item.applyLastDate);
-                    const isUrgent = daysRemaining <= 7 && daysRemaining >= 0;
-                    const isExpired = daysRemaining < 0;
-                    
-                    return (
-            <TouchableOpacity
-                            key={item.id}
-                            style={[
-                                styles.notificationItem,
-                                {
-                                    backgroundColor: isUrgent ? 'rgba(245, 158, 11, 0.05)' : 
-                                                   isExpired ? 'rgba(239, 68, 68, 0.05)' : 
-                                                   'rgba(16, 185, 129, 0.05)',
-                                    borderLeftWidth: 4,
-                                    borderLeftColor: isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : '#10B981'
-                                }
-                            ]}
-                            onPress={() => openNotificationModal(item)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.notificationContent}>
-                                <View style={styles.notificationHeader}>
-                                    <Text style={styles.notificationTitle} numberOfLines={1}>
-                                        {item.title}
-                                    </Text>
-                                    <View style={[
-                                        styles.statusBadge,
-                                        {
-                                            backgroundColor: isExpired ? '#EF4444' : isUrgent ? '#F59E0B' : '#10B981'
-                                        }
-                                    ]}>
-                                        <Text style={styles.statusText}>
-                                            {isExpired ? 'Expired' : isUrgent ? 'Urgent' : 'Active'}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.notificationInfo}>
-                                    <Ionicons name="calendar-outline" size={14} color={AppColors.grey} />
-                                    <Text style={styles.dateText}>
-                                        Last Date: {formatDate(item.applyLastDate)}
-                                    </Text>
-                                </View>
-                                {!isExpired && (
-                                    <Text style={[styles.daysLeft, { color: isUrgent ? '#F59E0B' : AppColors.grey }]}>
-                                        {daysRemaining === 0 ? 'Last Day!' : `${daysRemaining} days left`}
-                                    </Text>
-                                )}
-                            </View>
-                            <Ionicons name="chevron-forward" size={16} color={AppColors.grey} />
-                        </TouchableOpacity>
-                    );
-                    })
-                )}
-            </View>
+
+                    <View style={styles.countRow}>
+                        <View style={styles.countCol}>
+                            <Text style={[styles.countVal, { color: HomeTheme.primary }]}>{upcomingCount}</Text>
+                            <Text style={styles.countLabel}>Upcoming</Text>
+                        </View>
+                        <View style={styles.countDivider} />
+                        <View style={styles.countCol}>
+                            <Text style={[styles.countVal, { color: '#EA580C' }]}>{todayCount}</Text>
+                            <Text style={styles.countLabel}>Today</Text>
+                        </View>
+                        <View style={styles.countDivider} />
+                        <View style={styles.countCol}>
+                            <Text style={[styles.countVal, { color: '#059669' }]}>{weekCount}</Text>
+                            <Text style={styles.countLabel}>This Week</Text>
+                        </View>
+                    </View>
+                </View>
+            </LinearGradient>
 
             {/* Enhanced Modal with Animations */}
             <Modal
@@ -491,214 +461,107 @@ const ExamNotificationsSection = () => {
 const styles = StyleSheet.create({
     container: {
         marginHorizontal: 16,
-        marginVertical: 12,
-        borderRadius: 24,
-        shadowColor: '#047857',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 16,
-        elevation: 10,
-        borderWidth: 2,
-        borderColor: 'rgba(4, 120, 87, 0.1)',
+        marginBottom: 12,
+        borderRadius: 20,
         overflow: 'hidden',
-        backgroundColor: '#FFFFFF',
+        ...HomeTheme.shadowPurple,
     },
-    header: {
-        marginHorizontal: -2,
-        marginTop: -2,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        marginBottom: 15,
-        overflow: 'hidden',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    gradientShell: {
+        padding: 14,
+        borderRadius: 20,
     },
-    headerContent: {
+    headerRow: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        marginBottom: 12,
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerIcon: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+    headerIconBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
-        shadowColor: '#059669',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        borderWidth: 2,
-        borderColor: 'rgba(5, 150, 105, 0.3)',
     },
     headerTitle: {
-        fontSize: 17,
-        fontWeight: '800',
+        fontFamily: FontFamily.bold,
+        fontSize: 16,
         color: '#FFFFFF',
-        letterSpacing: 0.3,
-        textShadowColor: 'rgba(0, 0, 0, 0.08)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
-        fontFamily: 'System',
-        lineHeight: 20,
     },
-    headerSubtitle: {
-        fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.9)',
-        fontWeight: '600',
-        marginTop: 2,
-        letterSpacing: 0.3,
-        fontFamily: 'System',
-    },
-    headerViewAllButton: {
-        borderRadius: 10,
-        overflow: 'hidden',
-        zIndex: 3,
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-        elevation: 3,
-        borderWidth: 1,
-        borderColor: 'rgba(245, 158, 11, 0.3)',
-    },
-    headerViewAllGradient: {
+    viewAllBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-    },
-    headerViewAllText: {
-        fontSize: 12,
-        color: '#FFFFFF',
-        fontWeight: '600',
-        marginRight: 3,
-        letterSpacing: 0.3,
-        textShadowColor: 'rgba(0, 0, 0, 0.15)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
-        includeFontPadding: false,
-        lineHeight: 15,
-    },
-    monthBadge: {
-        borderRadius: 20,
-        overflow: 'hidden',
-    },
-    monthGradient: {
-        paddingHorizontal: 12,
+        backgroundColor: 'rgba(255,255,255,0.22)',
+        paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 20,
-    },
-    monthText: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#FFFFFF',
-        letterSpacing: 0.3,
-        fontFamily: 'System',
-    },
-    notificationsList: {
-        marginBottom: 10,
-        paddingHorizontal: 20,
-        paddingTop: 15,
-    },
-    notificationItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: AppColors.white,
-        borderRadius: 16,
-        marginBottom: 10,
-        shadowColor: 'rgba(4, 120, 87, 0.2)',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 4,
+        gap: 3,
         borderWidth: 1,
-        borderColor: 'rgba(4, 120, 87, 0.1)',
+        borderColor: 'rgba(255,255,255,0.3)',
     },
-    notificationContent: {
-        flex: 1,
+    viewAllText: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#FFFFFF' },
+    innerCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 14,
     },
-    notificationHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    innerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
+    bellWrap: {
+        width: 52,
+        height: 52,
+        borderRadius: 14,
+        backgroundColor: HomeTheme.primarySoft,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 6,
     },
-    notificationTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1F2937',
-        flex: 1,
-        marginRight: 10,
-        letterSpacing: 0.3,
-        textShadowColor: 'rgba(0, 0, 0, 0.08)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
+    bellDot: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#EF4444',
+        borderWidth: 1.5,
+        borderColor: '#FFF',
     },
-    statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
+    innerTextCol: { flex: 1 },
+    innerTitle: {
+        fontFamily: FontFamily.bold,
+        fontSize: 14,
+        color: HomeTheme.ink,
+        marginBottom: 3,
+    },
+    innerSub: {
+        fontFamily: FontFamily.regular,
+        fontSize: 11,
+        color: HomeTheme.inkMuted,
+    },
+    countRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8F7FC',
         borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
+        paddingVertical: 10,
+        paddingHorizontal: 8,
     },
-    statusText: {
-        fontSize: 12,
-        color: '#FFFFFF',
-        fontWeight: '700',
-        letterSpacing: 0.4,
-        textShadowColor: 'rgba(0, 0, 0, 0.2)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 2,
-    },
-    notificationInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    dateText: {
-        fontSize: 13,
-        color: '#047857',
-        marginLeft: 6,
-        fontWeight: '600',
-        letterSpacing: 0.3,
-        textShadowColor: 'rgba(4, 120, 87, 0.1)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
-    },
-    daysLeft: {
-        fontSize: 13,
-        fontWeight: '700',
-        letterSpacing: 0.3,
-        textShadowColor: 'rgba(0, 0, 0, 0.08)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 1,
+    countCol: { flex: 1, alignItems: 'center' },
+    countDivider: { width: 1, height: 28, backgroundColor: HomeTheme.border },
+    countVal: { fontFamily: FontFamily.bold, fontSize: 18, marginBottom: 2 },
+    countLabel: {
+        fontFamily: FontFamily.regular,
+        fontSize: 10,
+        color: HomeTheme.inkMuted,
     },
     loadingContainer: {
+        marginHorizontal: 16,
+        marginBottom: 12,
         padding: 20,
         alignItems: 'center',
-    },
-    emptyContainer: {
-        padding: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyText: {
-        fontSize: 14,
-        color: '#9CA3AF',
-        marginTop: 12,
-        fontWeight: '600',
+        backgroundColor: '#FFF',
+        borderRadius: 20,
     },
     modalOverlay: {
         flex: 1,

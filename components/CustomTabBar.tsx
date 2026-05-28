@@ -1,7 +1,18 @@
+import { FontFamily } from '@/constants/Typography';
 import { useLiveExam } from '@/context/LiveExamContext';
 import { Ionicons } from '@expo/vector-icons';
+import { type Href, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Alert, Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+/** Typed routes (expo-router experiments.typedRoutes) */
+const TAB_HREFS: Record<string, Href> = {
+    home: '/(tabs)/home',
+    exam: '/(tabs)/exam',
+    quiz: '/(tabs)/quiz',
+    timetable: '/(tabs)/timetable',
+    'book-store': '/(tabs)/book-store',
+};
 
 const { width } = Dimensions.get('window');
 const TAB_BAR_HEIGHT = 75;
@@ -17,9 +28,11 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         return null;
     }
 
-    // Filter to only the routes we expect, to prevent duplicates
-    const expectedRoutes = ['home', 'exam', 'quiz', 'timetable', 'book-store'];
-    const filteredRoutes = routes.filter((r: any) => expectedRoutes.includes(r.name));
+    // Fixed tab order — must match visible bottom nav (mockup: Home, Exam, Quiz, Timetable, Books)
+    const tabOrder = ['home', 'exam', 'quiz', 'timetable', 'book-store'];
+    const filteredRoutes = tabOrder
+        .map((name) => routes.find((r: any) => r.name === name))
+        .filter(Boolean);
 
     const onTabPress = (route: any, isFocused: boolean) => {
         const event = navigation.emit({
@@ -29,18 +42,23 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
         });
 
         if (!isFocused && !event.defaultPrevented) {
+            const href = TAB_HREFS[route.name];
+            if (!href) return;
+
+            const go = () => router.push(href);
+
             if (isLiveExamInProgress) {
                 Alert.alert(
                     'Leave exam?',
                     'Leaving will save your progress. You can resume when you return. Time will keep counting down.',
                     [
                         { text: 'Stay', style: 'cancel' },
-                        { text: 'Leave', style: 'destructive', onPress: () => navigation.navigate(route.name) },
+                        { text: 'Leave', style: 'destructive', onPress: go },
                     ]
                 );
                 return;
             }
-            navigation.navigate(route.name);
+            go();
         }
     };
 
@@ -54,7 +72,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                 {filteredRoutes.map((route: any) => {
                     const { options } = descriptors[route.key];
                     // Check if the current route in the filtered list is the active one
-                    const isFocused = routes[activeIndex].key === route.key;
+                    const isFocused = routes[activeIndex]?.name === route.name;
 
                     let iconName: any = 'home';
                     let label = 'Home';
@@ -78,7 +96,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                         case 'timetable':
                             iconName = isFocused ? 'calendar' : 'calendar-outline';
                             label = 'Timetable';
-                            tabIconImage = require('@/assets/images/icons/3d-alarm.png');
+                            tabIconImage = require('@/assets/images/icons/schedule.png');
                             break;
                         case 'book-store':
                             iconName = isFocused ? 'library' : 'library-outline';
@@ -97,14 +115,14 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                                 style={styles.centerTab}
                             >
                                 <LinearGradient
-                                    colors={['#FF6B35', '#FF8E53']}
+                                    colors={['#8E78E7', '#6344D4', '#5546C9']}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
                                     style={styles.centerTabGradient}
                                 >
-                                    <Ionicons name={iconName} size={ICON_SIZE * 1.2} color="#FFFFFF" />
-                                    <Text style={styles.centerLabel}>{label}</Text>
+                                    <Ionicons name="trophy" size={ICON_SIZE * 1.1} color="#FFFFFF" />
                                 </LinearGradient>
+                                <Text style={styles.centerLabel}>{label}</Text>
                             </TouchableOpacity>
                         );
                     }
@@ -125,13 +143,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                                     <Ionicons 
                                         name={iconName} 
                                         size={ICON_SIZE} 
-                                        color={isFocused ? "#6366F1" : "#64748B"}
+                                        color={isFocused ? "#6344D4" : "#64748B"}
                                     />
                                 )}
                             </View>
                             <Text style={[
                                 styles.label, 
-                                { color: isFocused ? "#6366F1" : "#64748B" }
+                                { color: isFocused ? "#6344D4" : "#64748B" }
                             ]}>
                                 {label}
                             </Text>
@@ -244,8 +262,8 @@ const styles = StyleSheet.create({
         borderColor: '#E2E8F0',
     },
     activeIconContainer: {
-        backgroundColor: 'rgba(99, 102, 241, 0.12)',
-        borderColor: 'rgba(99, 102, 241, 0.4)',
+        backgroundColor: 'rgba(106, 90, 224, 0.12)',
+        borderColor: 'rgba(106, 90, 224, 0.35)',
         borderWidth: 1.5,
         elevation: 0,
         transform: [{ scale: 1.05 }],
@@ -255,47 +273,43 @@ const styles = StyleSheet.create({
         height: 30,
     },
     label: {
-        fontSize: 12,
-        fontWeight: '800',
+        fontSize: 11,
+        fontFamily: FontFamily.semiBold,
         textAlign: 'center',
-        textShadowColor: 'rgba(0, 0, 0, 0.1)',
-        textShadowOffset: { width: 0, height: 0.5 },
-        textShadowRadius: 1,
-        letterSpacing: 0.4,
         marginTop: 3,
-        fontFamily: 'System',
         lineHeight: 14,
     },
     centerTab: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 58,
+        height: 58,
+        borderRadius: 29,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 32,
+        marginBottom: 28,
         elevation: 0,
     },
     centerTabGradient: {
-        width: '100%',
-        height: '100%',
-        borderRadius: 32,
+        width: 58,
+        height: 58,
+        borderRadius: 29,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 3.5,
+        borderWidth: 4,
         borderColor: '#FFFFFF',
-        elevation: 0,
+        shadowColor: '#6344D4',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 8,
     },
     centerLabel: {
         fontSize: 11,
-        color: '#FFFFFF',
+        color: '#6344D4',
         marginTop: 4,
-        fontWeight: '900',
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
-        letterSpacing: 0.5,
-        fontFamily: 'System',
+        fontFamily: FontFamily.semiBold,
         lineHeight: 12,
+        position: 'absolute',
+        bottom: -18,
     },
     activeIndicator: {
         position: 'absolute',
@@ -303,7 +317,7 @@ const styles = StyleSheet.create({
         width: 5,
         height: 5,
         borderRadius: 2.5,
-        backgroundColor: '#6366F1',
+        backgroundColor: '#6344D4',
         elevation: 0,
     },
 });

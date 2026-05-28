@@ -1,5 +1,6 @@
 import { AppColors } from '@/constants/Colors';
 import { apiFetchAuth, getImageUrl } from '@/constants/api';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,6 +14,7 @@ import {
     FlatList,
     Image,
     Modal,
+    Platform,
     RefreshControl,
     SafeAreaView,
     ScrollView,
@@ -535,7 +537,7 @@ const PracticeExamDetailsScreen = () => {
                         <View style={styles.enhancedDetailsGrid}>
                           {exam.description && (
                             <View style={styles.descriptionItem}>
-                              <Ionicons name="document-text" size={20} color="#667eea" />
+                              <Ionicons name="document-text" size={18} color="#6D28D9" />
                               <View style={styles.descriptionContainer}>
                                 <Text style={styles.detailLabel}>Description</Text>
                                 <Text style={styles.detailValue}>{exam.description}</Text>
@@ -543,7 +545,7 @@ const PracticeExamDetailsScreen = () => {
                             </View>
                           )}
                           <View style={styles.detailItem}>
-                            <Ionicons name="folder-outline" size={20} color="#667eea" />
+                            <Ionicons name="folder-outline" size={18} color="#6D28D9" />
                             <View>
                               <Text style={styles.detailLabel}>Category</Text>
                               <Text style={styles.detailValue}>{exam.category}</Text>
@@ -551,7 +553,7 @@ const PracticeExamDetailsScreen = () => {
                           </View>
                           {exam.subcategory && (
                             <View style={styles.detailItem}>
-                              <Ionicons name="folder-open-outline" size={20} color="#667eea" />
+                              <Ionicons name="folder-open-outline" size={18} color="#6D28D9" />
                               <View>
                                 <Text style={styles.detailLabel}>Subcategory</Text>
                                 <Text style={styles.detailValue}>{exam.subcategory}</Text>
@@ -559,14 +561,14 @@ const PracticeExamDetailsScreen = () => {
                             </View>
                           )}
                           <View style={styles.detailItem}>
-                            <Ionicons name="trophy-outline" size={20} color="#667eea" />
+                            <Ionicons name="trophy-outline" size={18} color="#6D28D9" />
                             <View>
                               <Text style={styles.detailLabel}>Max Marks</Text>
                               <Text style={styles.detailValue}>{examMeta?.maxMarks || 'Not specified'}</Text>
                             </View>
                           </View>
                           <View style={styles.detailItem}>
-                            <Ionicons name="people-outline" size={20} color="#667eea" />
+                            <Ionicons name="people-outline" size={18} color="#6D28D9" />
                             <View>
                               <Text style={styles.detailLabel}>Available Spots</Text>
                               <Text style={styles.detailValue}>{exam.spotsLeft} / {exam.spots}</Text>
@@ -634,7 +636,7 @@ const PracticeExamDetailsScreen = () => {
                                   <View style={styles.currentUserRank}>
                                     <Text style={styles.currentUserRankText}>#{currentUser.rank} / {leaderboard.length}</Text>
                                     </View>
-                                  <Ionicons name="person-circle" size={40} color={AppColors.primary} />
+                                  <Ionicons name="person-circle" size={40} color="#6D28D9" />
                                     <View style={styles.currentUserInfo}>
                                       <Text style={styles.currentUserName}>{currentUser.name}</Text>
                                     <Text style={styles.currentUserScoreLabel}>Your Score</Text>
@@ -698,9 +700,9 @@ const styles = StyleSheet.create({
     },
     headerLightCompact: {
         backgroundColor: '#F8FAFC',
-        paddingTop: 12,
-        paddingHorizontal: 16,
-        paddingBottom: 14,
+        paddingTop: Platform.OS === 'android' ? 6 : 10,
+        paddingHorizontal: Platform.OS === 'android' ? 12 : 16,
+        paddingBottom: Platform.OS === 'android' ? 10 : 12,
         borderBottomWidth: 1,
         borderBottomColor: '#E2E8F0',
     },
@@ -709,13 +711,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerIconLight: {
-        width: 56,
-        height: 56,
+        width: Platform.OS === 'android' ? 46 : 54,
+        height: Platform.OS === 'android' ? 46 : 54,
         borderRadius: 14,
         backgroundColor: '#FFFFFF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 14,
+        marginRight: Platform.OS === 'android' ? 10 : 14,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         overflow: 'hidden',
@@ -730,24 +732,24 @@ const styles = StyleSheet.create({
     },
     headerExamLabel: {
         fontSize: 11,
-        fontWeight: '700',
+        fontFamily: FontFamily.semiBold,
         color: '#64748B',
         letterSpacing: 1.2,
         marginBottom: 4,
         textTransform: 'uppercase',
     },
     headerTitleCompact: {
-        fontSize: 18,
-        fontWeight: '800',
+        fontSize: Platform.OS === 'android' ? 16 : 18,
+        fontFamily: FontFamily.extraBold,
         color: '#0F172A',
         marginBottom: 2,
-        lineHeight: 24,
+        lineHeight: Platform.OS === 'android' ? 21 : 24,
         letterSpacing: -0.3,
     },
     headerSubtitleCompact: {
-        fontSize: 13,
+        fontSize: Platform.OS === 'android' ? 12 : 13,
         color: '#64748B',
-        fontWeight: '500',
+        fontFamily: FontFamily.medium,
     },
     headerIconWrapper: {
         marginRight: 12,
@@ -1506,51 +1508,55 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 12,
         backgroundColor: '#FFFFFF',
-        borderRadius: 6,
-        marginBottom: 6,
+        borderRadius: 14,
+        marginBottom: 8,
         marginHorizontal: 0,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
-        minHeight: 50,
+        borderWidth: 1,
+        borderColor: '#E8E4FF',
+        minHeight: 54,
     },
     currentUserRow: {
-        backgroundColor: '#FFE4E6',
-        borderColor: '#FF6B6B',
-        borderWidth: 2,
-        shadowColor: '#FF6B6B',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
+        backgroundColor: 'rgba(109, 40, 217, 0.06)',
+        borderColor: 'rgba(109, 40, 217, 0.35)',
+        borderWidth: 1,
     },
     avatar: {
         marginHorizontal: 8,
-        color: '#667eea',
     },
-    rankContainer: {
+    rankBadge: {
         width: 30,
+        height: 30,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: 10,
+        backgroundColor: '#F3EEFF',
+        borderWidth: 1,
+        borderColor: '#DDD6FE',
     },
+    rankBadgeGold: { backgroundColor: '#F59E0B', borderColor: '#F59E0B' },
+    rankBadgeSilver: { backgroundColor: '#94A3B8', borderColor: '#94A3B8' },
+    rankBadgeBronze: { backgroundColor: '#D97706', borderColor: '#D97706' },
     rankNumber: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#2D3748',
+        fontSize: 13,
+        fontFamily: FontFamily.extraBold,
+        color: '#4C1D95',
     },
+    rankNumberOnDark: { color: '#FFFFFF' },
     userInfo: {
         flex: 1,
         marginRight: 10,
     },
     userName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#2D3748',
+        fontSize: 14,
+        fontFamily: FontFamily.semiBold,
+        color: '#0F172A',
         marginBottom: 2,
     },
     userHandle: {
-        fontSize: 12,
-        color: '#718096',
+        fontSize: 11,
+        fontFamily: FontFamily.regular,
+        color: '#64748B',
     },
     scoreRow: {
         flexDirection: 'row',
@@ -1558,15 +1564,15 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     scoreText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#667eea',
-        marginLeft: 4,
+        fontSize: 13,
+        fontFamily: FontFamily.bold,
+        color: '#6D28D9',
     },
   
     timeText: {
-        fontSize: 12,
-        color: '#718096',
+        fontSize: 11,
+        fontFamily: FontFamily.medium,
+        color: '#64748B',
         textAlign: 'right',
     },
     leaderboardNameText: {
@@ -2900,17 +2906,17 @@ const styles = StyleSheet.create({
     },
     // Info Tab Styles (keeping original)
     enhancedOverviewCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 20,
-        padding: 24,
-        marginBottom: 8,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        padding: Platform.OS === 'android' ? 12 : 16,
+        marginBottom: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.15,
         shadowRadius: 16,
         elevation: 8,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: '#E8E4FF',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -2946,10 +2952,10 @@ const styles = StyleSheet.create({
     detailItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(102, 126, 234, 0.05)',
+        backgroundColor: 'rgba(109, 40, 217, 0.06)',
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
+        padding: Platform.OS === 'android' ? 10 : 12,
+        marginBottom: Platform.OS === 'android' ? 8 : 10,
         flex: 1,
         marginHorizontal: 4,
         minWidth: '45%',
@@ -2957,10 +2963,10 @@ const styles = StyleSheet.create({
     descriptionItem: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: 'rgba(102, 126, 234, 0.05)',
+        backgroundColor: 'rgba(109, 40, 217, 0.06)',
         borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
+        padding: Platform.OS === 'android' ? 10 : 12,
+        marginBottom: Platform.OS === 'android' ? 8 : 10,
         flex: 1,
         marginHorizontal: 4,
         minWidth: '100%',
@@ -2970,16 +2976,16 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     detailLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#7f8c8d',
-        fontWeight: '600',
+        fontFamily: FontFamily.semiBold,
         marginLeft: 8,
         marginBottom: 4,
     },
     detailValue: {
-        fontSize: 14,
+        fontSize: Platform.OS === 'android' ? 13 : 14,
         color: '#2c3e50',
-        fontWeight: 'bold',
+        fontFamily: FontFamily.bold,
         marginLeft: 8,
     },
     enhancedActionButton: {
@@ -2991,7 +2997,7 @@ const styles = StyleSheet.create({
         shadowRadius: 12,
         elevation: 8,
         marginTop: 0,
-        marginBottom: 20,
+        marginBottom: Platform.OS === 'android' ? 12 : 18,
     },
     enhancedActionButtonDisabled: {
         opacity: 0.6,
@@ -3006,14 +3012,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 18,
+        paddingVertical: 14,
         paddingHorizontal: 32,
         borderRadius: 16,
     },
     enhancedActionButtonText: {
         color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 18,
+        fontFamily: FontFamily.bold,
+        fontSize: 16,
         marginLeft: 12,
         textShadowColor: 'rgba(0, 0, 0, 0.3)',
         textShadowOffset: { width: 0, height: 1 },
@@ -3105,18 +3111,18 @@ const styles = StyleSheet.create({
     
     // Other Users Section
     otherUsersSection: {
-        marginBottom: 20,
-        backgroundColor: '#F8F9FA',
-        borderRadius: 12,
-        padding: 10,
-        marginHorizontal: 5,
+        marginBottom: 18,
+        backgroundColor: 'transparent',
+        borderRadius: 0,
+        padding: 0,
+        marginHorizontal: 0,
     },
     otherUsersTitle: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#2D3748',
-        marginBottom: 15,
-        paddingHorizontal: 10,
+        fontSize: 15,
+        fontFamily: FontFamily.bold,
+        color: '#0F172A',
+        marginBottom: 10,
+        paddingHorizontal: 0,
     },
 });
 
@@ -3125,20 +3131,29 @@ const LeaderboardRow = ({ rank, name, score, timeTaken, isCurrentUser, isTopThre
     // Convert rank to number and ensure it's displayed properly
     const numericRank = typeof rank === 'string' ? parseInt(rank, 10) : rank;
     const displayRank = numericRank !== undefined && numericRank !== null && !isNaN(numericRank) ? numericRank : 'N/A';
+    const topStyle =
+        displayRank === 1 ? styles.rankBadgeGold : displayRank === 2 ? styles.rankBadgeSilver : displayRank === 3 ? styles.rankBadgeBronze : null;
     
     return (
         <View style={[styles.leaderboardRow, isCurrentUser && styles.currentUserRow]}>
-            <View style={styles.rankContainer}>
-                <Text style={styles.rankNumber}>{displayRank}</Text>
+            <View style={[styles.rankBadge, topStyle]}>
+                <Text style={[styles.rankNumber, (displayRank === 1 || displayRank === 2 || displayRank === 3) && styles.rankNumberOnDark]}>
+                    {displayRank}
+                </Text>
             </View>
-            <Ionicons name="person-circle" size={32} color="#667eea" style={styles.avatar} />
+            <Ionicons
+                name="person-circle"
+                size={32}
+                color={isCurrentUser ? '#6D28D9' : isTopThree ? '#1D4ED8' : '#64748B'}
+                style={styles.avatar}
+            />
             <View style={styles.userInfo}>
                 <Text style={styles.userName} numberOfLines={1}>{name || 'Unknown User'}</Text>
                 <Text style={styles.userHandle} numberOfLines={1}>@{name?.toLowerCase().replace(/\s+/g, '') || 'user'}</Text>
             </View>
             <View style={styles.scoreContainer}>
                 <View style={styles.scoreRow}>
-                    <Text style={[styles.scoreText, isCurrentUser && styles.currentUserScoreText]}>{score || 0} marks</Text>
+                    <Text style={[styles.scoreText, isCurrentUser && styles.currentUserScoreText]}>{score || 0} pts</Text>
                 </View>
                 {timeTaken && (
                     <Text style={styles.timeText}>{timeTaken}s</Text>

@@ -14,7 +14,7 @@ export default function HomeFixedBanner() {
     <TouchableOpacity
       style={styles.wrapper}
       activeOpacity={0.9}
-      onPress={() => router.push('/current-affairs')}
+      onPress={() => router.push('/(tabs)/current-affairs' as any)}
     >
       <LinearGradient
         colors={['#1E3A5F', '#0F172A']}

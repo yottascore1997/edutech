@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, AppStateStatus, Dimensions, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { removeJoinedLiveExamId } from '@/utils/joinedLiveExams';
 
 const { width, height } = Dimensions.get('window');
 
@@ -611,6 +612,7 @@ const LiveExamQuestionsScreen = () => {
 
       if (response.ok) {
         console.log('Live exam auto-submitted successfully');
+        if (user?.id && id) await removeJoinedLiveExamId(String(user.id), String(id));
         await clearExamState();
         const resultData = response.data;
         router.push({
@@ -664,6 +666,7 @@ const LiveExamQuestionsScreen = () => {
       });
 
       if (response.ok) {
+        if (user?.id && id) await removeJoinedLiveExamId(String(user.id), String(id));
         await clearExamState();
         const resultData = response.data;
         router.push({

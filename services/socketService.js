@@ -1,4 +1,5 @@
 import io from 'socket.io-client';
+import { WEBSOCKET_CONFIG } from '../constants/websocket';
 
 class SocketService {
   constructor() {
@@ -11,7 +12,7 @@ class SocketService {
       this.disconnect();
     }
 
-    this.socket = io('http://192.168.1.5:3000', {
+    this.socket = io(WEBSOCKET_CONFIG.SERVER_URL, {
       auth: { token },
       transports: ['websocket', 'polling']
     });
