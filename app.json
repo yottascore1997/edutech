@@ -23,8 +23,14 @@
         "ACCESS_NETWORK_STATE",
         "INTERNET"
       ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "package": "com.yottascore.closedbook",
-      "versionCode": 1,
+      "versionCode": 11,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.anonymous.Examfrontend"
     },
     "web": {
@@ -35,7 +41,14 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Yottascore to access your photos to upload profile pictures and posts.",
+          "cameraPermission": "Allow Yottascore to access your camera to take photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

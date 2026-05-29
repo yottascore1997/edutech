@@ -20,6 +20,7 @@ import {
 import CreatePost from '../../components/CreatePost';
 import { apiFetchAuth, uploadFile } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
+import { ensurePhotoLibraryPermission } from '../../utils/imagePickerPermissions';
 
 const { width, height } = Dimensions.get('window');
 
@@ -75,12 +76,7 @@ export default function ProfileScreen() {
 
   const handleProfilePhotoUpload = async () => {
     try {
-      // Request permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant permission to access your photo library.');
-        return;
-      }
+      if (!(await ensurePhotoLibraryPermission())) return;
 
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({

@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { apiFetchAuth, uploadFile } from '../constants/api';
 import { useAuth } from '../context/AuthContext';
+import { ensurePhotoLibraryPermission } from '../utils/imagePickerPermissions';
 
 const { width, height } = Dimensions.get('window');
 
@@ -102,11 +103,7 @@ export default function CreatePost({ visible, onClose, onPostCreated }: CreatePo
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant permission to access your photo library.');
-        return;
-      }
+      if (!(await ensurePhotoLibraryPermission())) return;
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,

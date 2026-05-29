@@ -22,6 +22,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ensurePhotoLibraryPermission } from '@/utils/imagePickerPermissions';
 
 type StudyPartnerProfileResponse = {
   id?: string;
@@ -176,11 +177,7 @@ export default function StudyPartnerProfileScreen() {
   const pickAndUploadPhoto = async () => {
     if (!user?.token || photos.length >= MAX_PHOTOS) return;
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to photos to upload.');
-        return;
-      }
+      if (!(await ensurePhotoLibraryPermission('Please allow access to photos to upload.'))) return;
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,

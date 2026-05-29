@@ -16,6 +16,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { ensurePhotoLibraryPermission } from '@/utils/imagePickerPermissions';
 
 interface KYCDocumentFormProps {
   visible: boolean;
@@ -41,9 +42,7 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
 
   const pickImage = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions to upload document image.');
+      if (!(await ensurePhotoLibraryPermission('Please grant photo library access to upload document image.'))) {
         return;
       }
 
