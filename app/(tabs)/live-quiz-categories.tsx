@@ -114,7 +114,10 @@ export default function LiveQuizCategoriesScreen() {
       const sessionId = String(res.data.session.id);
       router.push({
         pathname: '/(tabs)/live-quiz-play',
-        params: { sessionId },
+        params: {
+          sessionId,
+          categoryId: String(res.data.session.categoryId ?? categoryId),
+        },
       } as any);
     } catch (e) {
       setError('Unable to join live quiz. Please try again.');

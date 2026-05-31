@@ -1,24 +1,51 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'react-native';
-import { useRouter } from 'expo-router';
-import { AppColors } from '@/constants/Colors';
+import { HomeTheme } from '@/constants/HomeTheme';
 import { FontFamily } from '@/constants/Typography';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Dimensions, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - 56) / 2;
+const CARD_WIDTH = (SCREEN_WIDTH - 44) / 2;
 
 const items = [
-  { id: 'notes', title: 'Study Notes', subtitle: '10,000+ Expert', image: require('../assets/images/icons/book.png'), gradient: ['#FCE7F3', '#F3E8FF'] },
-  { id: 'pyp', title: 'Previous Year Papers', subtitle: 'Access 10,000+ PYPs', image: require('../assets/images/icons/exam.png'), gradient: ['#FFFBEB', '#FEF3C7'] },
-  { id: 'practice', title: 'Practice Section', subtitle: '', image: require('../assets/images/icons/practise-girl.png'), gradient: ['#EFF6FF', '#E0F2FE'] },
-  { id: 'live', title: 'Live Tests', subtitle: '&', image: require('../assets/images/icons/exam-time.png'), gradient: ['#F3E8FF', '#EEF2FF'] },
-  { id: 'live-classes', title: 'Daily Live Classes', subtitle: '', image: require('../assets/images/icons/schedule.png'), gradient: ['#FFF1F2', '#FFEEF0'] },
-  { id: 'quiz', title: 'Quiz Section', subtitle: '', image: require('../assets/images/icons/quiz.png'), gradient: ['#FFF1F2', '#FFF7ED'] },
-  { id: 'books', title: 'Exam Books', subtitle: '', image: require('../assets/images/icons/book-shop.png'), gradient: ['#F8FAFC', '#F1F5F9'] },
-  { id: 'current', title: 'Current Affairs', subtitle: '', image: require('../assets/images/icons/calendar.png'), gradient: ['#EEF2FF', '#F8FAFF'] },
+  {
+    id: 'notes',
+    title: 'Study Notes',
+    subtitle: 'Expert curated',
+    route: '/(tabs)/book-store' as const,
+    image: require('../assets/images/icons/book.png'),
+    iconGrad: ['#F9A8D4', '#EC4899'] as const,
+    cardGrad: ['#FDF2F8', '#FFFFFF'] as const,
+  },
+  {
+    id: 'pyp',
+    title: 'Previous Papers',
+    subtitle: '10,000+ PYQs',
+    route: '/(tabs)/pyq' as const,
+    image: require('../assets/images/icons/exam.png'),
+    iconGrad: ['#FCD34D', '#F59E0B'] as const,
+    cardGrad: ['#FFFBEB', '#FFFFFF'] as const,
+  },
+  {
+    id: 'live-classes',
+    title: 'Live Classes',
+    subtitle: 'Daily sessions',
+    route: '/(tabs)/social' as const,
+    image: require('../assets/images/icons/schedule.png'),
+    iconGrad: ['#A5B4FC', '#6366F1'] as const,
+    cardGrad: ['#EEF2FF', '#FFFFFF'] as const,
+  },
+  {
+    id: 'current',
+    title: 'Current Affairs',
+    subtitle: 'Stay updated',
+    route: '/(tabs)/current-affairs' as const,
+    image: require('../assets/images/icons/calendar.png'),
+    iconGrad: ['#6EE7B7', '#10B981'] as const,
+    cardGrad: ['#ECFDF5', '#FFFFFF'] as const,
+  },
 ];
 
 export default function HomeFeatureGrid() {
@@ -26,77 +53,35 @@ export default function HomeFeatureGrid() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.sectionHeader}>
-        <Image source={require('../assets/images/icons/question-mark.png')} style={styles.sectionIcon} resizeMode="contain" />
-        <Text style={styles.sectionTitle}>What are you looking for</Text>
+      <View style={styles.sectionHead}>
+        <View>
+          <Text style={styles.sectionTitle}>Explore More</Text>
+          <Text style={styles.sectionSub}>Resources to boost prep</Text>
+        </View>
       </View>
+
       <View style={styles.grid}>
-        {items.map((it, idx) => (
-              <TouchableOpacity
+        {items.map((it) => (
+          <TouchableOpacity
             key={it.id}
-            style={styles.cardWrapper}
-            activeOpacity={0.8}
-            onPress={() => {
-              // route mapping - adjust as needed
-              switch (it.id) {
-                case 'notes':
-                  router.push('/(tabs)/book-store' as any);
-                  break;
-                case 'pyp':
-                  router.push('/(tabs)/pyq' as any);
-                  break;
-                case 'practice':
-                  router.push('/(tabs)/practice-categories' as any);
-                  break;
-                case 'live':
-                  router.push('/(tabs)/exam' as any);
-                  break;
-                case 'live-classes':
-                  router.push('/(tabs)/social' as any);
-                  break;
-                case 'quiz':
-                  router.push('/(tabs)/quiz' as any);
-                  break;
-                case 'books':
-                  router.push('/(tabs)/book-store' as any);
-                  break;
-                case 'current':
-                  router.push('/(tabs)/current-affairs' as any);
-                  break;
-                default:
-                  break;
-              }
-            }}
+            style={styles.cardWrap}
+            activeOpacity={0.88}
+            onPress={() => router.push(it.route as any)}
           >
-            {idx < 2 ? (
-              <LinearGradient colors={it.gradient} style={styles.cardLarge}>
-                <View style={styles.cardLargeText}>
-                  <Text style={styles.cardLargeTitle} numberOfLines={2}>{it.title}</Text>
-                  {it.subtitle ? <Text style={styles.cardLargeSubtitle} numberOfLines={2}>{it.subtitle}</Text> : null}
-                </View>
-                <View style={styles.cardLargeIcon}>
-                  {it.image ? (
-                    <Image source={it.image} style={styles.cardLargeImage} resizeMode="contain" />
-                  ) : (
-                    <Ionicons name={it.icon as any} size={36} color={AppColors.primary} />
-                  )}
-                </View>
+            <LinearGradient colors={[...it.cardGrad]} style={styles.card}>
+              <LinearGradient colors={[...it.iconGrad]} style={styles.iconWrap}>
+                <Image source={it.image} style={styles.iconImg} resizeMode="contain" />
               </LinearGradient>
-            ) : (
-              <LinearGradient colors={it.gradient} style={styles.cardRow}>
-                <View style={styles.cardRowText}>
-                  <Text style={styles.cardTitle} numberOfLines={2}>{it.title}</Text>
-                  {it.subtitle ? <Text style={styles.cardSubtitle} numberOfLines={1}>{it.subtitle}</Text> : null}
-                </View>
-                <View style={styles.cardRowIcon}>
-                  {it.image ? (
-                    <Image source={it.image} style={styles.cardIconImageSmall} resizeMode="contain" />
-                  ) : (
-                    <Ionicons name={it.icon as any} size={20} color={AppColors.primary} />
-                  )}
-                </View>
-              </LinearGradient>
-            )}
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                {it.title}
+              </Text>
+              <Text style={styles.cardSub} numberOfLines={1}>
+                {it.subtitle}
+              </Text>
+              <View style={styles.cardArrow}>
+                <Ionicons name="arrow-forward" size={12} color={HomeTheme.primary} />
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         ))}
       </View>
@@ -107,119 +92,80 @@ export default function HomeFeatureGrid() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    marginTop: 8,
+    marginTop: 4,
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: 16,
-    color: '#0f172a',
-    marginBottom: 12,
-  },
-  sectionHeader: {
+  sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  sectionBar: {
-    width: 4,
-    height: 22,
-    backgroundColor: AppColors.primary,
-    borderRadius: 2,
-    marginRight: 10,
-  },
-  sectionIcon: {
-    width: 22,
-    height: 22,
-    marginRight: 10,
+  sectionTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: HomeTheme.ink },
+  sectionSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: HomeTheme.inkMuted,
+    marginTop: 2,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  cardWrapper: {
+  cardWrap: {
     width: CARD_WIDTH,
     marginBottom: 12,
+    borderRadius: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6344D4',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+    }),
   },
   card: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 72,
-    justifyContent: 'center',
-    elevation: 2,
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 130,
+    borderWidth: 1,
+    borderColor: HomeTheme.border,
+    position: 'relative',
   },
-  cardRow: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 88,
-    justifyContent: 'center',
-    elevation: 2,
-    flexDirection: 'row',
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  cardRowText: {
-    flex: 1,
-    paddingRight: 8,
-  },
+  iconImg: { width: 24, height: 24 },
   cardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  cardSubtitle: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 4,
-  },
-  cardRowIcon: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardIconImageSmall: {
-    width: 40,
-    height: 40,
-    opacity: 0.95,
-  },
-  /* Large first-row card */
-  cardLarge: {
-    borderRadius: 12,
-    padding: 16,
-    minHeight: 140,
-    justifyContent: 'space-between',
-    elevation: 3,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  cardLargeText: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  cardLargeTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  cardLargeSubtitle: {
+    fontFamily: FontFamily.bold,
     fontSize: 13,
-    color: '#6B7280',
+    color: HomeTheme.ink,
+    lineHeight: Platform.OS === 'android' ? 18 : 16,
+    marginBottom: 3,
+    paddingRight: 20,
   },
-  cardLargeIcon: {
-    width: 64,
-    height: 64,
-    justifyContent: 'center',
+  cardSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: HomeTheme.inkMuted,
+  },
+  cardArrow: {
+    position: 'absolute',
+    top: 14,
+    right: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    backgroundColor: HomeTheme.primarySoft,
     alignItems: 'center',
-  },
-  cardLargeImage: {
-    width: 56,
-    height: 56,
-    opacity: 0.95,
+    justifyContent: 'center',
   },
 });
-

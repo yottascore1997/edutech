@@ -2,13 +2,15 @@ import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
+import { mapScoresToLocalView, markBattleFlowComplete, markReadyForNewMatch } from '@/utils/battleQuizSession';
 import { SoundManager } from '@/utils/sounds';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Platform,
   ScrollView,
@@ -75,6 +77,57 @@ export default function BattleRoomScreen() {
   const socketListenersRef = useRef<Set<string>>(new Set());
   const lastQuestionIndexRef = useRef<number>(-1);
   const hasFinishedRef = useRef<boolean>(false);
+  const hasCleanedUpRef = useRef<boolean>(false);
+  const isLeavingRef = useRef<boolean>(false);
+  const socketRef = useRef<Socket | null>(null);
+  const matchIdRef = useRef<string>(matchId);
+  const userIdRef = useRef<string | undefined>(user?.id);
+  const myPositionRef = useRef<'player1' | 'player2' | undefined>(undefined);
+  const battleStatusRef = useRef<BattleState['status']>('preparing');
+  const hasJoinedMatchRef = useRef(false);
+  const seenQuestionKeysRef = useRef<Set<string>>(new Set());
+  const totalQuestionsRef = useRef(5);
+
+  const isBattleFinished = useCallback(() => {
+    return hasFinishedRef.current || battleStatusRef.current === 'finished';
+  }, []);
+
+  const hasPlayedFullMatch = useCallback(() => {
+    return (
+      lastQuestionIndexRef.current >= totalQuestionsRef.current - 1 ||
+      seenQuestionKeysRef.current.size >= totalQuestionsRef.current
+    );
+  }, []);
+
+  const getQuestionKey = useCallback((q?: Question | null) => {
+    if (!q) return null;
+    const text = q.text?.trim().toLowerCase();
+    if (text) return `text:${text.slice(0, 200)}`;
+    if (q.id != null && q.id !== 0) return `id:${q.id}`;
+    return null;
+  }, []);
+
+  useEffect(() => {
+    hasCleanedUpRef.current = false;
+    isLeavingRef.current = false;
+    hasJoinedMatchRef.current = false;
+    hasFinishedRef.current = false;
+    lastQuestionIndexRef.current = -1;
+    myPositionRef.current = undefined;
+    seenQuestionKeysRef.current = new Set();
+  }, [matchId, roomCode]);
+
+  useEffect(() => {
+    matchIdRef.current = matchId;
+  }, [matchId]);
+
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user?.id]);
+
+  useEffect(() => {
+    battleStatusRef.current = battleState.status;
+  }, [battleState.status]);
 
   // Animation values for victory screen
   const confettiAnim = useRef(new Animated.Value(0)).current;
@@ -310,14 +363,10 @@ export default function BattleRoomScreen() {
         setIsConnected(true);
         setError(null);
         
-        // Register user immediately after connection (like matchmaking.tsx)
+        // Register user — join_match happens after listeners are attached
         if (user?.id) {
-
           newSocket.emit('register_user', user.id);
         }
-        // Join the match room
-
-        newSocket.emit('join_match', { matchId, userId: user?.id });
 
       });
 
@@ -344,36 +393,53 @@ export default function BattleRoomScreen() {
       });
 
       setSocket(newSocket);
+      socketRef.current = newSocket;
 
       return () => {
-
+        if (!hasCleanedUpRef.current && hasJoinedMatchRef.current) {
+          const s = socketRef.current;
+          const mId = matchIdRef.current;
+          const uId = userIdRef.current;
+          if (s?.connected && mId) {
+            s.emit('cleanup_match_session', { matchId: mId, userId: uId });
+            s.emit('leave_match', { matchId: mId, userId: uId });
+          }
+        }
         newSocket.disconnect();
+        socketRef.current = null;
       };
     } else {
 
       setError('Authentication required.');
     }
-  }, [user?.token, matchId]);
+  }, [user?.token, matchId, roomCode]);
 
-  // Cleanup function for socket listeners
+  // Cleanup function for socket listeners — uses socketRef so Play Again always clears events
+  const detachBattleSocketListeners = useCallback((targetSocket?: Socket | null) => {
+    const s = targetSocket ?? socketRef.current;
+    if (!s) return;
+
+    const events = [
+      'match_started',
+      'next_question',
+      'match_status',
+      'match_state',
+      'match_ended',
+      'opponent_answered',
+      'score_update',
+      'match_not_found',
+      'pong',
+      'session_cleanup_complete',
+    ];
+    events.forEach((event) => s.off(event));
+    socketListenersRef.current.clear();
+  }, []);
+
   const cleanupSocketListeners = useCallback(() => {
-    if (!socket) return;
-    
+    detachBattleSocketListeners(socketRef.current);
+  }, [detachBattleSocketListeners]);
 
-    const events = ['match_started', 'next_question', 'match_ended', 'opponent_answered', 'score_update', 'match_not_found', 'pong', 'session_cleanup_complete'];
-    
-    events.forEach(event => {
-      if (socketListenersRef.current.has(event)) {
-        socket.off(event);
-        socketListenersRef.current.delete(event);
-
-      }
-    });
-  }, [socket]);
-
-  // Centralized return-to-quiz cleanup and navigation
-  const handleReturnToQuiz = useCallback(() => {
-    // clear timers
+  const clearBattleTimers = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -382,26 +448,66 @@ export default function BattleRoomScreen() {
       clearInterval(questionTimerRef.current);
       questionTimerRef.current = null;
     }
+  }, []);
 
-    // clean up listeners and tell server we're leaving
-    try {
-      cleanupSocketListeners();
-    } catch (e) {
-      console.warn('cleanupSocketListeners error', e);
-    }
+  const performMatchCleanup = useCallback(
+    (options?: { disconnect?: boolean }) => {
+      clearBattleTimers();
+      SoundManager.cleanup();
 
-    try {
-      if (socket && socket.connected) {
-        socket.emit('leave_match', { matchId, userId: user?.id });
-        socket.disconnect();
+      const s = socketRef.current;
+      const mId = matchIdRef.current;
+      const uId = userIdRef.current;
+
+      detachBattleSocketListeners(s);
+
+      if (s?.connected && mId && hasJoinedMatchRef.current && !hasCleanedUpRef.current) {
+        try {
+          s.emit('cleanup_match_session', { matchId: mId, userId: uId });
+          s.emit('leave_match', { matchId: mId, userId: uId });
+        } catch (e) {
+          console.warn('performMatchCleanup emit failed', e);
+        }
+        hasCleanedUpRef.current = true;
       }
-    } catch (e) {
-      console.warn('leave_match emit/disconnect failed', e);
-    }
 
-    // reset refs/state
+      if (options?.disconnect && s) {
+        try {
+          if (s.connected) s.disconnect();
+        } catch (e) {
+          console.warn('socket disconnect failed', e);
+        }
+        socketRef.current = null;
+        setSocket(null);
+        setIsConnected(false);
+      }
+    },
+    [clearBattleTimers, detachBattleSocketListeners],
+  );
+
+  const navigateToQuizFresh = useCallback(() => {
+    markBattleFlowComplete();
+    markReadyForNewMatch();
+    try {
+      if (router.canDismiss()) router.dismiss();
+      if (router.canDismiss()) router.dismiss();
+    } catch (_) {
+      // ignore
+    }
+    router.replace('/(tabs)/quiz' as any);
+  }, [router]);
+
+  // Centralized return-to-quiz cleanup and navigation (same as Draw "Back to Quiz")
+  const handleReturnToQuiz = useCallback(() => {
+    performMatchCleanup({ disconnect: true });
+
     hasFinishedRef.current = false;
+    hasCleanedUpRef.current = true;
     lastQuestionIndexRef.current = -1;
+    myPositionRef.current = undefined;
+    hasJoinedMatchRef.current = false;
+    isLeavingRef.current = false;
+
     setBattleState({
       status: 'preparing',
       currentQuestion: 0,
@@ -410,20 +516,31 @@ export default function BattleRoomScreen() {
       player1Score: 0,
       player2Score: 0,
       answers: {},
-      opponentAnswers: {}
+      opponentAnswers: {},
     });
+    setError(null);
 
-    // navigate back to quiz (fresh start)
-    try {
-      console.log('↩️ handleReturnToQuiz: navigating to quiz');
-      router.push('/(tabs)/quiz');
-      console.log('↩️ handleReturnToQuiz: router.push called');
-    } catch (e) {
-      // fallback
-      console.warn('router.push failed, trying replace', e);
-      try { router.replace('/(tabs)/quiz'); console.log('↩️ handleReturnToQuiz: router.replace called'); } catch (err) { console.warn('router.replace failed', err); }
-    }
-  }, [socket, matchId, user?.id, cleanupSocketListeners, router]);
+    navigateToQuizFresh();
+  }, [performMatchCleanup, navigateToQuizFresh]);
+
+  // Android back — leave battle and return to quiz
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (battleStatusRef.current === 'preparing') {
+          return false;
+        }
+        handleReturnToQuiz();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => {
+        sub.remove();
+      };
+    }, [handleReturnToQuiz]),
+  );
+
+  const startQuestionTimerRef = useRef<(timeLimit: number) => void>(() => {});
 
   // Setup socket listeners
   const setupSocketListeners = useCallback(() => {
@@ -441,6 +558,96 @@ export default function BattleRoomScreen() {
     // Listen for battle events
 
     
+    const applyQuestionUpdate = (data: {
+      questionIndex: number;
+      question: Question;
+      timeLimit?: number;
+      playerScores?: { player1?: number; player2?: number };
+      myScore?: number;
+      opponentScore?: number;
+      myPosition?: 'player1' | 'player2' | string;
+    }) => {
+      // Never leave result screen — late next_question was causing Draw → Q3 → stuck
+      if (isBattleFinished()) return;
+
+      const idx = data.questionIndex;
+      if (typeof idx !== 'number' || !data.question) return;
+      if (idx === lastQuestionIndexRef.current) return;
+
+      const key = getQuestionKey(data.question);
+      if (key && seenQuestionKeysRef.current.has(key)) {
+        return;
+      }
+
+      lastQuestionIndexRef.current = idx;
+      if (key) seenQuestionKeysRef.current.add(key);
+
+      if (data.myPosition === 'player2') myPositionRef.current = 'player2';
+      else if (data.myPosition === 'player1') myPositionRef.current = 'player1';
+
+      const timeLimit = data.timeLimit ?? 10;
+
+      setBattleState(prev => {
+        // Only ignore stale older indices — allow index 0 when starting (was skipping Q1)
+        if (idx < prev.currentQuestion) return prev;
+        if (
+          idx === prev.currentQuestion &&
+          prev.status === 'playing' &&
+          prev.question?.text === data.question.text
+        ) {
+          return prev;
+        }
+        const scores = mapScoresToLocalView(data, prev, myPositionRef.current);
+        return {
+          ...prev,
+          status: 'playing',
+          currentQuestion: idx,
+          question: data.question,
+          timeLeft: timeLimit,
+          ...scores,
+        };
+      });
+
+      startQuestionTimerRef.current(timeLimit);
+    };
+
+    const syncFromServerPayload = (payload: any) => {
+      if (!payload || typeof payload !== 'object') return;
+      if (payload.status === 'finished' || payload.matchEnded) {
+        if (payload.myScore != null && payload.opponentScore != null) {
+          handleMatchEnded({
+            matchId: payload.matchId || matchIdRef.current,
+            myScore: payload.myScore,
+            opponentScore: payload.opponentScore,
+            winner: payload.winner ?? '',
+            isDraw: payload.isDraw ?? payload.myScore === payload.opponentScore,
+            myPosition: payload.myPosition,
+          });
+        }
+        return;
+      }
+      if (isBattleFinished()) return;
+      const idx =
+        payload.questionIndex ??
+        payload.currentQuestionIndex ??
+        (typeof payload.currentQuestion === 'number' ? payload.currentQuestion : undefined);
+      const question =
+        payload.question ??
+        (payload.currentQuestion && typeof payload.currentQuestion === 'object'
+          ? payload.currentQuestion
+          : undefined);
+      if (typeof idx !== 'number' || !question) return;
+      applyQuestionUpdate({
+        questionIndex: idx,
+        question,
+        timeLimit: payload.timeLimit,
+        playerScores: payload.playerScores,
+        myScore: payload.myScore,
+        opponentScore: payload.opponentScore,
+        myPosition: payload.myPosition,
+      });
+    };
+
     // Match started event
     const handleMatchStarted = (data: { 
       matchId: string; 
@@ -448,72 +655,22 @@ export default function BattleRoomScreen() {
       question: Question; 
       timeLimit: number 
     }) => {
-
-
-
-
-
-      
-      setBattleState(prev => ({
-        ...prev,
-        status: 'playing',
-        currentQuestion: data.questionIndex,
-        question: data.question,
-        timeLeft: data.timeLimit
-      }));
-      
-      // Start timer (sound will play inside startQuestionTimer)
-      startQuestionTimer(data.timeLimit);
-      
-
+      seenQuestionKeysRef.current = new Set();
+      lastQuestionIndexRef.current = -1;
+      applyQuestionUpdate(data);
     };
 
-    // Next question event
+    // Next question event (includes score payload when present)
     const handleNextQuestion = (data: { 
       questionIndex: number; 
-      question: Question 
+      question: Question;
+      timeLimit?: number;
+      playerScores?: { player1?: number; player2?: number };
+      myScore?: number;
+      opponentScore?: number;
+      myPosition?: 'player1' | 'player2' | string;
     }) => {
-
-
-
-
-
-      
-      // Prevent duplicate processing
-      if (data.questionIndex === lastQuestionIndexRef.current) {
-
-        return;
-      }
-      
-      lastQuestionIndexRef.current = data.questionIndex;
-      
-      // Force state update with setTimeout for React Native compatibility
-      setTimeout(() => {
-
-        setBattleState(prev => {
-          // Only advance if this is a future question index (prevents resets)
-          if (data.questionIndex <= prev.currentQuestion) {
-            return prev;
-          }
-          const timeLimit = (data as any).timeLimit ?? 10; // use provided timeLimit if any
-          const newState = {
-            ...prev,
-            currentQuestion: data.questionIndex,
-            question: data.question,
-            timeLeft: timeLimit
-          };
-
-          return newState;
-        });
-        
-        // Start timer after state update
-        setTimeout(() => {
-          const timeLimit = (data as any).timeLimit ?? 10;
-          startQuestionTimer(timeLimit);
-        }, 100);
-      }, 100); // Longer delay for React Native
-      
-
+      applyQuestionUpdate(data);
     };
 
     // Match ended event
@@ -552,24 +709,23 @@ const handleMatchEnded = (data: {
   myScore: number; 
   opponentScore: number; 
   winner: string; 
-  isDraw: boolean 
+  isDraw: boolean;
+  myPosition?: 'player1' | 'player2' | string;
 }) => {
+  if (hasFinishedRef.current) return;
 
-
-
-
-
-  
-  if (timerRef.current) {
-    clearInterval(timerRef.current);
-    timerRef.current = null;
+  // Ignore premature end (e.g. draw after Q2) — wait until all 5 questions are played
+  if (!hasPlayedFullMatch()) {
+    return;
   }
-  if (questionTimerRef.current) {
-    clearInterval(questionTimerRef.current);
-    questionTimerRef.current = null;
-  }
-  
-  // Stop all playing sounds when battle ends
+
+  hasFinishedRef.current = true;
+  battleStatusRef.current = 'finished';
+
+  if (data.myPosition === 'player2') myPositionRef.current = 'player2';
+  else if (data.myPosition === 'player1') myPositionRef.current = 'player1';
+
+  clearBattleTimers();
   SoundManager.cleanup();
   
   setBattleState(prev => ({
@@ -579,25 +735,16 @@ const handleMatchEnded = (data: {
     player2Score: data.opponentScore
   }));
 
-  // 🧹 FRONTEND SESSION CLEANUP - यहाँ add करें
+  markBattleFlowComplete();
 
-
-
-  
-  // Send cleanup request to server
-  if (socket && socket.connected) {
-    socket.emit('cleanup_match_session', {
-      matchId: data.matchId,
-      userId: user?.id
-    });
-
+  const s = socketRef.current;
+  const mId = data.matchId || matchIdRef.current;
+  const uId = userIdRef.current;
+  if (s?.connected && mId && !hasCleanedUpRef.current) {
+    s.emit('cleanup_match_session', { matchId: mId, userId: uId });
+    s.emit('leave_match', { matchId: mId, userId: uId });
+    hasCleanedUpRef.current = true;
   }
-  
-  // Local state cleanup
-  setTimeout(() => {
-
-
-  }, 3000);
 };
     // Opponent answered event
     // const handleOpponentAnswered = (data: { questionIndex: number }) => {
@@ -625,18 +772,9 @@ const handleMatchEnded = (data: {
         ...prev,
         opponentAnswers: {
           ...prev.opponentAnswers,
-          [data.questionIndex]: data.answer // Store the specific answer
+          [data.questionIndex]: data.answer
         }
       }));
-    
-    // After recording opponent answer, nudge server to send next question if ready
-    try {
-      socket?.emit('get_match_status', { matchId });
-    } catch (err) {
-      // ignore
-    }
-      
-
     };
 
     // Match not found event
@@ -673,68 +811,19 @@ const handleMatchEnded = (data: {
       opponentScore?: number;
       myPosition?: 'player1' | 'player2' | string;
     }) => {
+      if (data.myPosition === 'player2') myPositionRef.current = 'player2';
+      else if (data.myPosition === 'player1') myPositionRef.current = 'player1';
+
       setBattleState(prev => {
-        let newPlayer1Score = prev.player1Score;
-        let newPlayer2Score = prev.player2Score;
-
-        if (data.playerScores) {
-          newPlayer1Score = typeof data.playerScores.player1 === 'number' ? data.playerScores.player1 : newPlayer1Score;
-          newPlayer2Score = typeof data.playerScores.player2 === 'number' ? data.playerScores.player2 : newPlayer2Score;
-        } else if (typeof data.myScore === 'number' && typeof data.opponentScore === 'number') {
-          if (data.myPosition === 'player2') {
-            newPlayer2Score = data.myScore;
-            newPlayer1Score = data.opponentScore;
-          } else {
-            newPlayer1Score = data.myScore;
-            newPlayer2Score = data.opponentScore;
-          }
-        }
-
-        return {
-          ...prev,
-          player1Score: newPlayer1Score,
-          player2Score: newPlayer2Score
-        };
+        const scores = mapScoresToLocalView(data, prev, myPositionRef.current);
+        return { ...prev, ...scores };
       });
-    };
-    // Also listen for scores embedded in next_question payloads
-    const handleNextQuestionScores = (data: any) => {
-      // data may include playerScores or myScore/opponentScore/myPosition
-      const playerScores = data.playerScores;
-      const myScore = data.myScore;
-      const opponentScore = data.opponentScore;
-      const myPosition = data.myPosition;
-
-      if (playerScores || (typeof myScore === 'number' && typeof opponentScore === 'number')) {
-        setBattleState(prev => {
-          let newPlayer1Score = prev.player1Score;
-          let newPlayer2Score = prev.player2Score;
-
-          if (playerScores) {
-            newPlayer1Score = typeof playerScores.player1 === 'number' ? playerScores.player1 : newPlayer1Score;
-            newPlayer2Score = typeof playerScores.player2 === 'number' ? playerScores.player2 : newPlayer2Score;
-          } else {
-            if (myPosition === 'player2') {
-              newPlayer2Score = myScore;
-              newPlayer1Score = opponentScore;
-            } else {
-              newPlayer1Score = myScore;
-              newPlayer2Score = opponentScore;
-            }
-          }
-
-          return {
-            ...prev,
-            player1Score: newPlayer1Score,
-            player2Score: newPlayer2Score
-          };
-        });
-      }
     };
     // Attach listeners
     socket.on('match_started', handleMatchStarted);
     socket.on('next_question', handleNextQuestion);
-    socket.on('next_question', handleNextQuestionScores);
+    socket.on('match_status', syncFromServerPayload);
+    socket.on('match_state', syncFromServerPayload);
     socket.on('match_ended', handleMatchEnded);
     socket.on('opponent_answered', handleOpponentAnswered);
     socket.on('score_update', handleScoreUpdate);
@@ -744,32 +833,39 @@ const handleMatchEnded = (data: {
     // Track attached listeners
     socketListenersRef.current.add('match_started');
     socketListenersRef.current.add('next_question');
-    socketListenersRef.current.add('next_question_scores');
+    socketListenersRef.current.add('match_status');
+    socketListenersRef.current.add('match_state');
     socketListenersRef.current.add('match_ended');
     socketListenersRef.current.add('opponent_answered');
     socketListenersRef.current.add('score_update');
     socketListenersRef.current.add('match_not_found');
     socketListenersRef.current.add('pong');
     socketListenersRef.current.add('session_cleanup_complete');
-    // Request match status from server
+    // Join match only after listeners are ready (prevents missing Q1)
+    if (!hasJoinedMatchRef.current) {
+      hasJoinedMatchRef.current = true;
+      socket.emit('join_match', {
+        matchId: matchId || undefined,
+        roomCode: roomCode || undefined,
+        userId: user?.id,
+      });
+    }
 
+    const syncTimer = setTimeout(() => {
+      if (matchIdRef.current) {
+        socket.emit('get_match_status', { matchId: matchIdRef.current });
+      }
+    }, 400);
 
-
-    socket.emit('get_match_status', { matchId });
-
-    
-    // Test socket connection by sending a ping
     setTimeout(() => {
-
       socket.emit('ping');
     }, 1000);
 
+    return () => {
+      clearTimeout(syncTimer);
+    };
 
-
-
-
-
-  }, [socket, isConnected, matchId, cleanupSocketListeners]);
+  }, [socket, isConnected, matchId, roomCode, user?.id, cleanupSocketListeners, clearBattleTimers, getQuestionKey, isBattleFinished, hasPlayedFullMatch]);
 
   // Battle useEffect
   useEffect(() => {
@@ -803,6 +899,43 @@ const handleMatchEnded = (data: {
       }
     };
   }, [socket, isConnected, matchId, setupSocketListeners, cleanupSocketListeners]);
+
+  // If stuck on preparing, sync once with server (missed events while connecting)
+  useEffect(() => {
+    if (battleState.status !== 'preparing') return;
+    const t = setTimeout(() => {
+      const s = socketRef.current;
+      const mId = matchIdRef.current;
+      if (s?.connected && mId && battleStatusRef.current === 'preparing') {
+        s.emit('get_match_status', { matchId: mId });
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [battleState.status, matchId]);
+
+  // Recover if stuck mid-match (both answered, no timer, still playing)
+  useEffect(() => {
+    if (battleState.status !== 'playing') return;
+    const idx = battleState.currentQuestion;
+    const userAnswered = battleState.answers[idx] !== undefined;
+    const oppAnswered = battleState.opponentAnswers[idx] !== undefined;
+    if (!userAnswered || !oppAnswered) return;
+
+    const t = setTimeout(() => {
+      if (battleStatusRef.current !== 'playing') return;
+      const s = socketRef.current;
+      const mId = matchIdRef.current;
+      if (s?.connected && mId) {
+        s.emit('get_match_status', { matchId: mId });
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [
+    battleState.status,
+    battleState.currentQuestion,
+    battleState.answers,
+    battleState.opponentAnswers,
+  ]);
 
   // Victory animations effect - Must be at top level to avoid hook order issues
   useEffect(() => {
@@ -905,6 +1038,8 @@ const handleMatchEnded = (data: {
     }, 1000);
   };
 
+  startQuestionTimerRef.current = startQuestionTimer;
+
   const handleAnswer = (answerIndex: number) => {
     if (!socket || !isConnected) {
       return;
@@ -948,17 +1083,10 @@ const handleMatchEnded = (data: {
     socket.emit('answer_question', answerData);
 
     
-    // Clear timer
+    // Clear timer — server advances when both players answer or time expires
     if (questionTimerRef.current) {
       clearInterval(questionTimerRef.current);
       questionTimerRef.current = null;
-    }
-    
-    // Nudge server to advance match status immediately (helps reduce delay after timeout)
-    try {
-      socket.emit('get_match_status', { matchId });
-    } catch (err) {
-      // ignore
     }
   };
 
@@ -996,7 +1124,7 @@ const handleMatchEnded = (data: {
           <Text style={styles.errorMessage}>{error}</Text>
           <TouchableOpacity
             style={styles.errorButton}
-            onPress={() => router.back()}
+            onPress={handleReturnToQuiz}
           >
             <LinearGradient
               colors={["#6C63FF", "#7366FF"]}
@@ -1058,7 +1186,7 @@ const handleMatchEnded = (data: {
           style={styles.container}
         >
           {/* Confetti Background */}
-          <View style={styles.confettiContainer}>
+          <View style={styles.confettiContainer} pointerEvents="none">
             {[...Array(Platform.OS === 'android' ? 8 : 20)].map((_, i) => (
               <Animated.View
                 key={i}
@@ -1089,7 +1217,7 @@ const handleMatchEnded = (data: {
           </View>
 
           {/* Enhanced Sparkle Background */}
-          <View style={styles.sparkleBackground}>
+          <View style={styles.sparkleBackground} pointerEvents="none">
             {[...Array(Platform.OS === 'android' ? 8 : 15)].map((_, i) => (
               <Animated.View
                 key={i}
@@ -1230,6 +1358,7 @@ const handleMatchEnded = (data: {
               <TouchableOpacity 
                 style={styles.victoryButton}
                 onPress={handleReturnToQuiz}
+                activeOpacity={0.85}
               >
                 <LinearGradient
                   colors={["#4CAF50", "#45A049", "#2E7D32"]}
@@ -1257,8 +1386,8 @@ const handleMatchEnded = (data: {
             </View>
           </View>
 
-          {/* Firecrackers - Now on top of everything */}
-          <View style={styles.firecrackersContainer}>
+          {/* Firecrackers - decorative only, must not block button taps */}
+          <View style={styles.firecrackersContainer} pointerEvents="none">
             {/* Firecracker 1 - Shooting up from bottom */}
             <Animated.View
               style={[
@@ -1498,7 +1627,7 @@ const handleMatchEnded = (data: {
                 </View>
               </View>
               <View style={styles.victoryButtonsContainer}>
-              <TouchableOpacity style={styles.victoryButton} onPress={handleReturnToQuiz}>
+              <TouchableOpacity style={styles.victoryButton} onPress={handleReturnToQuiz} activeOpacity={0.85}>
                   <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
                     <Text style={styles.victoryButtonText}>Back to Quiz</Text>
                   </LinearGradient>
@@ -1510,7 +1639,7 @@ const handleMatchEnded = (data: {
             <View style={styles.victoryContainer}>
               <Text style={styles.sadEmoji}>😢</Text>
               {/* Muted confetti / particles */}
-              <View style={styles.confettiContainer}>
+              <View style={styles.confettiContainer} pointerEvents="none">
                 {[...Array(Platform.OS === 'android' ? 6 : 12)].map((_, i) => (
                   <Animated.View
                     key={i}
@@ -1533,7 +1662,7 @@ const handleMatchEnded = (data: {
               </View>
 
               {/* Subtle sparkles */}
-              <View style={styles.sparkleBackground}>
+              <View style={styles.sparkleBackground} pointerEvents="none">
                 {[...Array(Platform.OS === 'android' ? 6 : 10)].map((_, i) => (
                   <Animated.View
                     key={i}
@@ -1605,6 +1734,7 @@ const handleMatchEnded = (data: {
                 <TouchableOpacity
                   style={styles.victoryButton}
                   onPress={handleReturnToQuiz}
+                  activeOpacity={0.85}
                 >
                   <LinearGradient colors={['#10B981', '#059669']} style={styles.victoryButtonGradient}>
                     <Ionicons name="refresh" size={18} color="#fff" />
@@ -1615,6 +1745,7 @@ const handleMatchEnded = (data: {
                 <TouchableOpacity
                   style={styles.victoryButton}
                   onPress={handleReturnToQuiz}
+                  activeOpacity={0.85}
                 >
                   <LinearGradient colors={['#4F46E5', '#7C3AED']} style={styles.victoryButtonGradient}>
                     <Ionicons name="arrow-back" size={18} color="#fff" />
@@ -1759,7 +1890,7 @@ const handleMatchEnded = (data: {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.headerBackButton}
-            onPress={() => router.back()}
+            onPress={handleReturnToQuiz}
           >
             <LinearGradient
               colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.15)']}
@@ -2521,6 +2652,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+    zIndex: 10,
+    elevation: 10,
   },
   resultIcon: {
     marginBottom: 20,
@@ -2597,6 +2730,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
     paddingHorizontal: 18,
+    zIndex: 10,
+    elevation: 10,
   },
   trophyContainer: {
     marginBottom: 20,
@@ -2681,6 +2816,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: Platform.OS === 'android' ? 320 : 420,
     marginTop: Platform.OS === 'android' ? -8 : -12,
+    zIndex: 20,
+    elevation: 20,
   },
   victoryButton: {
     flex: 1,
@@ -2897,6 +3034,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
+    zIndex: 10,
+    elevation: 10,
   },
   resultIcon: {
     marginBottom: 30,

@@ -1,11 +1,11 @@
 import { apiFetchAuth } from '@/constants/api';
-import {
-    enrichMyExamsWithJoinedLive,
-    syncJoinedLiveExamIds,
-    type MyExamRow,
-} from '@/utils/joinedLiveExams';
-import { TimetableTheme } from '@/constants/TimetableTheme';
+import { HomeTheme } from '@/constants/HomeTheme';
 import { FontFamily } from '@/constants/Typography';
+import {
+  enrichMyExamsWithJoinedLive,
+  syncJoinedLiveExamIds,
+  type MyExamRow,
+} from '@/utils/joinedLiveExams';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -20,6 +20,7 @@ import {
   Clock,
   Grid3x3,
   Plus,
+  Trophy,
   TrendingUp,
 } from 'lucide-react-native';
 import { useCallback, useMemo, useState } from 'react';
@@ -39,49 +40,36 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-/** Same lavender / purple palette as Timetable (calendar) screen */
 const C = {
-  bg: TimetableTheme.screenBg,
-  bgGrad: TimetableTheme.heroGradient,
-  ink: TimetableTheme.ink,
-  inkSoft: TimetableTheme.inkMuted,
-  primary: TimetableTheme.primary,
-  primaryLight: TimetableTheme.primarySoft,
-  primaryDark: '#4C1D95',
-  muted: TimetableTheme.inkMuted,
-  card: '#FFFFFF',
-  border: '#E8E4FF',
-  surface: '#EDE9FE',
-  surfaceAlt: '#EDE9FE',
-  success: TimetableTheme.inProgressText,
-  successSoft: TimetableTheme.inProgressBg,
-  warn: TimetableTheme.upcomingText,
-  warnSoft: TimetableTheme.upcomingBg,
+  bg: HomeTheme.bg,
+  bgGrad: HomeTheme.creamGrad,
+  ink: HomeTheme.ink,
+  inkSoft: HomeTheme.inkSecondary,
+  primary: HomeTheme.primary,
+  primaryLight: HomeTheme.primaryLight,
+  primaryDark: HomeTheme.primaryDark,
+  muted: HomeTheme.inkMuted,
+  card: HomeTheme.card,
+  border: HomeTheme.border,
+  surface: HomeTheme.primarySoft,
+  success: HomeTheme.success,
+  successSoft: HomeTheme.successLight,
+  warn: '#EA580C',
+  warnSoft: '#FFEDD5',
   live: '#DC2626',
   liveSoft: '#FEE2E2',
-  teal: TimetableTheme.completedText,
-  tealSoft: TimetableTheme.completedBg,
-  gold: TimetableTheme.upcomingText,
-  sectionBg: '#EDE9FE',
-  sectionBgWarm: '#E8E4FF',
-  ctaGrad: TimetableTheme.addBtn,
-  accentGrad: TimetableTheme.addBtn,
-  progressGrad: TimetableTheme.progress,
-  progressGreen: TimetableTheme.primary,
-  statPurple: ['#A78BFA', TimetableTheme.primary] as const,
-  statEmerald: ['#6EE7B7', TimetableTheme.inProgressText] as const,
-  statGold: ['#FDE68A', TimetableTheme.upcomingText] as const,
-  heroGrad: ['#1A0F3C', '#2D2068', '#4B32AF', '#6D28D9'] as const,
-  insightGrad: ['#047857', '#059669', '#10B981', '#34D399'] as const,
+  ctaGrad: HomeTheme.heroCta,
+  heroGrad: ['#2D2068', '#4B32AF', '#6344D4'] as const,
+  insightGrad: HomeTheme.heroCta,
 };
 
 const isAndroid = Platform.OS === 'android';
 
 const CARD_THEMES = [
-  { accent: '#2563EB', grad: ['#93C5FD', '#60A5FA', '#2563EB'] as const, icon: 'school' as const, glow: 'rgba(37, 99, 235, 0.12)' },
-  { accent: '#6D28D9', grad: ['#C4B5FD', '#A78BFA', '#6D28D9'] as const, icon: 'library' as const, glow: 'rgba(109, 40, 217, 0.12)' },
-  { accent: '#059669', grad: ['#A7F3D0', '#34D399', '#059669'] as const, icon: 'flask' as const, glow: 'rgba(5, 150, 105, 0.1)' },
-  { accent: '#D97706', grad: ['#FDE68A', '#FBBF24', '#D97706'] as const, icon: 'book' as const, glow: 'rgba(217, 119, 6, 0.1)' },
+  { accent: HomeTheme.primary, grad: ['#8E78E7', '#6344D4', '#5546C9'] as const, icon: 'school' as const },
+  { accent: '#059669', grad: ['#6EE7B7', '#10B981', '#059669'] as const, icon: 'flask' as const },
+  { accent: '#EA580C', grad: ['#FDBA74', '#FB923C', '#EA580C'] as const, icon: 'book' as const },
+  { accent: '#0284C7', grad: ['#7DD3FC', '#38BDF8', '#0284C7'] as const, icon: 'library' as const },
 ];
 
 type FilterKey = 'all' | 'upcoming' | 'completed';
@@ -356,59 +344,24 @@ export default function MyExamsScreen() {
           <Animated.View style={{ opacity: fadeAnim }}>
             <View style={st.heroWrap}>
               <LinearGradient
-                colors={Array.isArray(C.heroGrad) ? (C.heroGrad as any) : ['#1A0F3C', '#2D2068', '#4B32AF', '#6D28D9']}
+                colors={[...C.heroGrad]}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0.85 }}
-                style={st.heroCard}
+                end={{ x: 1, y: 1 }}
+                style={st.heroTop}
               >
-                <View style={st.heroRow}>
-                  <View style={st.heroLeft}>
-                    <View style={st.heroBadge}>
-                      <View style={st.heroBadgeDot} />
-                      <Text style={st.heroBadgeTxt}>MY JOURNEY</Text>
-                    </View>
-                    <Text style={st.heroTitle}>
-                      My <Text style={st.heroTitleAccent}>Exams</Text>
-                    </Text>
-                    <Text style={st.heroTagline} numberOfLines={1}>
+                <View style={st.orb1} />
+                <View style={st.orb2} />
+
+                <View style={st.heroTopRow}>
+                  <View style={st.heroTopLeft}>
+                    <LinearGradient colors={['#FBBF24', '#F59E0B']} style={st.heroBadge}>
+                      <Trophy size={12} color="#78350F" strokeWidth={2.4} />
+                      <Text style={st.heroBadgeTxt}>My Journey</Text>
+                    </LinearGradient>
+                    <Text style={st.heroTitle}>My Exams</Text>
+                    <Text style={st.heroTagline} numberOfLines={2}>
                       Scores, progress & live battles
                     </Text>
-
-                    <View style={st.heroStats}>
-                      <View style={st.heroStatPill}>
-                        <Calendar size={13} color="#C4B5FD" strokeWidth={2.2} />
-                        <Text style={st.heroStatTxt}>
-                          <Text style={st.heroStatNum}>{stats.upcoming}</Text> upcoming
-                        </Text>
-                      </View>
-                      <View style={st.heroStatPill}>
-                        <CheckCircle2 size={13} color="#6EE7B7" strokeWidth={2.2} />
-                        <Text style={st.heroStatTxt}>
-                          <Text style={st.heroStatNum}>{stats.completed}</Text> done
-                        </Text>
-                      </View>
-                      <View style={st.heroStatPill}>
-                        <TrendingUp size={13} color="#FDE68A" strokeWidth={2.2} />
-                        <Text style={st.heroStatTxt}>
-                          <Text style={st.heroStatNum}>{stats.avg}%</Text> avg
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={st.heroProg}>
-                      <View style={st.heroProgHead}>
-                        <Text style={st.heroProgLbl}>Overall readiness</Text>
-                        <Text style={st.heroProgPct}>{stats.overall}%</Text>
-                      </View>
-                      <View style={st.heroProgTrack}>
-                        <LinearGradient
-                          colors={['#A78BFA', '#C4B5FD', '#FFFFFF']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={[st.heroProgFill, { width: `${Math.min(stats.overall, 100)}%` }]}
-                        />
-                      </View>
-                    </View>
                   </View>
                   <Image source={HERO_IMG} style={st.heroArt} resizeMode="contain" />
                 </View>
@@ -418,12 +371,55 @@ export default function MyExamsScreen() {
                   activeOpacity={0.9}
                   style={st.heroCtaWrap}
                 >
-                  <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={st.heroCta}>
-                    <Plus size={16} color="#FFF" strokeWidth={2.5} />
+                  <View style={st.heroCta}>
+                    <Plus size={16} color={HomeTheme.primary} strokeWidth={2.5} />
                     <Text style={st.heroCtaTxt}>Join New Exam</Text>
-                    <ChevronRight size={16} color="#FFF" strokeWidth={2.5} />
-                  </LinearGradient>
+                    <ChevronRight size={16} color={HomeTheme.primary} strokeWidth={2.5} />
+                  </View>
                 </TouchableOpacity>
+              </LinearGradient>
+
+              <LinearGradient colors={['#FFFBF7', '#FFFFFF']} style={st.heroBody}>
+                <View style={st.statsRow}>
+                  <View style={st.statCol}>
+                    <View style={[st.statIconWrap, { backgroundColor: HomeTheme.primarySoft }]}>
+                      <Calendar size={14} color={HomeTheme.primary} strokeWidth={2.2} />
+                    </View>
+                    <Text style={[st.statNum, { color: HomeTheme.primary }]}>{stats.upcoming}</Text>
+                    <Text style={st.statLbl}>Upcoming</Text>
+                  </View>
+                  <View style={st.statDivider} />
+                  <View style={st.statCol}>
+                    <View style={[st.statIconWrap, { backgroundColor: HomeTheme.successLight }]}>
+                      <CheckCircle2 size={14} color={HomeTheme.success} strokeWidth={2.2} />
+                    </View>
+                    <Text style={[st.statNum, { color: HomeTheme.success }]}>{stats.completed}</Text>
+                    <Text style={st.statLbl}>Completed</Text>
+                  </View>
+                  <View style={st.statDivider} />
+                  <View style={st.statCol}>
+                    <View style={[st.statIconWrap, { backgroundColor: '#FFEDD5' }]}>
+                      <TrendingUp size={14} color="#EA580C" strokeWidth={2.2} />
+                    </View>
+                    <Text style={[st.statNum, { color: '#EA580C' }]}>{stats.avg}%</Text>
+                    <Text style={st.statLbl}>Avg Score</Text>
+                  </View>
+                </View>
+
+                <View style={st.heroProg}>
+                  <View style={st.heroProgHead}>
+                    <Text style={st.heroProgLbl}>Overall readiness</Text>
+                    <Text style={st.heroProgPct}>{stats.overall}%</Text>
+                  </View>
+                  <View style={st.heroProgTrack}>
+                    <LinearGradient
+                      colors={[...HomeTheme.progressGradient]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[st.heroProgFill, { width: `${Math.min(stats.overall, 100)}%` }]}
+                    />
+                  </View>
+                </View>
               </LinearGradient>
             </View>
 
@@ -466,8 +462,8 @@ export default function MyExamsScreen() {
               <View style={st.list}>
                 {filteredExams.length === 0 ? (
                   <View style={st.empty}>
-                    <LinearGradient colors={['#EDE9FE', '#DDD6FE']} style={st.emptyIcon}>
-                      <Award size={32} color={C.primary} strokeWidth={1.8} />
+                    <LinearGradient colors={[...HomeTheme.heroCta]} style={st.emptyIcon}>
+                      <Award size={32} color="#FFF" strokeWidth={1.8} />
                     </LinearGradient>
                     <Text style={st.emptyTitle}>No exams yet</Text>
                     <Text style={st.emptySub} numberOfLines={2}>
@@ -500,22 +496,22 @@ export default function MyExamsScreen() {
                 activeOpacity={0.9}
               >
                 <LinearGradient
-                  colors={Array.isArray(C.insightGrad) ? (C.insightGrad as any) : ['#047857', '#059669', '#10B981', '#34D399']}
+                  colors={[...C.insightGrad]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={st.bannerGrad}
                 >
                   <View style={st.bannerInner}>
-                    <View style={st.bannerIconWrap}>
-                      <BarChart3 size={isAndroid ? 17 : 19} color="#ECFDF5" strokeWidth={2.2} />
-                    </View>
+                    <LinearGradient colors={['#FBBF24', '#F59E0B']} style={st.bannerIconWrap}>
+                      <BarChart3 size={isAndroid ? 17 : 19} color="#78350F" strokeWidth={2.2} />
+                    </LinearGradient>
                     <View style={st.bannerText}>
                       <Text style={st.bannerTitle}>Performance Insights</Text>
                       <Text style={st.bannerSub} numberOfLines={1}>
-                        Avg {stats.avg}% · Leaderboard →
+                        Avg {stats.avg}% · View leaderboard
                       </Text>
                     </View>
-                    <ChevronRight size={isAndroid ? 17 : 19} color="#D1FAE5" strokeWidth={2.2} />
+                    <ChevronRight size={isAndroid ? 17 : 19} color="#FFFFFF" strokeWidth={2.2} />
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -547,8 +543,8 @@ export default function MyExamsScreen() {
 }
 
 const cardShadow = Platform.select({
-  ios: { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 14 },
-  android: { elevation: 4 },
+  ios: { shadowColor: '#4B32AF', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.18, shadowRadius: 18 },
+  android: { elevation: 7 },
 });
 
 const st = StyleSheet.create({
@@ -562,6 +558,8 @@ const st = StyleSheet.create({
     backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
     ...cardShadow,
   },
   loadTxt: { fontFamily: FontFamily.semiBold, fontSize: 14, color: C.primary },
@@ -570,86 +568,120 @@ const st = StyleSheet.create({
   retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 6 },
   retryTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
 
-  heroWrap: { marginHorizontal: PAD, marginTop: Platform.OS === 'android' ? 6 : 10 },
-  heroCard: {
+  heroWrap: {
+    marginHorizontal: PAD,
+    marginTop: Platform.OS === 'android' ? 6 : 10,
     borderRadius: 22,
-    padding: Platform.OS === 'android' ? 14 : 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
     ...cardShadow,
   },
-  heroRow: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroLeft: { flex: 1, paddingRight: 4, zIndex: 2 },
+  heroTop: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 14,
+    overflow: 'hidden',
+  },
+  orb1: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -30,
+    right: -10,
+  },
+  orb2: {
+    position: 'absolute',
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -15,
+    left: 24,
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'flex-end', zIndex: 1 },
+  heroTopLeft: { flex: 1, paddingRight: 8 },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginBottom: 8,
+    paddingVertical: 5,
+    borderRadius: 20,
+    marginBottom: 10,
   },
-  heroBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#A78BFA' },
-  heroBadgeTxt: { fontFamily: FontFamily.semiBold, fontSize: 9, color: '#E9D5FF', letterSpacing: 1.2 },
+  heroBadgeTxt: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#78350F' },
   heroTitle: {
     fontFamily: FontFamily.extraBold,
-    fontSize: Platform.OS === 'android' ? 22 : 24,
+    fontSize: Platform.OS === 'android' ? 24 : 26,
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
-  heroTitleAccent: { color: '#C4B5FD' },
   heroTagline: {
     fontFamily: FontFamily.medium,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.72)',
-    marginTop: 4,
-    marginBottom: 10,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 6,
+    lineHeight: 18,
   },
-  heroStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
-  heroStatPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  heroStatTxt: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.85)' },
-  heroStatNum: { fontFamily: FontFamily.bold, color: '#FFFFFF' },
-  heroProg: { marginTop: 2 },
-  heroProgHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  heroProgLbl: { fontFamily: FontFamily.medium, fontSize: 10, color: 'rgba(255,255,255,0.7)' },
-  heroProgPct: { fontFamily: FontFamily.bold, fontSize: 11, color: '#FFFFFF' },
-  heroProgTrack: {
-    height: 5,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  heroProgFill: { height: '100%', borderRadius: 5 },
   heroArt: {
-    width: Platform.OS === 'android' ? 88 : 100,
-    height: Platform.OS === 'android' ? 88 : 100,
+    width: Platform.OS === 'android' ? 80 : 92,
+    height: Platform.OS === 'android' ? 80 : 92,
     marginBottom: -4,
   },
-  heroCtaWrap: { marginTop: 12 },
+  heroCtaWrap: { marginTop: 14, zIndex: 1 },
   heroCta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: Platform.OS === 'android' ? 11 : 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    paddingVertical: Platform.OS === 'android' ? 10 : 11,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
   },
-  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: HomeTheme.primary },
+  heroBody: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: HomeTheme.border,
+  },
+  statCol: { flex: 1, alignItems: 'center' },
+  statDivider: { width: 1, height: 36, backgroundColor: HomeTheme.border },
+  statIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  statNum: { fontFamily: FontFamily.bold, fontSize: 18, marginBottom: 2 },
+  statLbl: { fontFamily: FontFamily.regular, fontSize: 10, color: C.muted },
+  heroProg: {},
+  heroProgHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  heroProgLbl: { fontFamily: FontFamily.medium, fontSize: 12, color: C.muted },
+  heroProgPct: { fontFamily: FontFamily.bold, fontSize: 12, color: HomeTheme.primary },
+  heroProgTrack: {
+    height: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  heroProgFill: { height: '100%', borderRadius: 8 },
 
   listSection: { marginTop: isAndroid ? 8 : 12, paddingHorizontal: PAD },
   sectionHead: {
@@ -664,48 +696,48 @@ const st = StyleSheet.create({
     color: C.ink,
   },
   countBadge: {
-    backgroundColor: '#EDE9FE',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    minWidth: 22,
+    backgroundColor: HomeTheme.primarySoft,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    minWidth: 24,
     alignItems: 'center',
   },
-  countBadgeTxt: { fontFamily: FontFamily.bold, fontSize: 10, color: C.primary },
-  filterRow: { gap: isAndroid ? 6 : 8, alignItems: 'center', marginBottom: isAndroid ? 6 : 8 },
+  countBadgeTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: C.primary },
+  filterRow: { gap: isAndroid ? 6 : 8, alignItems: 'center', marginBottom: isAndroid ? 8 : 10 },
   filterOn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: isAndroid ? 10 : 12,
-    paddingVertical: isAndroid ? 5 : 7,
-    borderRadius: 16,
+    gap: 5,
+    paddingHorizontal: isAndroid ? 12 : 14,
+    paddingVertical: isAndroid ? 7 : 8,
+    borderRadius: 20,
   },
   filterOnTxt: { fontFamily: FontFamily.bold, fontSize: isAndroid ? 11 : 12, color: '#FFF' },
   filterOff: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: isAndroid ? 10 : 12,
-    paddingVertical: isAndroid ? 5 : 7,
-    borderRadius: 16,
+    gap: 5,
+    paddingHorizontal: isAndroid ? 12 : 14,
+    paddingVertical: isAndroid ? 7 : 8,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8E4FF',
+    borderColor: '#E9D5FF',
   },
   filterOffTxt: { fontFamily: FontFamily.semiBold, fontSize: isAndroid ? 11 : 12, color: C.primary },
 
-  list: { gap: isAndroid ? 5 : 8 },
+  list: { gap: isAndroid ? 8 : 10 },
   examCard: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: isAndroid ? 12 : 14,
+    borderRadius: isAndroid ? 14 : 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#EDE9FE',
+    borderColor: '#E9D5FF',
     ...Platform.select({
-      ios: cardShadow,
-      android: { elevation: 1 },
+      ios: { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10 },
+      android: { elevation: 2 },
     }),
   },
   examAccent: { width: 3 },
@@ -744,12 +776,12 @@ const st = StyleSheet.create({
   liveDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#DC2626' },
   liveChipTxt: { fontFamily: FontFamily.bold, fontSize: 8, color: '#DC2626' },
   practiceChip: {
-    backgroundColor: TimetableTheme.completedBg,
+    backgroundColor: HomeTheme.successLight,
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  practiceChipTxt: { fontFamily: FontFamily.bold, fontSize: 8, color: TimetableTheme.completedText },
+  practiceChipTxt: { fontFamily: FontFamily.bold, fontSize: 8, color: HomeTheme.success },
   statusBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6 },
   statusUp: { backgroundColor: C.warnSoft },
   statusDone: { backgroundColor: C.successSoft },
@@ -772,8 +804,8 @@ const st = StyleSheet.create({
   },
   scoreVal: { fontFamily: FontFamily.extraBold, fontSize: isAndroid ? 12 : 13 },
   progTrack: {
-    height: isAndroid ? 3 : 4,
-    backgroundColor: '#EDE9FE',
+    height: isAndroid ? 4 : 5,
+    backgroundColor: HomeTheme.primarySoft,
     borderRadius: 4,
     overflow: 'hidden',
     marginTop: isAndroid ? 6 : 7,
@@ -799,10 +831,9 @@ const st = StyleSheet.create({
     paddingHorizontal: isAndroid ? 10 : 12,
   },
   bannerIconWrap: {
-    width: isAndroid ? 34 : 38,
-    height: isAndroid ? 34 : 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.22)',
+    width: isAndroid ? 36 : 40,
+    height: isAndroid ? 36 : 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -811,19 +842,22 @@ const st = StyleSheet.create({
   bannerSub: {
     fontFamily: FontFamily.medium,
     fontSize: isAndroid ? 10 : 11,
-    color: 'rgba(236,253,245,0.9)',
-    marginTop: 1,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
   },
 
   empty: {
     alignItems: 'center',
-    paddingVertical: 28,
+    paddingVertical: 32,
     paddingHorizontal: 20,
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#EDE9FE',
-    ...cardShadow,
+    borderColor: '#E9D5FF',
+    ...Platform.select({
+      ios: { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12 },
+      android: { elevation: 3 },
+    }),
   },
   emptyIcon: {
     width: 64,

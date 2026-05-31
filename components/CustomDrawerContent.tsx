@@ -1,21 +1,61 @@
 import { useAuth } from '@/context/AuthContext';
-import { ShadowUtils } from '@/utils/shadowUtils';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Dimensions, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PRIMARY = '#6344D4';
+const SP_BG = '#FAFAFF';
+
+type MenuItemProps = {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  isActive: boolean;
+  iconColor?: string;
+  iconImage?: number;
+};
+
+const MenuSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <View style={styles.menuGroup}>
+    <Text style={styles.menuGroupTitle}>{title}</Text>
+    {children}
+  </View>
+);
+
+const MenuItem = ({ icon, label, onPress, isActive, iconColor = PRIMARY, iconImage }: MenuItemProps) => (
+  <TouchableOpacity
+    style={[styles.menuItem, isActive && styles.activeMenuItem]}
+    onPress={onPress}
+    activeOpacity={0.75}
+  >
+    <View style={[styles.menuIconBox, isActive ? styles.menuIconBoxActive : { backgroundColor: `${iconColor}14` }]}>
+      {iconImage ? (
+        <Image source={iconImage} style={styles.menuItemIconImage} resizeMode="contain" />
+      ) : (
+        <Ionicons name={icon} size={20} color={isActive ? '#fff' : iconColor} />
+      )}
+    </View>
+    <Text style={[styles.menuItemText, isActive && styles.activeMenuItemText]} numberOfLines={1}>
+      {label}
+    </Text>
+    {isActive ? (
+      <View style={styles.activeDot} />
+    ) : (
+      <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+    )}
+  </TouchableOpacity>
+);
 
 const CustomDrawerContent = (props: any) => {
     const { user, logout } = useAuth();
     const { navigation } = props;
     const router = useRouter();
     const [activeMenu, setActiveMenu] = useState('');
-    const [isDarkMode] = useState(false);
 
     const navigateToTimetable = () => {
         setActiveMenu('timetable');
@@ -181,21 +221,30 @@ const CustomDrawerContent = (props: any) => {
     };
 
 
+    const displayName = user?.name || (user as any)?.user?.name || 'Student';
+    const displayEmail = user?.email || '';
+
     return (
-        <View style={[styles.container, isDarkMode && styles.darkContainer]}>
-            <SafeAreaView style={{ flex: 1 }}>
-                <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent}>
-                    
-                    {/* Header - User profile */}
+        <View style={styles.container}>
+            <LinearGradient colors={['#EDE9FE', '#FDF2F8', SP_BG]} style={StyleSheet.absoluteFill} />
+            <SafeAreaView style={styles.safeArea}>
+                <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     <View style={styles.headerWrapper}>
                         <LinearGradient
-                            colors={['#4F46E5', '#6366F1', '#7C3AED']}
+                            colors={['#1A0F3C', '#4B32AF', PRIMARY]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.headerGradient}
                         >
-                            <View style={styles.logoSection}>
-                                <View style={styles.logoContainer}>
+                            <TouchableOpacity
+                                style={styles.closeBtn}
+                                onPress={() => navigation.closeDrawer()}
+                                hitSlop={12}
+                            >
+                                <Ionicons name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.logoSection} onPress={navigateToProfile} activeOpacity={0.85}>
+                                <View style={styles.avatarRing}>
                                     <View style={styles.avatarWrapper}>
                                         {(user?.profilePicture || user?.profilePhoto) ? (
                                             <Image
@@ -204,250 +253,111 @@ const CustomDrawerContent = (props: any) => {
                                                 resizeMode="cover"
                                             />
                                         ) : (
-                                            <Image source={require('../assets/images/icons/students.png')} style={styles.avatarStudentIcon} resizeMode="contain" />
+                                            <LinearGradient colors={['#C4B5FD', '#A78BFA']} style={styles.avatarPlaceholder}>
+                                                <Text style={styles.avatarInitials}>
+                                                    {displayName.charAt(0).toUpperCase()}
+                                                </Text>
+                                            </LinearGradient>
                                         )}
                                     </View>
                                 </View>
                                 <View style={styles.appNameContainer}>
-                                    {(user?.name || (user as any)?.user?.name) ? (
-                                        <Text style={styles.appName} numberOfLines={1}>
-                                            {(user?.name || (user as any)?.user?.name || '').split(' ')[0]}
-                                        </Text>
-                                    ) : (
-                                        <Text style={styles.appName}>Guest</Text>
-                                    )}
-                                    <Text style={styles.tagline}>Yottascore</Text>
+                                    <Text style={styles.appName} numberOfLines={1}>{displayName}</Text>
+                                    {displayEmail ? (
+                                        <Text style={styles.userEmail} numberOfLines={1}>{displayEmail}</Text>
+                                    ) : null}
+                                    <View style={styles.brandPill}>
+                                        <Ionicons name="sparkles" size={11} color="#E9D5FF" />
+                                        <Text style={styles.tagline}>Yottascore</Text>
+                                    </View>
                                 </View>
-                            </View>
+                                <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+                            </TouchableOpacity>
                         </LinearGradient>
                     </View>
 
-                    {/* Menu Section */}
                     <View style={styles.menuSection}>
-                        <View style={styles.menuItems}>
-                            <MenuItem 
-                                icon="document-text-outline" 
-                                label="My Exams" 
+                        <MenuSection title="Main">
+                            <MenuItem
+                                icon="document-text-outline"
+                                label="My Exams"
                                 onPress={navigateToMyExams}
                                 isActive={activeMenu === 'my-exams'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#2ED573"
+                                iconColor="#16A34A"
                                 iconImage={require('../assets/images/icons/exam.png')}
                             />
-                            
-                            <MenuItem 
-                                icon="book-outline" 
-                                label="PYQ" 
+                            <MenuItem
+                                icon="book-outline"
+                                label="PYQ"
                                 onPress={navigateToPYQ}
                                 isActive={activeMenu === 'pyq'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#1f2937"
+                                iconColor={PRIMARY}
                                 iconImage={require('../assets/images/icons/question-mark.png')}
                             />
-                            <MenuItem 
+                            <MenuItem
                                 icon="newspaper-outline"
                                 label="Current Affairs"
                                 onPress={navigateToCurrentAffairs}
                                 isActive={activeMenu === 'current-affairs'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#06B6D4"
+                                iconColor="#0891B2"
                             />
-                            <MenuItem 
-                                icon="ribbon-outline" 
-                                label="My Certificates" 
-                                onPress={navigateToMyCertificates}
-                                isActive={activeMenu === 'my-certificates'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#aa35ce"
-                            />
-                            <MenuItem 
-                                icon="notifications-outline" 
-                                label="Exam Notifications" 
-                                onPress={navigateToExamNotifications}
-                                isActive={activeMenu === 'exam-notifications'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#F59E0B"
-                                iconImage={require('../assets/images/icons/push-notification.png')}
-                            />
-                            <MenuItem 
-                                icon="book-outline" 
-                                label="Book Store" 
-                                onPress={navigateToBookStore}
-                                isActive={activeMenu === 'book-store'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#8B5CF6"
-                                iconImage={require('../assets/images/icons/book-shop.png')}
-                            />
-                            
-                            <MenuItem 
-                                icon="list-outline" 
-                                label="My Listings" 
-                                onPress={navigateToMyListings}
-                                isActive={activeMenu === 'my-listings'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#F59E0B"
-                            />
-                            
-                            <MenuItem 
-                                icon="school-outline" 
-                                label="Practise" 
-                                onPress={navigateToPracticeExam}
-                                isActive={activeMenu === 'practice-exam'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#1E90FF"
-                                iconImage={require('../assets/images/icons/exam-time.png')}
-                            />
-                            
-                            <MenuItem 
-                                icon="game-controller-outline" 
-                                label="Play Quiz" 
-                                onPress={navigateToBattleQuiz}
-                                isActive={activeMenu === 'quiz'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#96CEB4"
-                                iconImage={require('../assets/images/icons/quiz.png')}
-                            />
-                            
-                            {/* My Profile - Temporarily hidden */}
-                            {false && (
-                                <MenuItem 
-                                    icon="person-outline" 
-                                    label="My Profile" 
-                                    onPress={navigateToProfile}
-                                    isActive={activeMenu === 'profile'}
-                                    isDarkMode={isDarkMode}
-                                    iconColor="#FF4757"
-                                />
-                            )}
-                            
-                            {/* Messages - Temporarily hidden */}
-                            {false && (
-                                <MenuItem 
-                                    icon="chatbubbles-outline" 
-                                    label="Messages" 
-                                    onPress={navigateToMessages}
-                                    isActive={activeMenu === 'messages'}
-                                    isDarkMode={isDarkMode}
-                                    iconColor="#667eea"
-                                />
-                            )}
-                            
-                            <MenuItem 
-                                icon="trophy-outline" 
-                                label="Leaderboard" 
-                                onPress={handleLeaderboardPress}
-                                isActive={activeMenu === 'leaderboard'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#FF6348"
-                            />
-
-                            <MenuItem 
-                                icon="person-remove-outline" 
-                                label="Deactivate Account" 
-                                onPress={navigateToDeactivateAccount}
-                                isActive={activeMenu === 'deactivate-account'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#EA580C"
-                            />
-                            
-                            <MenuItem 
-                                icon="calendar-outline" 
-                                label="Timetable" 
+                            <MenuItem
+                                icon="calendar-outline"
+                                label="Timetable"
                                 onPress={navigateToTimetable}
                                 isActive={activeMenu === 'timetable'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#9C88FF"
+                                iconColor="#7C3AED"
                                 iconImage={require('../assets/images/icons/study-time.png')}
                             />
-                            
-                            <MenuItem 
-                                icon="person-add-outline" 
-                                label="Refer & Earn" 
+                            <MenuItem
+                                icon="school-outline"
+                                label="Practise"
+                                onPress={navigateToPracticeExam}
+                                isActive={activeMenu === 'practice-exam'}
+                                iconColor="#2563EB"
+                                iconImage={require('../assets/images/icons/exam-time.png')}
+                            />
+                            <MenuItem
+                                icon="game-controller-outline"
+                                label="Play Quiz"
+                                onPress={navigateToBattleQuiz}
+                                isActive={activeMenu === 'quiz'}
+                                iconColor="#059669"
+                                iconImage={require('../assets/images/icons/quiz.png')}
+                            />
+                            <MenuItem
+                                icon="chatbubbles-outline"
+                                label="Messages"
+                                onPress={navigateToMessages}
+                                isActive={activeMenu === 'messages'}
+                                iconColor="#4F46E5"
+                            />
+                            <MenuItem
+                                icon="person-add-outline"
+                                label="Refer & Earn"
                                 onPress={navigateToRefer}
                                 isActive={activeMenu === 'refer'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#FF9FF3"
+                                iconColor="#DB2777"
                                 iconImage={require('../assets/images/icons/budget.png')}
                             />
-                            
-                            {/* Membership - Hidden for now */}
-                            {false && (
-                                <MenuItem 
-                                    icon="diamond-outline" 
-                                    label="Membership" 
-                                    onPress={navigateToMembership}
-                                    isActive={activeMenu === 'membership'}
-                                    isDarkMode={isDarkMode}
-                                    iconColor="#FFD700"
-                                />
-                            )}
-                            
-                            {/* <MenuItem 
-                                icon="headset-outline" 
-                                label="24/7 Support" 
-                                onPress={handleSupportPress}
-                                isActive={activeMenu === 'support'}
-                                isDarkMode={isDarkMode}
-                                iconColor="#54A0FF"
-                            /> */}
-                        </View>
+                        </MenuSection>
                     </View>
 
 
 
 
-                    {/* Social Media Section */}
-                    <View style={styles.socialSection}>
-                        <Text style={styles.socialTitle}>Follow Us</Text>
-                        <View style={styles.socialIcons}>
-                            <TouchableOpacity 
-                                style={styles.socialIcon}
-                                onPress={() => {
-                                    Linking.openURL('https://www.facebook.com/yottascore').catch(err => 
-                                        console.error('Failed to open Facebook:', err)
-                                    );
-                                }}
-                            >
-                                <View style={styles.facebookIconContainer}>
-                                    <Ionicons name="logo-facebook" size={20} color="#FFFFFF" />
-                                </View>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.socialIcon}>
-                                <View style={styles.youtubeIconContainer}>
-                                    <Ionicons name="logo-youtube" size={20} color="#FFFFFF" />
-                                </View>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={styles.socialIcon}
-                                onPress={() => {
-                                    Linking.openURL('https://www.instagram.com/yottascore?igsh=Zm5ycng3YjBvNnU1&utm_source=qr').catch(err => 
-                                        console.error('Failed to open Instagram:', err)
-                                    );
-                                }}
-                            >
-                                <View style={styles.instagramIconContainer}>
-                                    <Ionicons name="logo-instagram" size={20} color="#FFFFFF" />
-                                </View>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Privacy Policy and Terms */}
-                    <View style={styles.privacySection}>
+                    <View style={styles.footerCard}>
                         <View style={styles.privacyLinks}>
                             <TouchableOpacity onPress={navigateToPrivacyPolicy}>
                                 <Text style={styles.privacyLinkText}>Privacy Policy</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={navigateToTerms} style={styles.termsContainer}>
-                                <Text style={styles.privacyLinkText}>Terms & Conditions</Text>
+                            <Text style={styles.privacyDot}>·</Text>
+                            <TouchableOpacity onPress={navigateToTerms}>
+                                <Text style={styles.privacyLinkText}>Terms</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
-
-                    {/* Logout */}
-                    <View style={styles.logoutSection}>
                         <TouchableOpacity style={styles.logoutButton} onPress={handleLogoutPress} activeOpacity={0.85}>
-                            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
+                            <Ionicons name="log-out-outline" size={20} color="#DC2626" />
                             <Text style={styles.logoutButtonText}>Log out</Text>
                         </TouchableOpacity>
                     </View>
@@ -458,349 +368,233 @@ const CustomDrawerContent = (props: any) => {
     );
 };
 
-const MenuItem = ({ icon, label, onPress, isActive, isDarkMode, badge, iconColor, iconImage }: any) => (
-    <TouchableOpacity 
-        style={[styles.menuItem, isActive && styles.activeMenuItem, isDarkMode && styles.darkMenuItem]} 
-        onPress={onPress}
-    >
-        <View style={styles.menuItemContent}>
-            <View style={styles.iconWrapper}>
-                {iconImage ? (
-                    <Image source={iconImage} style={styles.menuItemIconImage} resizeMode="contain" />
-                ) : (
-                    <Ionicons 
-                        name={icon} 
-                        size={36} 
-                        color={isActive ? "#FFFFFF" : iconColor} 
-                    />
-                )}
-            </View>
-            <Text 
-                style={[
-                    styles.menuItemText, 
-                    isActive && styles.activeMenuItemText,
-                    isDarkMode && styles.darkMenuItemText
-                ]}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-            >
-                {label}
-            </Text>
-            {badge && (
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{badge}</Text>
-                </View>
-            )}
-        </View>
-    </TouchableOpacity>
-);
-
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFBFC',
+        backgroundColor: SP_BG,
     },
-    darkContainer: {
-        backgroundColor: '#0F172A',
+    safeArea: {
+        flex: 1,
     },
     scrollContent: {
-        paddingTop: 14,
-        paddingBottom: 16,
+        paddingTop: 8,
+        paddingBottom: 24,
         flexGrow: 1,
-        backgroundColor: '#FAFBFC',
     },
-    
-    // Header - compact
     headerWrapper: {
-        marginHorizontal: 8,
-        marginTop: 4,
-        marginBottom: 6,
-        borderRadius: 14,
+        marginHorizontal: 12,
+        marginBottom: 12,
+        borderRadius: 18,
         overflow: 'hidden',
-        ...ShadowUtils.noShadow(),
     },
     headerGradient: {
-        paddingVertical: 14,
+        paddingVertical: 16,
         paddingHorizontal: 14,
+        position: 'relative',
+    },
+    closeBtn: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 2,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     logoSection: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingRight: 28,
     },
-    logoContainer: {
+    avatarRing: {
+        padding: 2,
+        borderRadius: 32,
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,0.5)',
         marginRight: 12,
     },
     avatarWrapper: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: 'rgba(255,255,255,0.3)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         overflow: 'hidden',
     },
     avatarImage: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
+        width: 56,
+        height: 56,
     },
-    avatarStudentIcon: {
-        width: 36,
-        height: 36,
+    avatarPlaceholder: {
+        width: 56,
+        height: 56,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    avatarEmoji: {
-        fontSize: 32,
-        lineHeight: 40,
+    avatarInitials: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#fff',
     },
     appNameContainer: {
         flex: 1,
+        minWidth: 0,
     },
     appName: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '800',
         color: '#FFFFFF',
-        letterSpacing: 0.4,
+    },
+    userEmail: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.85)',
+        marginTop: 2,
+        fontWeight: '500',
+    },
+    brandPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 6,
+        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 8,
     },
     tagline: {
         fontSize: 11,
-        color: 'rgba(255,255,255,0.9)',
-        marginTop: 2,
-        fontWeight: '600',
-        letterSpacing: 0.3,
-    },
-    userGreeting: {
-        fontSize: 12,
-        color: 'rgba(255,255,255,0.85)',
-        marginTop: 4,
-        fontWeight: '600',
-    },
-    darkText: {
-        color: '#F8FAFC',
-    },
-
-    // Menu Section - compact
-    menuSection: {
-        backgroundColor: '#FFFFFF',
-        marginHorizontal: 8,
-        marginBottom: 6,
-        borderRadius: 12,
-        paddingVertical: 10,
-        ...ShadowUtils.noShadow(),
-    },
-    sectionTitle: {
-        fontSize: 12,
+        color: '#F3EEFF',
         fontWeight: '700',
-        color: '#64748B',
-        marginBottom: 8,
-        paddingHorizontal: 12,
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
     },
-    menuItems: {
+    menuSection: {
+        marginHorizontal: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingVertical: 8,
         paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: '#EDE9FE',
+        marginBottom: 12,
+    },
+    menuGroup: {
+        marginBottom: 4,
+    },
+    menuGroupTitle: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#94A3B8',
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        marginTop: 8,
+        marginBottom: 4,
+        marginLeft: 8,
     },
     menuItem: {
-        marginHorizontal: 4,
-        marginVertical: 0,
-        borderRadius: 10,
-        ...ShadowUtils.noShadow(),
-    },
-    darkMenuItem: {
-        backgroundColor: '#334155',
-    },
-    activeMenuItem: {
-        backgroundColor: '#6366F1',
-        ...ShadowUtils.noShadow(),
-    },
-    menuItemContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        minHeight: 40,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 12,
+        marginBottom: 2,
+    },
+    activeMenuItem: {
+        backgroundColor: PRIMARY,
+    },
+    menuIconBox: {
+        width: 38,
+        height: 38,
+        borderRadius: 11,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    menuIconBoxActive: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    menuItemIconImage: {
+        width: 22,
+        height: 22,
     },
     menuItemText: {
-        fontSize: Platform.select({
-            ios: 13,
-            android: SCREEN_HEIGHT > 800 ? 13 : 12,
-        }),
-        fontWeight: '700',
-        color: '#4B5563',
-        marginLeft: 4,
         flex: 1,
-        letterSpacing: 0.2,
-        fontFamily: 'System',
-        textAlign: 'left',
-        flexWrap: 'nowrap',
-    },
-    darkMenuItemText: {
-        color: '#F1F5F9',
+        fontSize: Platform.select({ ios: 15, android: SCREEN_HEIGHT > 800 ? 15 : 14 }),
+        fontWeight: '600',
+        color: '#334155',
     },
     activeMenuItemText: {
         color: '#FFFFFF',
         fontWeight: '700',
     },
-    iconWrapper: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
+    activeDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#fff',
     },
-    menuItemIconImage: {
-        width: 42,
-        height: 42,
-    },
-    badge: {
-        backgroundColor: '#EF4444',
-        borderRadius: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        minWidth: 24,
-        alignItems: 'center',
-        ...ShadowUtils.noShadow(),
-    },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 13,
-        fontWeight: '700',
-        fontFamily: 'System',
-    },
-
-
-    // Social - compact
-    socialSection: {
+    footerCard: {
+        marginHorizontal: 12,
         backgroundColor: '#FFFFFF',
-        marginHorizontal: 8,
-        marginBottom: 6,
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        ...ShadowUtils.noShadow(),
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#EDE9FE',
+        alignItems: 'center',
     },
     socialTitle: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: '700',
         color: '#64748B',
-        marginBottom: 8,
-        textAlign: 'center',
-        letterSpacing: 0.5,
+        marginBottom: 12,
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     socialIcons: {
         flexDirection: 'row',
-        justifyContent: 'center',
+        gap: 20,
+        marginBottom: 14,
+    },
+    socialBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: '#F8FAFC',
         alignItems: 'center',
-        gap: 16,
-    },
-    socialIcon: {
-        padding: 4,
-    },
-    facebookIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#1877F2',
         justifyContent: 'center',
-        alignItems: 'center',
-    },
-    youtubeIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#FF0000',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    instagramIconContainer: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#E1306C',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-
-    // Privacy - compact
-    privacySection: {
-        paddingHorizontal: 12,
-        paddingBottom: 10,
+        borderWidth: 1,
+        borderColor: '#E8E8F0',
     },
     privacyLinks: {
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    termsContainer: {
-        marginTop: 4,
-    },
-    privacyLinkText: {
-        color: '#475569',
-        fontSize: 15,
-        fontWeight: '600',
-        letterSpacing: 0.2,
-        fontFamily: 'System',
-    },
-
-    // Profile Section
-    profileSection: {
-        marginTop: 16,
-    },
-    profileContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    profileImageContainer: {
-        marginRight: 16,
-    },
-    profileImage: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        borderWidth: 2,
-        borderColor: '#F1F5F9',
-    },
-    profileInfo: {
-        flex: 1,
-    },
-    profileName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#1E293B',
-        marginBottom: 4,
-        letterSpacing: 0.1,
-        fontFamily: 'System',
-    },
-    profileEmail: {
-        fontSize: 14,
-        color: '#64748B',
-        fontWeight: '500',
-        fontFamily: 'System',
-    },
-    darkSubText: {
-        color: '#CBD5E1',
-    },
-    logoutSection: {
-        marginHorizontal: 8,
         marginBottom: 14,
-        marginTop: 0,
+    },
+    privacyLinkText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: PRIMARY,
+    },
+    privacyDot: {
+        marginHorizontal: 8,
+        color: '#CBD5E1',
     },
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 10,
-        backgroundColor: '#FF0000',
+        gap: 8,
+        width: '100%',
+        paddingVertical: 12,
+        borderRadius: 12,
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
     },
     logoutButtonText: {
-        color: '#FFFFFF',
-        fontSize: 13,
-        fontWeight: '600',
-        marginLeft: 4,
-        fontFamily: 'System',
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#DC2626',
     },
 });
 

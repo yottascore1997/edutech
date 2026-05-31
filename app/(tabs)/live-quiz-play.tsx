@@ -20,9 +20,11 @@ type LiveQuizSession = {
   id: string;
   categoryId: string;
   categoryName?: string;
+  status?: string;
   timePerQuestion?: number;
   currentQuestionIndex?: number;
   totalQuestions?: number;
+  startedAt?: string | null;
 };
 
 type LiveQuizQuestion = {
@@ -60,25 +62,76 @@ const TEXT_MUTED = 'rgba(255,255,255,0.7)';
 /** Delay (ms) to show correct/wrong feedback before next question. Kept short so multiplayer stays in sync. */
 const NEXT_QUESTION_DELAY_MS = 4000;
 
-/** Normalize questionEndsAt from API/socket: if in seconds (value < 1e12), convert to ms for Date.now() comparison */
 function toQuestionEndsAtMs(value: number | null | undefined): number | null {
   if (value == null || value <= 0) return null;
   return value < 1e12 ? value * 1000 : value;
 }
 
-/** Get question end timestamp in ms: use server value if valid, else compute from timePerQuestion */
+/** Match web client: use server endsAt, or derive from session.startedAt + question index */
 function getQuestionEndsAtMs(
   serverEndsAt: number | null | undefined,
-  timePerQuestionSec: number
-): number {
+  session: Pick<LiveQuizSession, 'startedAt' | 'currentQuestionIndex' | 'timePerQuestion'>,
+): number | null {
   const fromServer = toQuestionEndsAtMs(serverEndsAt);
-  if (fromServer != null && fromServer > Date.now()) return fromServer;
-  return Date.now() + (timePerQuestionSec ?? 10) * 1000;
+  if (fromServer != null) return fromServer;
+  if (session.startedAt) {
+    const startedAtMs = new Date(session.startedAt).getTime();
+    const t = (session.timePerQuestion ?? 10) * 1000;
+    return startedAtMs + ((session.currentQuestionIndex ?? 0) + 1) * t;
+  }
+  if (session.timePerQuestion) {
+    return Date.now() + session.timePerQuestion * 1000;
+  }
+  return null;
+}
+
+function parseSession(raw: any, fallback?: LiveQuizSession | null): LiveQuizSession | null {
+  if (!raw && !fallback) return null;
+  const id = String(raw?.id ?? fallback?.id ?? '');
+  if (!id) return fallback ?? null;
+  return {
+    id,
+    categoryId: String(raw?.categoryId ?? fallback?.categoryId ?? ''),
+    categoryName: raw?.title ?? raw?.categoryName ?? fallback?.categoryName ?? 'Live Quiz',
+    status: raw?.status ?? fallback?.status,
+    timePerQuestion: Number(raw?.timePerQuestion ?? fallback?.timePerQuestion ?? 10),
+    currentQuestionIndex:
+      typeof raw?.currentQuestionIndex === 'number'
+        ? raw.currentQuestionIndex
+        : fallback?.currentQuestionIndex,
+    totalQuestions: raw?.totalQuestions ?? fallback?.totalQuestions,
+    startedAt: raw?.startedAt ?? fallback?.startedAt ?? null,
+  };
+}
+
+function parseQuestion(raw: any, session?: LiveQuizSession | null): LiveQuizQuestion | null {
+  if (!raw?.text) return null;
+  const questionIndex =
+    typeof raw.questionIndex === 'number'
+      ? raw.questionIndex
+      : typeof session?.currentQuestionIndex === 'number'
+        ? session.currentQuestionIndex
+        : 0;
+  return {
+    questionIndex,
+    text: raw.text,
+    options: raw.options || [],
+    correctIndex: raw.correctIndex ?? raw.correctAnswerIndex ?? raw.correct,
+    correctAnswerIndex: raw.correctAnswerIndex ?? raw.correctIndex ?? raw.correct,
+    correct: raw.correct ?? raw.correctIndex ?? raw.correctAnswerIndex,
+  };
+}
+
+function isSessionFinished(status?: string) {
+  return String(status || '').toUpperCase() === 'FINISHED';
 }
 
 export default function LiveQuizPlayScreen() {
   const insets = useSafeAreaInsets();
-  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const { sessionId, categoryId: categoryIdParam } = useLocalSearchParams<{
+    sessionId?: string;
+    categoryId?: string;
+  }>();
   const { user } = useAuth();
   const router = useRouter();
   const { socket, isConnected } = useSocket({ token: user?.token, userId: user?.id });
@@ -94,11 +147,18 @@ export default function LiveQuizPlayScreen() {
   const [correctAnswerIndex, setCorrectAnswerIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  /** True after first socket state / round_started — avoids flashing stale REST questions */
+  const [socketSynced, setSocketSynced] = useState(false);
+  /** Between rounds: old session ended, waiting for live_quiz_round_started */
+  const [betweenRounds, setBetweenRounds] = useState(false);
 
   const submitLockRef = useRef(false);
   const lastAnsweredQuestionIndexRef = useRef<number | null>(null);
   const currentQuestionRef = useRef<LiveQuizQuestion | null>(null);
+  const sessionRef = useRef<LiveQuizSession | null>(null);
+  const socketSyncedRef = useRef(false);
   const nextQuestionDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const catchUpDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const questionEndsAtRef = useRef<number | null>(null);
   const answeredMapRef = useRef<AnsweredMap>({});
   const refetchedAtZeroForQuestionRef = useRef<number | null>(null);
@@ -109,60 +169,53 @@ export default function LiveQuizPlayScreen() {
     currentQuestionRef.current = currentQuestion;
   }, [currentQuestion]);
   useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  useEffect(() => {
     questionEndsAtRef.current = questionEndsAt;
   }, [questionEndsAt]);
   useEffect(() => {
     answeredMapRef.current = answeredMap;
   }, [answeredMap]);
 
+  const markSocketSynced = () => {
+    if (!socketSyncedRef.current) {
+      socketSyncedRef.current = true;
+      setSocketSynced(true);
+    }
+  };
+
   const refetchSessionState = async () => {
-    if (!session?.id || !user?.token) return;
+    const activeSession = sessionRef.current;
+    if (!activeSession?.id || !user?.token) return;
     try {
-      const res = await apiFetchAuth(`/student/live-quiz/session/${session.id}`, user.token);
+      const res = await apiFetchAuth(`/student/live-quiz/session/${activeSession.id}`, user.token);
       if (!res.ok) return;
       const data = res.data || {};
-      if (data.session) {
-        setSession({
-          id: String(session.id),
-          categoryId: String(data.session.categoryId ?? session.categoryId),
-          categoryName: data.session.categoryName ?? session.categoryName,
-          timePerQuestion: Number(data.session.timePerQuestion ?? session.timePerQuestion ?? 10),
-          currentQuestionIndex: data.session.currentQuestionIndex,
-          totalQuestions: data.session.totalQuestions ?? session.totalQuestions,
-        });
+      const nextSession = parseSession(data.session, activeSession);
+      if (nextSession) setSession(nextSession);
+
+      if (isSessionFinished(nextSession?.status)) {
+        setBetweenRounds(true);
+        setCurrentQuestion(null);
+        return;
       }
+
       if (data.currentQuestion) {
-        const q = data.currentQuestion;
-        const newIndex = q.questionIndex;
+        const q = parseQuestion(data.currentQuestion, nextSession ?? activeSession);
+        if (!q) return;
+        const endsAtMs = getQuestionEndsAtMs(
+          data.questionEndsAt != null ? Number(data.questionEndsAt) : null,
+          nextSession ?? activeSession,
+        );
+        setBetweenRounds(false);
         const prevIndex = currentQuestionRef.current?.questionIndex;
-        const justAnswered = lastAnsweredQuestionIndexRef.current;
-
-        const shouldDelayForFeedback =
-          justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-
-        const applyNextQuestion = () => {
-          setCurrentQuestion({
-            questionIndex: q.questionIndex,
-            text: q.text,
-            options: q.options || [],
-            correctIndex: q.correctIndex ?? q.correctAnswerIndex ?? q.correct,
-            correctAnswerIndex: q.correctAnswerIndex ?? q.correctIndex ?? q.correct,
-            correct: q.correct ?? q.correctIndex ?? q.correctAnswerIndex,
-          });
-          setAnswerFeedback(null);
-          setCorrectAnswerIndex(null);
-          lastAnsweredQuestionIndexRef.current = null;
-          refetchedAtZeroForQuestionRef.current = null;
-          const endsAtMs = getQuestionEndsAtMs(data.questionEndsAt != null ? Number(data.questionEndsAt) : null, session.timePerQuestion ?? 10);
-          setQuestionEndsAt(endsAtMs);
-        };
-
-        if (shouldDelayForFeedback) {
-          if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-          nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-        } else {
-          applyNextQuestion();
+        if (prevIndex != null && q.questionIndex > prevIndex + 1) {
+          return;
         }
+        setCurrentQuestion(q);
+        setQuestionEndsAt(endsAtMs);
+        refetchedAtZeroForQuestionRef.current = null;
       }
       if (Array.isArray(data.leaderboard)) {
         setLeaderboard(
@@ -179,7 +232,7 @@ export default function LiveQuizPlayScreen() {
       }
       if (typeof data.playingCount === 'number') setPlayingCount(data.playingCount);
       if (data.questionEndsAt != null && !data.currentQuestion) {
-        const endsAtMs = getQuestionEndsAtMs(Number(data.questionEndsAt), session.timePerQuestion ?? 10);
+        const endsAtMs = getQuestionEndsAtMs(Number(data.questionEndsAt), nextSession ?? activeSession);
         setQuestionEndsAt(endsAtMs);
       }
     } catch (_) {}
@@ -200,30 +253,19 @@ export default function LiveQuizPlayScreen() {
 
         if (res.ok) {
           const data = res.data || {};
-          setSession({
+          const loadedSession = parseSession(data.session, {
             id: String(data.session?.id ?? sessionId),
-            categoryId: String(data.session?.categoryId ?? data.categoryId ?? ''),
-            categoryName: data.session?.categoryName ?? data.categoryName ?? 'Live Quiz',
-            timePerQuestion: Number(data.session?.timePerQuestion ?? data.timePerQuestion ?? 10),
-            currentQuestionIndex: data.session?.currentQuestionIndex,
-            totalQuestions: data.session?.totalQuestions ?? data.totalQuestions,
+            categoryId: String(
+              data.session?.categoryId ?? data.categoryId ?? categoryIdParam ?? '',
+            ),
+            categoryName: data.session?.title ?? data.session?.categoryName ?? data.categoryName ?? 'Live Quiz',
           });
+          if (loadedSession) setSession(loadedSession);
 
-          if (data.currentQuestion) {
-            const q = data.currentQuestion;
-            setCurrentQuestion({
-              questionIndex: q.questionIndex,
-              text: q.text,
-              options: q.options || [],
-              correctIndex: q.correctIndex ?? q.correctAnswerIndex ?? q.correct,
-              correctAnswerIndex: q.correctAnswerIndex ?? q.correctIndex ?? q.correct,
-              correct: q.correct ?? q.correctIndex ?? q.correctAnswerIndex,
-            });
+          if (isSessionFinished(loadedSession?.status)) {
+            setBetweenRounds(true);
           }
-
-          const timePerQuestion = Number(data.session?.timePerQuestion ?? data.timePerQuestion ?? 10);
-          const endsAtMs = getQuestionEndsAtMs(data.questionEndsAt != null ? Number(data.questionEndsAt) : null, timePerQuestion);
-          setQuestionEndsAt(endsAtMs);
+          // Question + timer come from socket (live_quiz_state) to avoid flashing mid-round catch-up
 
           if (Array.isArray(data.leaderboard)) {
             setLeaderboard(
@@ -253,7 +295,32 @@ export default function LiveQuizPlayScreen() {
     return () => {
       isMounted = false;
     };
-  }, [sessionId, user?.token]);
+  }, [sessionId, categoryIdParam, user?.token]);
+
+  // Seed category early so socket can join before REST finishes
+  useEffect(() => {
+    if (!categoryIdParam || session?.categoryId) return;
+    setSession((prev) =>
+      prev ?? {
+        id: String(sessionId ?? ''),
+        categoryId: String(categoryIdParam),
+        categoryName: 'Live Quiz',
+        timePerQuestion: 10,
+      },
+    );
+  }, [categoryIdParam, sessionId, session?.categoryId]);
+
+  // If socket never connects, fall back to REST after a short wait
+  useEffect(() => {
+    if (socketSynced || !session?.categoryId) return;
+    const t = setTimeout(() => {
+      if (!socketSyncedRef.current) {
+        markSocketSynced();
+        refetchSessionState();
+      }
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [session?.categoryId, socketSynced]);
 
   useEffect(() => {
     if (!socket || !isConnected || !session?.categoryId) return;
@@ -262,52 +329,102 @@ export default function LiveQuizPlayScreen() {
 
     s.emit('live_quiz_join_category', { categoryId: session.categoryId });
 
+    const applyQuestionUpdate = (
+      q: LiveQuizQuestion,
+      endsAtMs: number | null,
+      opts: { fromRoundStart?: boolean; delayFeedback?: boolean },
+    ) => {
+      const prevIndex = currentQuestionRef.current?.questionIndex;
+      const newIndex = q.questionIndex;
+      const justAnswered = lastAnsweredQuestionIndexRef.current;
+
+      setBetweenRounds(false);
+
+      const shouldDelayForFeedback =
+        !!opts.delayFeedback &&
+        justAnswered !== null &&
+        prevIndex !== undefined &&
+        justAnswered === prevIndex &&
+        newIndex !== prevIndex;
+
+      const apply = () => {
+        setCurrentQuestion(q);
+        setAnswerFeedback(null);
+        setCorrectAnswerIndex(null);
+        setQuestionEndsAt(endsAtMs);
+        lastAnsweredQuestionIndexRef.current = null;
+        refetchedAtZeroForQuestionRef.current = null;
+      };
+
+      // Server catch-up: skip intermediate questions (only show latest)
+      if (
+        !opts.fromRoundStart &&
+        prevIndex != null &&
+        newIndex > prevIndex + 1 &&
+        justAnswered !== prevIndex
+      ) {
+        if (catchUpDebounceRef.current) clearTimeout(catchUpDebounceRef.current);
+        catchUpDebounceRef.current = setTimeout(apply, 350);
+        return;
+      }
+
+      if (shouldDelayForFeedback) {
+        if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
+        nextQuestionDelayTimerRef.current = setTimeout(apply, NEXT_QUESTION_DELAY_MS);
+      } else {
+        if (catchUpDebounceRef.current) {
+          clearTimeout(catchUpDebounceRef.current);
+          catchUpDebounceRef.current = null;
+        }
+        apply();
+      }
+    };
+
+    const applySocketSession = (payloadSession: any, resetAnswers = false) => {
+      const prev = sessionRef.current;
+      const next = parseSession(payloadSession, prev);
+      if (!next) return;
+      const sessionChanged = !!(prev && next.id !== prev.id);
+      if (resetAnswers || sessionChanged) {
+        setAnsweredMap({});
+        setAnswerFeedback(null);
+        setCorrectAnswerIndex(null);
+        lastAnsweredQuestionIndexRef.current = null;
+        refetchedAtZeroForQuestionRef.current = null;
+      }
+      // Only show "naya round" when session actually changed (round ended → new session)
+      if (sessionChanged && !resetAnswers) {
+        setBetweenRounds(true);
+        setCurrentQuestion(null);
+      }
+      setSession(next);
+    };
+
     const handleState = (payload: any) => {
       if (!payload) return;
+      markSocketSynced();
       if (payload.session) {
-        setSession((prev) => ({
-          id: String(prev?.id ?? payload.session.id ?? ''),
-          categoryId: String(payload.session.categoryId ?? prev?.categoryId ?? ''),
-          categoryName: payload.session.categoryName ?? prev?.categoryName ?? 'Live Quiz',
-          timePerQuestion: Number(
-            payload.session.timePerQuestion ?? prev?.timePerQuestion ?? 10,
-          ),
-          currentQuestionIndex: payload.session.currentQuestionIndex ?? prev?.currentQuestionIndex,
-          totalQuestions: payload.session.totalQuestions ?? prev?.totalQuestions,
-        }));
+        applySocketSession(payload.session);
+      }
+      if (isSessionFinished(payload.session?.status)) {
+        setBetweenRounds(true);
+        setCurrentQuestion(null);
+        return;
       }
       if (payload.currentQuestion) {
-        const q = payload.currentQuestion;
-        const newIndex = q.questionIndex;
-        const prevIndex = currentQuestionRef.current?.questionIndex;
-        const justAnswered = lastAnsweredQuestionIndexRef.current;
-
-        const shouldDelayForFeedback =
-          justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-
-        const applyNextQuestion = () => {
-          setCurrentQuestion({
-            questionIndex: q.questionIndex,
-            text: q.text,
-            options: q.options || [],
-          });
-          const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
-          const endsAtMs = getQuestionEndsAtMs(payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null, timePerQuestion);
-          setQuestionEndsAt(endsAtMs);
-          lastAnsweredQuestionIndexRef.current = null;
-          refetchedAtZeroForQuestionRef.current = null;
-        };
-
-        if (shouldDelayForFeedback) {
-          if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-          nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-        } else {
-          applyNextQuestion();
-        }
+        const q = parseQuestion(payload.currentQuestion, payload.session);
+        if (!q) return;
+        const endsAtMs = getQuestionEndsAtMs(
+          payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null,
+          payload.session ?? sessionRef.current ?? { timePerQuestion: 10 },
+        );
+        applyQuestionUpdate(q, endsAtMs, { fromRoundStart: q.questionIndex === 0 });
       }
       if (payload.questionEndsAt != null && !payload.currentQuestion) {
-        const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
-        const endsAtMs = getQuestionEndsAtMs(Number(payload.questionEndsAt), timePerQuestion);
+        const endsAtMs = getQuestionEndsAtMs(
+          Number(payload.questionEndsAt),
+          payload.session ?? sessionRef.current ?? { timePerQuestion: 10 },
+        );
         setQuestionEndsAt(endsAtMs);
       }
       if (Array.isArray(payload.leaderboard)) {
@@ -329,63 +446,44 @@ export default function LiveQuizPlayScreen() {
     };
 
     const handleRoundStarted = (payload: any) => {
+      markSocketSynced();
+      setBetweenRounds(false);
       if (nextQuestionDelayTimerRef.current) {
         clearTimeout(nextQuestionDelayTimerRef.current);
         nextQuestionDelayTimerRef.current = null;
       }
-      lastAnsweredQuestionIndexRef.current = null;
-      setAnsweredMap({});
-      setAnswerFeedback(null);
-      setCorrectAnswerIndex(null);
+      if (catchUpDebounceRef.current) {
+        clearTimeout(catchUpDebounceRef.current);
+        catchUpDebounceRef.current = null;
+      }
+      if (payload?.session) {
+        applySocketSession(payload.session, true);
+      } else {
+        setAnsweredMap({});
+        setAnswerFeedback(null);
+        setCorrectAnswerIndex(null);
+        lastAnsweredQuestionIndexRef.current = null;
+      }
       handleState(payload);
     };
 
     const handleNextQuestion = (payload: any) => {
-      const q = payload.currentQuestion;
-      const newIndex = q?.questionIndex;
+      markSocketSynced();
+      if (payload?.session) {
+        applySocketSession(payload.session);
+      }
+      const q = payload.currentQuestion ? parseQuestion(payload.currentQuestion, payload.session) : null;
+      if (!q) return;
       const prevIndex = currentQuestionRef.current?.questionIndex;
       const justAnswered = lastAnsweredQuestionIndexRef.current;
-
-      const shouldDelayForFeedback =
-        q && justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && newIndex !== prevIndex;
-
-      const applyNextQuestion = () => {
-        setAnswerFeedback(null);
-        setCorrectAnswerIndex(null);
-        if (payload.currentQuestion) {
-          const qq = payload.currentQuestion;
-          setCurrentQuestion({
-            questionIndex: qq.questionIndex,
-            text: qq.text,
-            options: qq.options || [],
-            correctIndex: qq.correctIndex ?? qq.correctAnswerIndex ?? qq.correct,
-            correctAnswerIndex: qq.correctAnswerIndex ?? qq.correctIndex ?? qq.correct,
-            correct: qq.correct ?? qq.correctIndex ?? qq.correctAnswerIndex,
-          });
-        }
-        if (payload.session?.currentQuestionIndex != null) {
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  currentQuestionIndex: payload.session.currentQuestionIndex,
-                }
-              : prev,
-          );
-        }
-        const timePerQuestion = Number(payload.session?.timePerQuestion ?? 10);
-        const endsAtMs = getQuestionEndsAtMs(payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null, timePerQuestion);
-        setQuestionEndsAt(endsAtMs);
-        lastAnsweredQuestionIndexRef.current = null;
-        refetchedAtZeroForQuestionRef.current = null;
-      };
-
-      if (shouldDelayForFeedback) {
-        if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
-        nextQuestionDelayTimerRef.current = setTimeout(applyNextQuestion, NEXT_QUESTION_DELAY_MS);
-      } else {
-        applyNextQuestion();
-      }
+      const endsAtMs = getQuestionEndsAtMs(
+        payload.questionEndsAt != null ? Number(payload.questionEndsAt) : null,
+        payload.session ?? sessionRef.current ?? { timePerQuestion: 10 },
+      );
+      applyQuestionUpdate(q, endsAtMs, {
+        delayFeedback:
+          justAnswered !== null && prevIndex !== undefined && justAnswered === prevIndex && q.questionIndex !== prevIndex,
+      });
     };
 
     const handleLeaderboard = (payload: any) => {
@@ -424,6 +522,10 @@ export default function LiveQuizPlayScreen() {
         clearTimeout(nextQuestionDelayTimerRef.current);
         nextQuestionDelayTimerRef.current = null;
       }
+      if (catchUpDebounceRef.current) {
+        clearTimeout(catchUpDebounceRef.current);
+        catchUpDebounceRef.current = null;
+      }
       s.emit('live_quiz_leave_category', { categoryId: session.categoryId });
       s.off('live_quiz_state', handleState);
       s.off('live_quiz_round_started', handleRoundStarted);
@@ -450,34 +552,48 @@ export default function LiveQuizPlayScreen() {
     return () => clearInterval(id);
   }, [questionEndsAt]);
 
-  // When timer hits 0, sync with server so we get next question even if socket didn't push (fixes one user stuck while other advances)
+  // When timer hits 0, sync with server (only if clock was valid — not stale catch-up)
   useEffect(() => {
     if (timeLeft !== 0 || !currentQuestion || !session?.id || !user?.token) return;
+    if (!socketSyncedRef.current || betweenRounds) return;
+    const endsAt = questionEndsAtRef.current;
+    if (endsAt != null && endsAt <= Date.now()) return;
     if (refetchedAtZeroForQuestionRef.current === currentQuestion.questionIndex) return;
     refetchedAtZeroForQuestionRef.current = currentQuestion.questionIndex;
     refetchSessionState();
-  }, [timeLeft, currentQuestion?.questionIndex, session?.id, user?.token]);
+  }, [timeLeft, currentQuestion?.questionIndex, session?.id, user?.token, betweenRounds]);
 
-  // Periodic sync so all players stay on same question and leaderboard stays updated
+  // Periodic sync — only after socket is ready and user is in an active question
   useEffect(() => {
-    if (!session?.id || !currentQuestion || !user?.token) return;
+    if (!socketSynced || !session?.id || !currentQuestion || !user?.token || betweenRounds) return;
     const interval = setInterval(() => refetchSessionState(), 6000);
     return () => clearInterval(interval);
-  }, [session?.id, currentQuestion?.questionIndex, user?.token]);
+  }, [socketSynced, session?.id, currentQuestion?.questionIndex, user?.token, betweenRounds]);
 
   const handleSelectOption = async (optionIndex: number) => {
-    if (!session || !currentQuestion || !user?.token) return;
+    const activeSession = sessionRef.current;
+    if (!activeSession || !currentQuestion || !user?.token) return;
+    if (isSessionFinished(activeSession.status)) {
+      Alert.alert('Quiz ended', 'Naya round shuru ho raha hai, thoda wait karein.');
+      refetchSessionState();
+      return;
+    }
     if (submitting || submitLockRef.current) return;
 
+    const questionIndex =
+      typeof currentQuestion.questionIndex === 'number'
+        ? currentQuestion.questionIndex
+        : activeSession.currentQuestionIndex ?? 0;
+
     // prevent double submit for same question
-    if (answeredMap[currentQuestion.questionIndex] !== undefined) return;
+    if (answeredMap[questionIndex] !== undefined) return;
 
     // lock immediately so double-tap can't send second request
     submitLockRef.current = true;
     setSubmitting(true);
 
     // 1) Time calculate as per spec
-    const timePerMs = (session.timePerQuestion ?? 10) * 1000;
+    const timePerMs = (activeSession.timePerQuestion ?? 10) * 1000;
     const now = Date.now();
     const remainingMs = questionEndsAt ? Math.max(0, questionEndsAt - now) : 0;
     const timeSpentMs = Math.max(0, timePerMs - remainingMs);
@@ -485,18 +601,18 @@ export default function LiveQuizPlayScreen() {
     // 2) Mark locally as answered so UI disables double tap
     setAnsweredMap((prev) => ({
       ...prev,
-      [currentQuestion.questionIndex]: optionIndex,
+      [questionIndex]: optionIndex,
     }));
 
     try {
-      // 3) API call to submit answer
+      // 3) API call to submit answer — always use latest session id from socket sync
       const res = await apiFetchAuth(
-        `/student/live-quiz/session/${session.id}/submit`,
+        `/student/live-quiz/session/${activeSession.id}/submit`,
         user.token,
         {
           method: 'POST',
           body: {
-            questionIndex: currentQuestion.questionIndex,
+            questionIndex,
             answerIndex: optionIndex,
             timeSpentMs,
           },
@@ -540,40 +656,42 @@ export default function LiveQuizPlayScreen() {
         }
 
         // Mark that user just answered so next question shows after 2s delay
-        lastAnsweredQuestionIndexRef.current = currentQuestion.questionIndex;
+        lastAnsweredQuestionIndexRef.current = questionIndex;
 
         // Fallback: refetch after delay so next question UI updates if socket didn't push
         setTimeout(() => refetchSessionState(), NEXT_QUESTION_DELAY_MS);
       }
 
       // 7) Ask server to refresh global leaderboard via socket
-      if (socket && session.categoryId) {
+      const latestSession = sessionRef.current;
+      if (socket && latestSession?.categoryId) {
         (socket as any).emit('live_quiz_refresh_leaderboard', {
-          categoryId: session.categoryId,
-          sessionId: session.id,
+          categoryId: latestSession.categoryId,
+          sessionId: latestSession.id,
         });
       }
     } catch (err: any) {
+      const errText = String(err?.data?.error || err?.data?.message || '').toLowerCase();
       const isAlreadyAnswered =
-        err?.status === 400 &&
-        (String(err?.data?.error || err?.data?.message || '').toLowerCase().includes('already answered'));
+        err?.status === 400 && errText.includes('already');
 
       if (isAlreadyAnswered) {
-        // Server already has this answer – sync state so next question appears
         refetchSessionState();
-        // Delayed refetch again so UI gets next question when server has moved on
         setTimeout(() => refetchSessionState(), NEXT_QUESTION_DELAY_MS);
-        if (socket && session.categoryId) {
+        const latestSession = sessionRef.current;
+        if (socket && latestSession?.categoryId) {
           (socket as any).emit('live_quiz_refresh_leaderboard', {
-            categoryId: session.categoryId,
-            sessionId: session.id,
+            categoryId: latestSession.categoryId,
+            sessionId: latestSession.id,
           });
         }
+      } else if (errText.includes('ended')) {
+        // Stale session — sync with server; new round may have started via socket
+        refetchSessionState();
+        Alert.alert('Quiz ended', 'Naya round load ho raha hai. Dubara try karein.');
       } else {
-        // Keep selection visible; show error so user knows submit failed
-        const msg = err?.data?.message || err?.data?.error || err?.message || 'Answer submit failed. Check connection.';
+        const msg = err?.data?.error || err?.data?.message || err?.message || 'Answer submit failed. Check connection.';
         Alert.alert('Submit failed', String(msg));
-        // Optionally show as wrong so user sees red (optional: setAnswerFeedback('wrong'))
       }
     } finally {
       submitLockRef.current = false;
@@ -595,16 +713,21 @@ export default function LiveQuizPlayScreen() {
     return `${Math.floor(sec / 60)}M`;
   };
 
-  if (loading) {
+  const waitingForSocket = !!session?.categoryId && !socketSynced && !betweenRounds;
+
+  if (loading || waitingForSocket) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: DARK_BG }]}>
         <StatusBar barStyle="light-content" />
         <ActivityIndicator size="large" color={GREEN} />
+        <Text style={{ color: TEXT_MUTED, marginTop: 12, fontSize: 14 }}>
+          {waitingForSocket ? 'Live quiz join ho raha hai...' : 'Quiz load ho raha hai...'}
+        </Text>
       </View>
     );
   }
 
-  if (!session || !currentQuestion) {
+  if (!session) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: DARK_BG }]}>
         <StatusBar barStyle="light-content" />
@@ -616,8 +739,44 @@ export default function LiveQuizPlayScreen() {
     );
   }
 
+  // Only between full rounds — not after every question
+  if (betweenRounds && !currentQuestion) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: DARK_BG, paddingHorizontal: 24 }]}>
+        <StatusBar barStyle="light-content" />
+        <ActivityIndicator size="large" color={YELLOW} />
+        <Text style={[styles.errorText, { color: WHITE, fontSize: 20, fontWeight: '800', marginTop: 16 }]}>
+          Naya round shuru ho raha hai...
+        </Text>
+        <Text style={{ color: TEXT_MUTED, textAlign: 'center', marginTop: 8, fontSize: 13 }}>
+          Purana round khatam ho gaya. Thodi der mein naya quiz shuru hoga.
+        </Text>
+        <TouchableOpacity
+          style={[styles.backButton, { marginTop: 24 }]}
+          onPress={() => router.replace('/(tabs)/live-quiz-categories')}
+        >
+          <Text style={styles.backButtonText}>Category change karein</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!currentQuestion) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: DARK_BG }]}>
+        <StatusBar barStyle="light-content" />
+        <ActivityIndicator size="large" color={GREEN} />
+        <Text style={{ color: TEXT_MUTED, marginTop: 12 }}>Agla question load ho raha hai...</Text>
+      </View>
+    );
+  }
+
   const quizTitle = session.categoryName || 'Live Quiz';
   const displayTitle = quizTitle.length > 18 ? quizTitle.slice(0, 16) + '...' : quizTitle;
+  const activeQuestionIndex =
+    typeof currentQuestion.questionIndex === 'number'
+      ? currentQuestion.questionIndex
+      : session.currentQuestionIndex ?? 0;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -710,8 +869,8 @@ export default function LiveQuizPlayScreen() {
         {/* Options 1-4 */}
         <View style={styles.optionsContainer}>
           {currentQuestion.options.map((opt, index) => {
-            const hasAnswered = answeredMap[currentQuestion.questionIndex] !== undefined;
-            const selectedIndex = answeredMap[currentQuestion.questionIndex];
+            const hasAnswered = answeredMap[activeQuestionIndex] !== undefined;
+            const selectedIndex = answeredMap[activeQuestionIndex];
             const isSelectedOption = selectedIndex === index;
             const isCorrectAnswer = correctAnswerIndex !== null && index === correctAnswerIndex;
             const isDisabled = submitting || hasAnswered;

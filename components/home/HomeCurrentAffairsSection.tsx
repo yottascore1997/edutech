@@ -5,10 +5,11 @@ import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowRight } from 'lucide-react-native';
+import { ArrowRight, Globe, Newspaper } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,7 +19,7 @@ import {
 const QUICK_STATS = [
   { label: "Today's News", valueKey: 'today' as const, icon: 'today' as const, color: '#6344D4', bg: '#F3EFFF' },
   { label: 'This Month', valueKey: 'month' as const, icon: 'calendar' as const, color: '#059669', bg: '#ECFDF5' },
-  { label: 'Monthly Streak', valueKey: 'streak' as const, icon: 'flame' as const, color: '#EA580C', bg: '#FFF7ED' },
+  { label: 'Streak', valueKey: 'streak' as const, icon: 'flame' as const, color: '#EA580C', bg: '#FFF7ED' },
 ];
 
 const SNAPSHOT = [
@@ -65,151 +66,272 @@ export default function HomeCurrentAffairsSection() {
   const openCA = () => router.push('/(tabs)/current-affairs' as any);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Current Affairs</Text>
-        <TouchableOpacity onPress={openCA} activeOpacity={0.85}>
-          <Text style={styles.seeAll}>See All ›</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.wrap}>
+      <LinearGradient
+        colors={['#064E3B', '#047857', '#10B981']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.hero}
+      >
+        <View style={styles.orb1} />
+        <View style={styles.orb2} />
 
-      {loading ? (
-        <ActivityIndicator color={HomeTheme.primary} style={{ paddingVertical: 16 }} />
-      ) : (
-        <>
-          <View style={styles.topRow}>
-            <TouchableOpacity style={styles.viewCardWrap} onPress={openCA} activeOpacity={0.9}>
-              <LinearGradient colors={['#F5F0FF', '#EDE9FE']} style={styles.viewCard}>
-                <View style={styles.globeWrap}>
-                  <Ionicons name="globe-outline" size={22} color={HomeTheme.primary} />
+        <View style={styles.heroTop}>
+          <LinearGradient colors={['#FBBF24', '#F59E0B']} style={styles.badge}>
+            <Globe size={12} color="#78350F" strokeWidth={2.4} />
+            <Text style={styles.badgeText}>Daily Updates</Text>
+          </LinearGradient>
+
+          <TouchableOpacity onPress={openCA} style={styles.seeAllBtn} activeOpacity={0.85}>
+            <Text style={styles.seeAllText}>See All</Text>
+            <ArrowRight size={13} color="#064E3B" strokeWidth={2.5} />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.heroCount}>{statValues.today}</Text>
+        <Text style={styles.heroLabel}>articles available today</Text>
+      </LinearGradient>
+
+      <LinearGradient colors={['#FFFBF7', '#FFFFFF']} style={styles.body}>
+        {loading ? (
+          <ActivityIndicator color="#059669" style={{ paddingVertical: 20 }} />
+        ) : (
+          <>
+            <TouchableOpacity onPress={openCA} activeOpacity={0.9} style={styles.ctaWrap}>
+              <LinearGradient colors={['#ECFDF5', '#D1FAE5']} style={styles.ctaCard}>
+                <View style={styles.ctaLeft}>
+                  <LinearGradient colors={['#059669', '#10B981']} style={styles.ctaIcon}>
+                    <Newspaper size={20} color="#FFFFFF" strokeWidth={2} />
+                  </LinearGradient>
+                  <View style={styles.ctaTextCol}>
+                    <Text style={styles.ctaTitle}>View Current Affairs</Text>
+                    <Text style={styles.ctaSub}>
+                      {monthCount > 0 ? `${monthCount} months archived` : 'Stay exam-ready daily'}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.viewCardTitle}>View Current Affairs</Text>
-                <View style={styles.arrowBtn}>
-                  <ArrowRight size={14} color="#FFF" strokeWidth={2.5} />
-                </View>
+                <LinearGradient colors={['#059669', '#10B981']} style={styles.ctaArrow}>
+                  <ArrowRight size={16} color="#FFF" strokeWidth={2.5} />
+                </LinearGradient>
               </LinearGradient>
             </TouchableOpacity>
 
-            <View style={styles.quickStats}>
+            <View style={styles.statsRow}>
               {QUICK_STATS.map((s) => (
-                <View key={s.label} style={styles.quickStatItem}>
-                  <View style={[styles.quickStatIcon, { backgroundColor: s.bg }]}>
+                <View key={s.label} style={styles.statPill}>
+                  <View style={[styles.statIcon, { backgroundColor: s.bg }]}>
                     <Ionicons name={s.icon} size={14} color={s.color} />
                   </View>
-                  <Text style={[styles.quickStatVal, { color: s.color }]}>
-                    {statValues[s.valueKey]}
-                  </Text>
-                  <Text style={styles.quickStatLabel} numberOfLines={2}>
+                  <Text style={[styles.statVal, { color: s.color }]}>{statValues[s.valueKey]}</Text>
+                  <Text style={styles.statLabel} numberOfLines={2}>
                     {s.label}
                   </Text>
                 </View>
               ))}
             </View>
-          </View>
 
-          <View style={styles.snapshot}>
-            <Text style={styles.snapshotTitle}>Your Learning Snapshot</Text>
-            <View style={styles.snapshotRow}>
-              {SNAPSHOT.map((item, i) => (
-                <View
-                  key={item.label}
-                  style={[styles.snapshotItem, i < SNAPSHOT.length - 1 && styles.snapshotItemBorder]}
-                >
-                  <Ionicons name={item.icon} size={14} color={HomeTheme.primary} />
-                  <Text style={styles.snapshotValue}>{item.value}</Text>
-                  <Text style={styles.snapshotLabel} numberOfLines={1}>
-                    {item.label}
-                  </Text>
-                </View>
-              ))}
+            <View style={styles.snapshot}>
+              <Text style={styles.snapshotTitle}>Your Learning Snapshot</Text>
+              <View style={styles.snapshotRow}>
+                {SNAPSHOT.map((item) => (
+                  <View key={item.label} style={styles.snapshotItem}>
+                    <View style={styles.snapshotIconWrap}>
+                      <Ionicons name={item.icon} size={13} color="#059669" />
+                    </View>
+                    <Text style={styles.snapshotValue}>{item.value}</Text>
+                    <Text style={styles.snapshotLabel} numberOfLines={1}>
+                      {item.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        </>
-      )}
+          </>
+        )}
+      </LinearGradient>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrap: {
     marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#047857',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+      },
+      android: { elevation: 7 },
+    }),
+  },
+  hero: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    paddingBottom: 18,
+    overflow: 'hidden',
+  },
+  orb1: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -30,
+    right: -10,
+  },
+  orb2: {
+    position: 'absolute',
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -15,
+    left: 24,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
-    backgroundColor: '#FFFFFF',
+    zIndex: 1,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
-    padding: 14,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontFamily: FontFamily.semiBold,
+    color: '#78350F',
+  },
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  seeAllText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: '#064E3B',
+  },
+  heroCount: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 32,
+    color: '#FDE68A',
+    letterSpacing: -0.5,
+    zIndex: 1,
+  },
+  heroLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    zIndex: 1,
+  },
+  body: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  ctaWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  ctaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  ctaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  ctaIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ctaTextCol: { flex: 1 },
+  ctaTitle: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 14,
+    color: HomeTheme.ink,
+    marginBottom: 2,
+  },
+  ctaSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11,
+    color: HomeTheme.inkMuted,
+  },
+  ctaArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  statPill: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     borderWidth: 1,
     borderColor: HomeTheme.border,
-    ...HomeTheme.shadow,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  title: { fontFamily: FontFamily.bold, fontSize: 16, color: HomeTheme.ink },
-  seeAll: { fontFamily: FontFamily.semiBold, fontSize: 13, color: HomeTheme.primary },
-  topRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  viewCardWrap: { flex: 1, borderRadius: 14, overflow: 'hidden' },
-  viewCard: {
-    flex: 1,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
-    minHeight: 100,
-    justifyContent: 'space-between',
-  },
-  globeWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  viewCardTitle: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: 12,
-    color: HomeTheme.ink,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  arrowBtn: {
-    alignSelf: 'flex-start',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: HomeTheme.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickStats: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 4,
-  },
-  quickStatItem: { flex: 1, alignItems: 'center' },
-  quickStatIcon: {
+  statIcon: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  quickStatVal: { fontFamily: FontFamily.bold, fontSize: 14, marginBottom: 2 },
-  quickStatLabel: {
+  statVal: {
+    fontFamily: FontFamily.bold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  statLabel: {
     fontFamily: FontFamily.regular,
-    fontSize: 8,
+    fontSize: 9,
     color: HomeTheme.inkMuted,
     textAlign: 'center',
-    lineHeight: 11,
+    lineHeight: 12,
   },
   snapshot: {
-    backgroundColor: '#F8F7FC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -220,18 +342,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: HomeTheme.inkMuted,
     marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  snapshotRow: { flexDirection: 'row', alignItems: 'center' },
-  snapshotItem: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
-  snapshotItemBorder: {
-    borderRightWidth: 1,
-    borderRightColor: HomeTheme.border,
+  snapshotRow: { flexDirection: 'row' },
+  snapshotItem: { flex: 1, alignItems: 'center' },
+  snapshotIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#ECFDF5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   snapshotValue: {
     fontFamily: FontFamily.bold,
     fontSize: 13,
     color: HomeTheme.ink,
-    marginTop: 4,
     marginBottom: 2,
   },
   snapshotLabel: {

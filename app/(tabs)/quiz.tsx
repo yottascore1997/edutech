@@ -3,6 +3,7 @@ import { apiFetchAuth } from '@/constants/api';
 import { FontFamily } from '@/constants/Typography';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
+import { markReadyForNewMatch } from '@/utils/battleQuizSession';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -246,6 +247,7 @@ export default function QuizScreen() {
 
 
     closeAmountModal();
+    markReadyForNewMatch();
     
     router.push({
       pathname: '/(tabs)/matchmaking',
@@ -253,7 +255,8 @@ export default function QuizScreen() {
         category: selectedCategory,
         amount: selectedAmount.amount.toString(),
         amountId: selectedAmount.id,
-        mode: 'battle'
+        mode: 'battle',
+        session: Date.now().toString(),
       }
     } as any);
   };

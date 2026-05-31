@@ -2,7 +2,7 @@
   "expo": {
     "name": "Yottascore",
     "slug": "Exam-frontend",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "examfrontend",
@@ -30,7 +30,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "package": "com.yottascore.closedbook",
-      "versionCode": 11,
+      "versionCode": 12,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.anonymous.Examfrontend"
     },
     "web": {

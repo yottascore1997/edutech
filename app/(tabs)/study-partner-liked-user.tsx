@@ -18,8 +18,32 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_HEIGHT = 440;
-const SLIDE_WIDTH = SCREEN_WIDTH - 32 - 8;
+const CARD_HEIGHT = 400;
+const SLIDE_WIDTH = SCREEN_WIDTH - 32;
+const SP_BG = ['#EDE9FE', '#FDF2F8', '#FAFAFF'] as const;
+const PRIMARY = '#6344D4';
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={detailStyles.row}>
+      <View style={detailStyles.iconWrap}>
+        <Ionicons name={icon} size={18} color={PRIMARY} />
+      </View>
+      <View style={detailStyles.rowText}>
+        <Text style={detailStyles.rowLabel}>{label}</Text>
+        <Text style={detailStyles.rowValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function StudyPartnerLikedUserScreen() {
   const { user } = useAuth();
@@ -41,6 +65,7 @@ export default function StudyPartnerLikedUserScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [spProfile, setSpProfile] = useState<any>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -89,6 +114,7 @@ export default function StudyPartnerLikedUserScreen() {
           const spRes = await apiFetchAuth(`/student/study-partner/profile?userId=${userId}`, user.token);
           if (mounted && spRes?.ok) {
             const spData = spRes.data || {};
+            setSpProfile(spData);
             const spPhotos = Array.isArray(spData.photos) ? spData.photos : [];
             if (spPhotos.length > 0) {
               setPhotos(spPhotos);
@@ -120,12 +146,33 @@ export default function StudyPartnerLikedUserScreen() {
     setPhotoIndex(0);
   }, [displayPhotos.length]);
 
-  const displayExamType = profile?.examType || fallbackProfile.examType;
-  const displayBio = profile?.bio || profile?.about || profile?.description || '';
-  const displayAge = profile?.age || fallbackProfile.age;
-  const displayLanguage = profile?.language;
-  const displayStudyTimeFrom = profile?.studyTimeFrom;
-  const displayStudyTimeTo = profile?.studyTimeTo;
+  const displayBio =
+    spProfile?.bio || profile?.bio || profile?.about || profile?.description || '';
+  const displayAge = spProfile?.age ?? profile?.age ?? fallbackProfile.age;
+  const displayLanguage = spProfile?.language || profile?.language;
+  const displayExamType = spProfile?.examType || profile?.examType || fallbackProfile.examType;
+  const displayGoals = spProfile?.goals || '';
+  const displayStudySlot = spProfile?.studyTimeSlot || '';
+  const displayGender = spProfile?.gender || '';
+  const displayStudyTimeFrom = spProfile?.studyTimeFrom || profile?.studyTimeFrom;
+  const displayStudyTimeTo = spProfile?.studyTimeTo || profile?.studyTimeTo;
+  const displaySubjects = Array.isArray(spProfile?.subjects) ? spProfile.subjects : [];
+
+  useEffect(() => {
+    if (fromMatchOrChat) setDetailsOpen(true);
+  }, [fromMatchOrChat]);
+
+  const openChat = () => {
+    router.push({
+      pathname: '/(tabs)/chat-screen',
+      params: {
+        userId,
+        userName: displayName,
+        userProfilePhoto: displayPhoto || '',
+        isFollowing: 'true',
+      },
+    } as any);
+  };
 
   const sendAction = async (action: 'like' | 'pass') => {
     if (!user?.token || !userId || actionLoading) return;
@@ -157,27 +204,45 @@ export default function StudyPartnerLikedUserScreen() {
     }
   };
 
+  const studyTimeLabel =
+    displayStudyTimeFrom && displayStudyTimeTo
+      ? `${displayStudyTimeFrom} – ${displayStudyTimeTo}`
+      : displayStudySlot || 'Not set';
+
   return (
     <View style={styles.screen}>
+      <LinearGradient colors={[...SP_BG]} style={StyleSheet.absoluteFill} />
       <ScrollView
         style={styles.scrollContent}
         contentContainerStyle={[
           styles.scrollContentContainer,
-          { paddingTop: 10 + insets.top, paddingBottom: 120 + insets.bottom },
+          {
+            paddingTop: 8 + insets.top,
+            paddingBottom: fromMatchOrChat ? 100 + insets.bottom : 120 + insets.bottom,
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header row with back + title (Discover style) */}
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={22} color="#111827" />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.8}>
+            <Ionicons name="arrow-back" size={22} color="#0F0A1E" />
           </TouchableOpacity>
-          <Text style={styles.title}>{fromMatchOrChat ? 'Profile' : 'Discover'}</Text>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.title}>{fromMatchOrChat ? 'Study Buddy' : 'Discover'}</Text>
+            {fromMatchOrChat ? (
+              <Text style={styles.headerSubtitle} numberOfLines={1}>{displayName}</Text>
+            ) : null}
+          </View>
+          {fromMatchOrChat ? (
+            <TouchableOpacity style={styles.chatHeaderBtn} onPress={openChat} activeOpacity={0.85}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#4F46E5" />
+            <ActivityIndicator size="large" color={PRIMARY} />
             <Text style={styles.loadingText}>Loading profile...</Text>
           </View>
         ) : (
@@ -186,18 +251,27 @@ export default function StudyPartnerLikedUserScreen() {
 
             {/* Discover card (same look) */}
             <View style={styles.cardShadowWrapper}>
-              <TouchableOpacity
-                style={styles.detailsArrowBtn}
-                activeOpacity={0.9}
-                onPress={() => setDetailsOpen(v => !v)}
-                disabled={actionLoading}
-              >
-                <Ionicons
-                  name={detailsOpen ? 'chevron-down' : 'chevron-up'}
-                  size={22}
-                  color="#111827"
-                />
-              </TouchableOpacity>
+              {!fromMatchOrChat ? (
+                <TouchableOpacity
+                  style={styles.detailsArrowBtn}
+                  activeOpacity={0.9}
+                  onPress={() => setDetailsOpen(v => !v)}
+                  disabled={actionLoading}
+                >
+                  <Ionicons
+                    name={detailsOpen ? 'chevron-down' : 'chevron-up'}
+                    size={22}
+                    color="#111827"
+                  />
+                </TouchableOpacity>
+              ) : null}
+              {fromMatchOrChat && displayPhotos.length > 1 ? (
+                <View style={styles.photoCountPill}>
+                  <Text style={styles.photoCountText}>
+                    {photoIndex + 1}/{displayPhotos.length}
+                  </Text>
+                </View>
+              ) : null}
 
               <View style={styles.card}>
                 {displayPhotos.length > 0 ? (
@@ -363,11 +437,51 @@ export default function StudyPartnerLikedUserScreen() {
               </View>
             </View>
 
-            {/* Inline details (same as Discover inline details) */}
-            {detailsOpen && (
+            {detailsOpen && fromMatchOrChat ? (
+              <View style={styles.profileDetailsCard}>
+                <View style={styles.profileDetailsHeader}>
+                  <Ionicons name="sparkles" size={18} color={PRIMARY} />
+                  <Text style={styles.profileDetailsTitle}>Profile details</Text>
+                </View>
+
+                <DetailRow icon="school-outline" label="Preparing for" value={displayExamType || 'Not set'} />
+                <DetailRow icon="language-outline" label="Language" value={displayLanguage || 'Not set'} />
+                <DetailRow icon="time-outline" label="Study time" value={studyTimeLabel} />
+                {displayGender ? (
+                  <DetailRow icon="person-outline" label="Gender" value={displayGender} />
+                ) : null}
+                {displayAge ? (
+                  <DetailRow icon="calendar-outline" label="Age" value={`${displayAge} years`} />
+                ) : null}
+                {displayGoals ? (
+                  <DetailRow icon="flag-outline" label="Goals" value={displayGoals} />
+                ) : null}
+
+                {displaySubjects.length > 0 ? (
+                  <View style={styles.subjectsBlock}>
+                    <Text style={styles.subjectsLabel}>Subjects</Text>
+                    <View style={styles.subjectsRow}>
+                      {displaySubjects.map((s: string) => (
+                        <View key={s} style={styles.subjectChip}>
+                          <Text style={styles.subjectChipText}>{s}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                {displayBio ? (
+                  <View style={styles.aboutBox}>
+                    <Text style={styles.aboutTitle}>About</Text>
+                    <Text style={styles.aboutText}>{displayBio}</Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {detailsOpen && !fromMatchOrChat ? (
               <View style={styles.inlineDetailsCard}>
                 <Text style={styles.inlineTitle}>Details</Text>
-
                 <View style={styles.inlineRow}>
                   <Ionicons name="person" size={16} color="#374151" />
                   <Text style={styles.inlineText}>{displayName}</Text>
@@ -382,13 +496,8 @@ export default function StudyPartnerLikedUserScreen() {
                 </View>
                 <View style={styles.inlineRow}>
                   <Ionicons name="time" size={16} color="#374151" />
-                  <Text style={styles.inlineText}>
-                    {displayStudyTimeFrom && displayStudyTimeTo
-                      ? `${displayStudyTimeFrom} - ${displayStudyTimeTo}`
-                      : 'Study time not set'}
-                  </Text>
+                  <Text style={styles.inlineText}>{studyTimeLabel}</Text>
                 </View>
-
                 {displayBio ? (
                   <View style={styles.inlineBioBox}>
                     <Text style={styles.inlineBioTitle}>About</Text>
@@ -396,7 +505,7 @@ export default function StudyPartnerLikedUserScreen() {
                   </View>
                 ) : null}
               </View>
-            )}
+            ) : null}
 
             {/* Bottom actions like Tinder (X / Heart) – only when coming from discovery / liked list */}
             {!fromMatchOrChat && (
@@ -422,32 +531,164 @@ export default function StudyPartnerLikedUserScreen() {
           </>
         )}
       </ScrollView>
+
+      {fromMatchOrChat && !loading ? (
+        <View style={[styles.bottomBar, { paddingBottom: 12 + insets.bottom }]}>
+          <TouchableOpacity onPress={openChat} activeOpacity={0.9} style={styles.messageBtnWrap}>
+            <LinearGradient
+              colors={['#8E78E7', '#6344D4', '#5546C9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.messageBtn}
+            >
+              <Ionicons name="chatbubbles" size={22} color="#fff" />
+              <Text style={styles.messageBtnText}>Send message</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
 
+const detailStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#FAFAFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    marginBottom: 8,
+  },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F3EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowText: { flex: 1 },
+  rowLabel: { fontSize: 11, fontWeight: '600', color: '#64748B', marginBottom: 2 },
+  rowValue: { fontSize: 15, fontWeight: '700', color: '#0F0A1E' },
+});
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F9FAFB' },
+  screen: { flex: 1, backgroundColor: '#FAFAFF' },
   scrollContent: { flex: 1 },
   scrollContentContainer: { flexGrow: 1, paddingHorizontal: 16 },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E5E7EB',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E8E8F0',
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: '#111827' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 10,
+  },
+  headerTextWrap: { flex: 1 },
+  title: { fontSize: 20, fontWeight: '800', color: '#0F0A1E' },
+  headerSubtitle: { fontSize: 14, fontWeight: '600', color: '#64748B', marginTop: 2 },
+  chatHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoCountPill: {
+    position: 'absolute',
+    left: 12,
+    top: 16,
+    zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  photoCountText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  profileDetailsCard: {
+    marginTop: 14,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    padding: 16,
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  profileDetailsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  profileDetailsTitle: { fontSize: 17, fontWeight: '800', color: '#0F0A1E' },
+  subjectsBlock: { marginTop: 4, marginBottom: 8 },
+  subjectsLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 8 },
+  subjectsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  subjectChip: {
+    backgroundColor: '#F3EEFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  subjectChipText: { fontSize: 13, fontWeight: '600', color: PRIMARY },
+  aboutBox: {
+    marginTop: 8,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#FDF4FF',
+    borderWidth: 1,
+    borderColor: '#F3E8FF',
+  },
+  aboutTitle: { fontSize: 12, fontWeight: '800', color: PRIMARY, marginBottom: 6 },
+  aboutText: { fontSize: 14, lineHeight: 21, color: '#334155', fontWeight: '500' },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: 'rgba(250,250,255,0.95)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EDE9FE',
+  },
+  messageBtnWrap: { borderRadius: 16, overflow: 'hidden' },
+  messageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  messageBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#4B5563', fontWeight: '500' },
+  loadingText: { marginTop: 12, fontSize: 14, color: '#64748B', fontWeight: '500' },
   errorText: { color: '#DC2626', fontSize: 13, marginBottom: 8 },
   cardShadowWrapper: {
     marginTop: 8,
@@ -596,10 +837,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
   },
   dotActive: {
-    backgroundColor: '#FFF',
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    backgroundColor: '#C4B5FD',
+    width: 18,
+    height: 8,
+    borderRadius: 4,
   },
 });
 

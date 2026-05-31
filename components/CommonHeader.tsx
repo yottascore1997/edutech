@@ -7,7 +7,7 @@ import { useWallet } from '@/context/WalletContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -19,6 +19,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,12 +27,34 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_W = (SCREEN_W - 32 - 10) / 2;
 
+/** Keep app bar height stable across Android display / font sizes */
+function useHeaderMetrics() {
+  const { width, height, fontScale } = useWindowDimensions();
+  return useMemo(() => {
+    const largeAndroid = Platform.OS === 'android' && (height >= 760 || width >= 392 || fontScale > 1.05);
+    const compact = Platform.OS === 'android' && (largeAndroid || fontScale > 1);
+    return {
+      compact,
+      btnSize: compact ? 38 : 42,
+      examMinH: compact ? 36 : 40,
+      examPadV: compact ? 3 : 5,
+      examPadH: compact ? 7 : 8,
+      iconRing: compact ? 26 : 28,
+      chevronSize: compact ? 22 : 24,
+      barPadBottom: compact ? 6 : 8,
+      topInsetExtra: compact ? 3 : 6,
+      fontScale,
+    };
+  }, [width, height, fontScale]);
+}
+
 const H = {
   bg: '#FFFBF7',
   bgGrad: ['#FFFCF8', '#FFFBF7', '#FAF8F5'] as const,
   primary: HomeTheme.primary,
   primaryLight: HomeTheme.primaryLight,
   ink: HomeTheme.ink,
+  inkSecondary: HomeTheme.inkSecondary,
   muted: HomeTheme.inkMuted,
   border: HomeTheme.border,
   card: '#FFFFFF',
@@ -62,6 +85,7 @@ const MAIN_OPTIONS = [
 const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, title = '' }) => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const hm = useHeaderMetrics();
   const { user } = useAuth();
   const { walletAmount, refreshWalletAmount } = useWallet();
   const { selectedCategory, setSelectedCategory, clearCategory } = useCategory();
@@ -145,28 +169,41 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
     <View style={st.wrapper}>
       <LinearGradient colors={[...H.bgGrad]} style={StyleSheet.absoluteFill} />
 
-      <View style={[st.bar, { paddingTop: insets.top + 6 }]}>
+      <View style={[st.bar, { paddingTop: insets.top + hm.topInsetExtra, paddingBottom: hm.barPadBottom }]}>
         <Pressable
           style={st.iconBtn}
           onPress={() => navigation.toggleDrawer()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           android_ripple={{ color: 'rgba(99,68,212,0.12)', borderless: true }}
         >
-          <View style={st.menuInner}>
-            <Ionicons name="menu" size={21} color={H.ink} />
+          <View style={[st.menuInner, { width: hm.btnSize, height: hm.btnSize, borderRadius: hm.compact ? 12 : 14 }]}>
+            <Ionicons name="menu" size={hm.compact ? 19 : 21} color={H.ink} />
           </View>
         </Pressable>
 
         <TouchableOpacity style={st.examWrap} onPress={handleSelectExamPress} activeOpacity={0.88}>
           {hasCategory ? (
             <LinearGradient colors={[...H.examBorder]} style={st.examBorder}>
-              <View style={st.examInner}>
-                <LinearGradient colors={[...H.examGrad]} style={st.examIconRing}>
-                  <Ionicons name="school" size={14} color="#FFF" />
+              <View
+                style={[
+                  st.examInner,
+                  { minHeight: hm.examMinH, paddingVertical: hm.examPadV, paddingHorizontal: hm.examPadH },
+                ]}
+              >
+                <LinearGradient
+                  colors={[...H.examGrad]}
+                  style={[st.examIconRing, { width: hm.iconRing, height: hm.iconRing, borderRadius: hm.compact ? 8 : 10 }]}
+                >
+                  <Ionicons name="school" size={hm.compact ? 12 : 14} color="#FFF" />
                 </LinearGradient>
-                <Text style={st.examTextActive} numberOfLines={1}>
-                  {selectedCategory}
-                </Text>
+                <View style={st.examTextCol}>
+                  <Text style={st.examLabelActive} numberOfLines={1} allowFontScaling={false}>
+                    Selected Exam
+                  </Text>
+                  <Text style={st.examTextActive} numberOfLines={1} allowFontScaling={false}>
+                    {selectedCategory}
+                  </Text>
+                </View>
                 <TouchableOpacity
                   onPress={(e) => {
                     e.stopPropagation();
@@ -175,20 +212,39 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
                   hitSlop={8}
                   style={st.clearBtn}
                 >
-                  <Ionicons name="close-circle" size={17} color="#94A3B8" />
+                  <Ionicons name="close-circle" size={hm.compact ? 16 : 18} color="#94A3B8" />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
           ) : (
-            <View style={st.examInnerPlain}>
-              <View style={st.examIconPlain}>
-                <Ionicons name="school-outline" size={15} color={H.primary} />
+            <LinearGradient colors={['#EDE9FE', '#C4B5FD']} style={st.examBorder}>
+              <View
+                style={[
+                  st.examInnerPlain,
+                  { minHeight: hm.examMinH, paddingVertical: hm.examPadV, paddingHorizontal: hm.examPadH },
+                ]}
+              >
+                <LinearGradient
+                  colors={[...H.examGrad]}
+                  style={[st.examIconRing, { width: hm.iconRing, height: hm.iconRing, borderRadius: hm.compact ? 8 : 10 }]}
+                >
+                  <Ionicons name="school-outline" size={hm.compact ? 12 : 14} color="#FFF" />
+                </LinearGradient>
+                <View style={st.examTextCol}>
+                  <Text style={st.examLabel} numberOfLines={1} allowFontScaling={false}>
+                    Select Exam
+                  </Text>
+                  {!hm.compact ? (
+                    <Text style={st.examHint} numberOfLines={1} allowFontScaling={false}>
+                      Tap to choose category
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={[st.examChevronWrap, { width: hm.chevronSize, height: hm.chevronSize }]}>
+                  <Ionicons name="chevron-down" size={hm.compact ? 12 : 14} color={H.primary} />
+                </View>
               </View>
-              <Text style={st.examText} numberOfLines={1}>
-                Select Exam
-              </Text>
-              <Ionicons name="chevron-down" size={15} color={H.primaryLight} />
-            </View>
+            </LinearGradient>
           )}
         </TouchableOpacity>
 
@@ -198,8 +254,8 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
             onPress={() => navigation.navigate('(tabs)', { screen: 'notifications' })}
             activeOpacity={0.85}
           >
-            <View style={st.bellInner}>
-              <Ionicons name="notifications-outline" size={20} color={H.ink} />
+            <View style={[st.bellInner, { width: hm.btnSize, height: hm.btnSize, borderRadius: hm.compact ? 12 : 14 }]}>
+              <Ionicons name="notifications-outline" size={hm.compact ? 18 : 20} color={H.ink} />
               <View style={st.notifDot} />
             </View>
           </TouchableOpacity>
@@ -209,9 +265,16 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
             onPress={() => navigation.navigate('(tabs)', { screen: 'wallet' })}
             activeOpacity={0.9}
           >
-            <LinearGradient colors={[...H.walletGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.walletGrad}>
-              <Ionicons name="wallet-outline" size={14} color="#FFF" />
-              <Text style={st.walletAmt}>₹{walletAmount || '0'}</Text>
+            <LinearGradient
+              colors={[...H.walletGrad]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[st.walletGrad, { paddingVertical: hm.compact ? 7 : 9, minWidth: hm.compact ? 72 : 78 }]}
+            >
+              <Ionicons name="wallet-outline" size={hm.compact ? 12 : 14} color="#FFF" />
+              <Text style={st.walletAmt} allowFontScaling={false}>
+                ₹{walletAmount || '0'}
+              </Text>
               <View style={st.walletPlus}>
                 <Ionicons name="add" size={12} color="#EA580C" />
               </View>
@@ -259,16 +322,38 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
       >
         <Pressable style={st.modalOverlay} onPress={() => setShowCategoryModal(false)}>
           <Pressable style={st.modalSheet} onPress={(e) => e.stopPropagation()}>
-            <View style={st.modalHandle} />
-            <View style={st.modalHead}>
-              <View>
-                <Text style={st.modalTitle}>Select your Exam</Text>
-                <Text style={st.modalSub}>Filter content across the app</Text>
+            <LinearGradient colors={[...H.examGrad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.modalHero}>
+              <View style={st.modalHandle} />
+              <View style={st.modalHeroOrb} />
+              <View style={st.modalHead}>
+                <View style={st.modalHeadLeft}>
+                  <View style={st.modalHeroIcon}>
+                    <Ionicons name="school" size={22} color="#FFF" />
+                  </View>
+                  <View style={st.modalHeadText}>
+                    <Text style={st.modalTitle}>Select your Exam</Text>
+                    <Text style={st.modalSub}>Filter exams, practice & content</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setShowCategoryModal(false)} style={st.modalClose}>
+                  <Ionicons name="close" size={20} color={H.ink} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setShowCategoryModal(false)} style={st.modalClose}>
-                <Ionicons name="close" size={20} color={H.ink} />
-              </TouchableOpacity>
-            </View>
+              {!loadingCategories && categories.length > 0 && (
+                <View style={st.modalCountPill}>
+                  <Text style={st.modalCountText}>{categories.length} categories available</Text>
+                </View>
+              )}
+            </LinearGradient>
+
+            {selectedCategory ? (
+              <View style={st.selectedBanner}>
+                <Ionicons name="checkmark-circle" size={18} color={H.primary} />
+                <Text style={st.selectedBannerText} numberOfLines={1}>
+                  Current: <Text style={st.selectedBannerBold}>{selectedCategory}</Text>
+                </Text>
+              </View>
+            ) : null}
 
             <ScrollView
               style={st.modalList}
@@ -285,11 +370,12 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
                   <View style={st.modalEmptyIcon}>
                     <Ionicons name="book-outline" size={32} color={H.primaryLight} />
                   </View>
-                  <Text style={st.modalEmptyTxt}>No categories available</Text>
+                  <Text style={st.modalEmptyTitle}>No categories yet</Text>
+                  <Text style={st.modalEmptyTxt}>Exam categories will appear here</Text>
                 </View>
               ) : (
                 <View style={st.catGrid}>
-                  {categories.map((category, index) => {
+                  {categories.map((category) => {
                     const active = selectedCategory === category.name;
                     return (
                       <TouchableOpacity
@@ -326,7 +412,8 @@ const CommonHeader: React.FC<CommonHeaderProps> = ({ showMainOptions = false, ti
             </ScrollView>
 
             {selectedCategory ? (
-              <TouchableOpacity style={st.clearAllBtn} onPress={handleClearCategory}>
+              <TouchableOpacity style={st.clearAllBtn} onPress={handleClearCategory} activeOpacity={0.85}>
+                <Ionicons name="close-circle-outline" size={18} color={H.muted} />
                 <Text style={st.clearAllTxt}>Clear selection</Text>
               </TouchableOpacity>
             ) : null}
@@ -362,7 +449,6 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingBottom: 10,
     gap: 8,
   },
   iconBtn: {
@@ -370,8 +456,6 @@ const st = StyleSheet.create({
     overflow: 'hidden',
   },
   menuInner: {
-    width: 44,
-    height: 44,
     borderRadius: 14,
     backgroundColor: H.card,
     borderWidth: 1,
@@ -383,64 +467,62 @@ const st = StyleSheet.create({
       : {}),
   },
   examWrap: { flex: 1, minWidth: 0 },
-  examBorder: { borderRadius: 16, padding: 1.5 },
+  examBorder: { borderRadius: 14, padding: 1.5 },
   examInner: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: H.card,
-    borderRadius: 14.5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 8,
-    minHeight: 44,
+    borderRadius: 12.5,
   },
   examInnerPlain: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: H.card,
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 8,
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: H.border,
-    ...(Platform.OS === 'ios'
-      ? { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6 }
-      : { elevation: 1 }),
+    borderRadius: 12.5,
+  },
+  examTextCol: { flex: 1, minWidth: 0, marginLeft: 7, justifyContent: 'center' },
+  examLabel: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 11,
+    color: H.primary,
+    lineHeight: 14,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  examLabelActive: {
+    fontFamily: FontFamily.medium,
+    fontSize: 9,
+    color: H.muted,
+    lineHeight: 12,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  examHint: {
+    fontFamily: FontFamily.regular,
+    fontSize: 9,
+    color: H.muted,
+    lineHeight: 12,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   examIconRing: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  examIconPlain: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+  examChevronWrap: {
+    borderRadius: 7,
     backgroundColor: HomeTheme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  examText: {
-    flex: 1,
-    fontFamily: FontFamily.semiBold,
-    fontSize: 13,
-    color: H.muted,
+    marginLeft: 3,
   },
   examTextActive: {
-    flex: 1,
     fontFamily: FontFamily.bold,
-    fontSize: 13,
+    fontSize: 11,
     color: H.ink,
+    lineHeight: 14,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   clearBtn: { padding: 2 },
   rightRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   bellInner: {
-    width: 44,
-    height: 44,
     borderRadius: 14,
     backgroundColor: H.card,
     borderWidth: 1,
@@ -464,16 +546,14 @@ const st = StyleSheet.create({
   walletGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 5,
-    borderRadius: 14,
-    minWidth: 78,
+    paddingHorizontal: 9,
+    gap: 4,
+    borderRadius: 12,
     ...(Platform.OS === 'ios'
       ? { shadowColor: '#EA580C', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 }
       : { elevation: 3 }),
   },
-  walletAmt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
+  walletAmt: { fontFamily: FontFamily.bold, fontSize: 12, color: '#FFF' },
   walletPlus: {
     width: 18,
     height: 18,
@@ -518,44 +598,105 @@ const st = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: H.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '78%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '82%',
     paddingBottom: Platform.OS === 'ios' ? 28 : 20,
+    overflow: 'hidden',
   },
   modalHandle: {
-    width: 44,
+    width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: 'rgba(255,255,255,0.35)',
     alignSelf: 'center',
     marginTop: 10,
-    marginBottom: 6,
+    marginBottom: 0,
+    zIndex: 2,
+  },
+  modalHero: {
+    paddingBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  modalHeroOrb: {
+    position: 'absolute',
+    top: -30,
+    right: -20,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   modalHead: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: H.border,
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
-  modalTitle: { fontFamily: FontFamily.bold, fontSize: 18, color: H.ink },
-  modalSub: { fontFamily: FontFamily.regular, fontSize: 12, color: H.muted, marginTop: 2 },
+  modalHeadLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  modalHeroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  modalHeadText: { flex: 1 },
+  modalTitle: { fontFamily: FontFamily.bold, fontSize: 18, color: '#FFF' },
+  modalSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    lineHeight: Platform.OS === 'android' ? 18 : 16,
+  },
+  modalCountPill: {
+    alignSelf: 'flex-start',
+    marginLeft: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  modalCountText: { fontFamily: FontFamily.medium, fontSize: 11, color: '#FFF' },
+  selectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: HomeTheme.primarySoft,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  selectedBannerText: {
+    flex: 1,
+    marginLeft: 8,
+    fontFamily: FontFamily.medium,
+    fontSize: 13,
+    color: H.inkSecondary,
+  },
+  selectedBannerBold: { fontFamily: FontFamily.bold, color: H.primary },
   modalClose: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: H.border,
+    marginLeft: 8,
   },
   modalList: { paddingHorizontal: 16 },
-  modalListContent: { paddingTop: 14, paddingBottom: 8 },
-  modalEmpty: { alignItems: 'center', paddingVertical: 40, gap: 12 },
+  modalListContent: { paddingTop: 12, paddingBottom: 8 },
+  modalEmpty: { alignItems: 'center', paddingVertical: 40 },
   modalEmptyIcon: {
     width: 64,
     height: 64,
@@ -563,22 +704,28 @@ const st = StyleSheet.create({
     backgroundColor: HomeTheme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
-  modalEmptyTxt: { fontFamily: FontFamily.medium, fontSize: 14, color: H.muted },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
-  catItemWrap: { width: CARD_W },
+  modalEmptyTitle: { fontFamily: FontFamily.bold, fontSize: 16, color: H.ink, marginBottom: 4 },
+  modalEmptyTxt: { fontFamily: FontFamily.medium, fontSize: 13, color: H.muted, textAlign: 'center' },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  catItemWrap: { width: CARD_W, marginBottom: 10 },
   catBorder: { borderRadius: 16, padding: 1.5 },
   catCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAFAFC',
     borderRadius: 14,
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: H.border,
-    minHeight: 108,
+    minHeight: 112,
     justifyContent: 'center',
+    ...(Platform.OS === 'ios'
+      ? { shadowColor: '#6344D4', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 }
+      : { elevation: 2 }),
   },
-  catCardActive: { backgroundColor: H.card, position: 'relative' },
+  catCardActive: { backgroundColor: H.card, position: 'relative', borderColor: '#C4B5FD' },
   catThumb: {
     width: 48,
     height: 48,
@@ -594,14 +741,16 @@ const st = StyleSheet.create({
     fontSize: 12,
     color: H.ink,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: Platform.OS === 'android' ? 18 : 16,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   catNameActive: {
     fontFamily: FontFamily.bold,
     fontSize: 12,
     color: H.primary,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: Platform.OS === 'android' ? 18 : 16,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   catCheck: {
     position: 'absolute',
@@ -615,16 +764,18 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
   clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: 20,
     marginTop: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
+    paddingVertical: 13,
     borderRadius: 14,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: H.border,
   },
-  clearAllTxt: { fontFamily: FontFamily.semiBold, fontSize: 14, color: H.muted },
+  clearAllTxt: { fontFamily: FontFamily.semiBold, fontSize: 14, color: H.muted, marginLeft: 6 },
 });
 
 export default CommonHeader;

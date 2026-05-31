@@ -1,5 +1,4 @@
 import { apiFetchAuth } from '@/constants/api';
-import { AppColors } from '@/constants/Colors';
 import { HomeTheme } from '@/constants/HomeTheme';
 import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
@@ -7,9 +6,9 @@ import { useCategory } from '@/context/CategoryContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowRight } from 'lucide-react-native';
+import { ArrowRight, Bell, Calendar } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Dimensions, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -39,19 +38,19 @@ const getMonthYear = (notifications: ExamNotification[]) => {
 
 const statusColors = {
     active: {
-        border: '#7C3AED',
+        border: HomeTheme.primary,
         badge: '#10B981',
-        gradient: ['#a18cd1', '#fbc2eb'],
+        gradient: ['#8E78E7', '#6344D4'],
     },
     urgent: {
         border: '#F59E0B',
         badge: '#F59E0B',
-        gradient: ['#f7971e', '#ffd200'],
+        gradient: ['#FBBF24', '#F59E0B'],
     },
     expired: {
         border: '#EF4444',
         badge: '#EF4444',
-        gradient: ['#f85032', '#e73827'],
+        gradient: ['#FCA5A5', '#EF4444'],
     },
 };
 
@@ -163,7 +162,7 @@ const ExamNotificationsSection = () => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={AppColors.primary} />
+                <ActivityIndicator size="small" color={HomeTheme.primary} />
             </View>
         );
     }
@@ -259,20 +258,37 @@ const ExamNotificationsSection = () => {
         return days >= 0 && days <= 7;
     }).length;
 
+    const previewNotifications = activeNotifications.slice(0, 4);
+
+    const getStatusKey = (lastDate: string): 'active' | 'urgent' | 'expired' => {
+        const days = getDaysRemaining(lastDate);
+        if (days < 0) return 'expired';
+        if (days <= 7) return 'urgent';
+        return 'active';
+    };
+
     return (
         <View style={styles.container}>
             <LinearGradient
-                colors={['#4C1D95', '#6D28D9', '#DB2777']}
+                colors={['#2D2068', '#4B32AF', '#6344D4']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.gradientShell}
             >
+                <View style={styles.orb1} />
+                <View style={styles.orb2} />
+
                 <View style={styles.headerRow}>
                     <View style={styles.headerLeft}>
-                        <View style={styles.headerIconBox}>
-                            <Ionicons name="notifications" size={18} color={HomeTheme.primary} />
-                        </View>
-                        <Text style={styles.headerTitle}>Exam Notifications</Text>
+                        <LinearGradient colors={['#FBBF24', '#F59E0B']} style={styles.headerBadge}>
+                            <Bell size={12} color="#78350F" strokeWidth={2.4} />
+                            <Text style={styles.headerBadgeText}>Job Alerts</Text>
+                        </LinearGradient>
+                        <Text style={styles.headerSubtitle}>
+                            {upcomingCount === 0
+                                ? 'No active notifications'
+                                : `${upcomingCount} active notification${upcomingCount > 1 ? 's' : ''}`}
+                        </Text>
                     </View>
                     <TouchableOpacity
                         style={styles.viewAllBtn}
@@ -280,47 +296,87 @@ const ExamNotificationsSection = () => {
                         activeOpacity={0.85}
                     >
                         <Text style={styles.viewAllText}>View All</Text>
-                        <ArrowRight size={13} color="#FFF" strokeWidth={2.5} />
+                        <ArrowRight size={13} color={HomeTheme.primary} strokeWidth={2.5} />
                     </TouchableOpacity>
                 </View>
+            </LinearGradient>
 
-                <View style={styles.innerCard}>
-                    <View style={styles.innerTop}>
-                        <View style={styles.bellWrap}>
-                            <Ionicons name="notifications" size={28} color={HomeTheme.primary} />
-                            {upcomingCount > 0 && <View style={styles.bellDot} />}
-                        </View>
-                        <View style={styles.innerTextCol}>
-                            <Text style={styles.innerTitle}>
-                                {upcomingCount === 0
-                                    ? 'No active notifications'
-                                    : `${upcomingCount} active notification${upcomingCount > 1 ? 's' : ''}`}
-                            </Text>
-                            <Text style={styles.innerSub}>
-                                {upcomingCount === 0
-                                    ? "You're all caught up!"
-                                    : 'Tap View All for exam updates'}
-                            </Text>
-                        </View>
+            <LinearGradient colors={['#FFFBF7', '#FFFFFF']} style={styles.body}>
+                <View style={styles.countRow}>
+                    <View style={styles.countCol}>
+                        <Text style={[styles.countVal, { color: HomeTheme.primary }]}>{upcomingCount}</Text>
+                        <Text style={styles.countLabel}>Upcoming</Text>
                     </View>
-
-                    <View style={styles.countRow}>
-                        <View style={styles.countCol}>
-                            <Text style={[styles.countVal, { color: HomeTheme.primary }]}>{upcomingCount}</Text>
-                            <Text style={styles.countLabel}>Upcoming</Text>
-                        </View>
-                        <View style={styles.countDivider} />
-                        <View style={styles.countCol}>
-                            <Text style={[styles.countVal, { color: '#EA580C' }]}>{todayCount}</Text>
-                            <Text style={styles.countLabel}>Today</Text>
-                        </View>
-                        <View style={styles.countDivider} />
-                        <View style={styles.countCol}>
-                            <Text style={[styles.countVal, { color: '#059669' }]}>{weekCount}</Text>
-                            <Text style={styles.countLabel}>This Week</Text>
-                        </View>
+                    <View style={styles.countDivider} />
+                    <View style={styles.countCol}>
+                        <Text style={[styles.countVal, { color: '#EA580C' }]}>{todayCount}</Text>
+                        <Text style={styles.countLabel}>Today</Text>
+                    </View>
+                    <View style={styles.countDivider} />
+                    <View style={styles.countCol}>
+                        <Text style={[styles.countVal, { color: '#059669' }]}>{weekCount}</Text>
+                        <Text style={styles.countLabel}>This Week</Text>
                     </View>
                 </View>
+
+                {previewNotifications.length > 0 ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.previewScroll}
+                    >
+                        {previewNotifications.map((item) => {
+                            const days = getDaysRemaining(item.applyLastDate);
+                            const statusKey = getStatusKey(item.applyLastDate);
+                            const urgent = days >= 0 && days <= 7;
+                            return (
+                                <TouchableOpacity
+                                    key={item.id}
+                                    style={styles.previewCard}
+                                    onPress={() => openNotificationModal(item)}
+                                    activeOpacity={0.88}
+                                >
+                                    <View style={styles.previewTop}>
+                                        <LinearGradient
+                                            colors={[...HomeTheme.heroCta]}
+                                            style={styles.previewIcon}
+                                        >
+                                            <Ionicons name="briefcase-outline" size={16} color="#FFF" />
+                                        </LinearGradient>
+                                        {urgent && (
+                                            <View style={styles.urgentPill}>
+                                                <Text style={styles.urgentText}>Urgent</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <Text style={styles.previewTitle} numberOfLines={2}>
+                                        {item.title}
+                                    </Text>
+                                    <View style={styles.previewFooter}>
+                                        <Calendar size={11} color={HomeTheme.primaryLight} strokeWidth={2} />
+                                        <Text style={styles.previewDate}>
+                                            {days >= 0 ? `${days}d left` : 'Expired'}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={[
+                                            styles.previewStatusBar,
+                                            { backgroundColor: statusColors[statusKey].badge },
+                                        ]}
+                                    />
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                ) : (
+                    <View style={styles.emptyPreview}>
+                        <LinearGradient colors={[...HomeTheme.heroCta]} style={styles.emptyIcon}>
+                            <Bell size={22} color="#FFF" strokeWidth={2} />
+                        </LinearGradient>
+                        <Text style={styles.emptyText}>You&apos;re all caught up!</Text>
+                        <Text style={styles.emptySub}>New exam alerts will appear here</Text>
+                    </View>
+                )}
             </LinearGradient>
 
             {/* Enhanced Modal with Animations */}
@@ -357,7 +413,7 @@ const ExamNotificationsSection = () => {
                     >
                         {/* Enhanced Header */}
                         <LinearGradient
-                            colors={['#047857', '#059669', '#10B981']}
+                            colors={[...HomeTheme.heroCta]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.modalHeaderGradient}
@@ -435,7 +491,7 @@ const ExamNotificationsSection = () => {
                                             activeOpacity={0.8}
                                         >
                                             <LinearGradient
-                                                colors={['#10B981', '#059669', '#047857']}
+                                                colors={[...HomeTheme.heroCta]}
                                                 start={{ x: 0, y: 0 }}
                                                 end={{ x: 1, y: 1 }}
                                                 style={styles.modalApplyButtonEnhanced}
@@ -461,107 +517,215 @@ const ExamNotificationsSection = () => {
 const styles = StyleSheet.create({
     container: {
         marginHorizontal: 16,
-        marginBottom: 12,
-        borderRadius: 20,
+        marginBottom: 16,
+        borderRadius: 22,
         overflow: 'hidden',
-        ...HomeTheme.shadowPurple,
+        borderWidth: 1,
+        borderColor: '#C4B5FD',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#4B32AF',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.2,
+                shadowRadius: 18,
+            },
+            android: { elevation: 7 },
+        }),
     },
     gradientShell: {
-        padding: 14,
-        borderRadius: 20,
+        paddingHorizontal: 18,
+        paddingTop: 16,
+        paddingBottom: 14,
+        overflow: 'hidden',
+    },
+    orb1: {
+        position: 'absolute',
+        width: 90,
+        height: 90,
+        borderRadius: 45,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        top: -30,
+        right: -10,
+    },
+    orb2: {
+        position: 'absolute',
+        width: 55,
+        height: 55,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        bottom: -15,
+        left: 24,
     },
     headerRow: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        marginBottom: 12,
+        zIndex: 1,
     },
-    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-    headerIconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#FFFFFF',
-        justifyContent: 'center',
+    headerLeft: { flex: 1, marginRight: 10 },
+    headerBadge: {
+        flexDirection: 'row',
         alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        marginBottom: 8,
     },
-    headerTitle: {
-        fontFamily: FontFamily.bold,
-        fontSize: 16,
-        color: '#FFFFFF',
+    headerBadgeText: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 11,
+        color: '#78350F',
+    },
+    headerSubtitle: {
+        fontFamily: FontFamily.medium,
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.85)',
     },
     viewAllBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.22)',
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 20,
         gap: 3,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-    },
-    viewAllText: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#FFFFFF' },
-    innerCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        borderRadius: 20,
     },
-    innerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 12 },
-    bellWrap: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: HomeTheme.primarySoft,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    bellDot: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#EF4444',
-        borderWidth: 1.5,
-        borderColor: '#FFF',
-    },
-    innerTextCol: { flex: 1 },
-    innerTitle: {
-        fontFamily: FontFamily.bold,
-        fontSize: 14,
-        color: HomeTheme.ink,
-        marginBottom: 3,
-    },
-    innerSub: {
-        fontFamily: FontFamily.regular,
+    viewAllText: {
+        fontFamily: FontFamily.semiBold,
         fontSize: 11,
-        color: HomeTheme.inkMuted,
+        color: HomeTheme.primary,
+    },
+    body: {
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 16,
     },
     countRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#F8F7FC',
-        borderRadius: 12,
-        paddingVertical: 10,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        paddingVertical: 12,
         paddingHorizontal: 8,
+        marginBottom: 14,
+        borderWidth: 1,
+        borderColor: HomeTheme.border,
     },
     countCol: { flex: 1, alignItems: 'center' },
     countDivider: { width: 1, height: 28, backgroundColor: HomeTheme.border },
-    countVal: { fontFamily: FontFamily.bold, fontSize: 18, marginBottom: 2 },
+    countVal: { fontFamily: FontFamily.bold, fontSize: 20, marginBottom: 2 },
     countLabel: {
         fontFamily: FontFamily.regular,
         fontSize: 10,
         color: HomeTheme.inkMuted,
     },
+    previewScroll: {
+        gap: 10,
+        paddingRight: 4,
+    },
+    previewCard: {
+        width: 168,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#E9D5FF',
+        overflow: 'hidden',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#6344D4',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.08,
+                shadowRadius: 8,
+            },
+            android: { elevation: 2 },
+        }),
+    },
+    previewTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    previewIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    urgentPill: {
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 7,
+        paddingVertical: 3,
+        borderRadius: 8,
+    },
+    urgentText: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 9,
+        color: '#B45309',
+    },
+    previewTitle: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 12,
+        color: HomeTheme.ink,
+        lineHeight: 16,
+        marginBottom: 10,
+        minHeight: 32,
+    },
+    previewFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    previewDate: {
+        fontFamily: FontFamily.medium,
+        fontSize: 10,
+        color: HomeTheme.inkMuted,
+    },
+    previewStatusBar: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
+        borderTopLeftRadius: 14,
+        borderBottomLeftRadius: 14,
+    },
+    emptyPreview: {
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    emptyIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    emptyText: {
+        fontFamily: FontFamily.semiBold,
+        fontSize: 14,
+        color: HomeTheme.ink,
+    },
+    emptySub: {
+        fontFamily: FontFamily.regular,
+        fontSize: 12,
+        color: HomeTheme.inkMuted,
+        marginTop: 4,
+    },
     loadingContainer: {
         marginHorizontal: 16,
-        marginBottom: 12,
-        padding: 20,
+        marginBottom: 16,
+        padding: 24,
         alignItems: 'center',
         backgroundColor: '#FFF',
-        borderRadius: 20,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: HomeTheme.border,
     },
     modalOverlay: {
         flex: 1,
@@ -583,13 +747,13 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         overflow: 'hidden',
         backgroundColor: '#FFFFFF',
-        shadowColor: '#047857',
+        shadowColor: '#6344D4',
         shadowOffset: { width: 0, height: 15 },
-        shadowOpacity: 0.35,
+        shadowOpacity: 0.25,
         shadowRadius: 25,
         elevation: 15,
-        borderWidth: 2,
-        borderColor: 'rgba(4, 120, 87, 0.15)',
+        borderWidth: 1,
+        borderColor: '#C4B5FD',
     },
     modalHeaderGradient: {
         borderTopLeftRadius: 24,
@@ -610,28 +774,18 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: 'rgba(219, 39, 119, 0.2)',
+        backgroundColor: 'rgba(255,255,255,0.2)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 14,
-        borderWidth: 2,
-        borderColor: 'rgba(219, 39, 119, 0.3)',
-        shadowColor: '#DB2777',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 6,
-        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
     },
     modalHeaderTitle: {
-        fontSize: 22,
-        fontWeight: '900',
+        fontSize: 20,
+        fontFamily: FontFamily.bold,
         color: '#FFFFFF',
-        letterSpacing: 0.7,
-        textShadowColor: 'rgba(0, 0, 0, 0.4)',
-        textShadowOffset: { width: 0, height: 2 },
-        textShadowRadius: 5,
-        fontFamily: 'System',
-        lineHeight: 26,
+        letterSpacing: 0.3,
     },
     modalCloseBtn: {
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -707,9 +861,9 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         paddingHorizontal: 24,
         borderRadius: 16,
-        shadowColor: '#10B981',
+        shadowColor: '#6344D4',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.25,
         shadowRadius: 12,
         elevation: 8,
     },

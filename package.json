@@ -1,7 +1,7 @@
 {
   "name": "exam-frontend",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "scripts": {
     "start": "node scripts/start-lan.js",
     "start:lan": "node scripts/start-lan.js",

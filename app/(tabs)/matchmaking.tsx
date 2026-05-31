@@ -2,6 +2,7 @@ import { QuizTheme } from '@/constants/QuizTheme';
 import { FontFamily } from '@/constants/Typography';
 import { WEBSOCKET_CONFIG } from '@/constants/websocket';
 import { useAuth } from '@/context/AuthContext';
+import { markReadyForNewMatch } from '@/utils/battleQuizSession';
 import { SoundManager } from '@/utils/sounds';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -105,12 +106,24 @@ export default function MatchmakingScreen() {
   const category = params.category as string;
   const mode = params.mode as string;
   const amount = params.amount as string;
+  const session = params.session as string;
   const navigation = useNavigation();
 
-  // Reset matchmaking state when screen gains focus (helps when returning from a finished match)
+  const detachMatchmakingListeners = (s: Socket | null | undefined) => {
+    if (!s) return;
+    s.off('matchmaking_update');
+    s.off('opponent_found');
+    s.off('match_starting');
+    s.off('match_ready');
+    s.off('matchmaking_error');
+    s.off('opponent_cancelled');
+    s.off('pong');
+    s.off('connect_error');
+  };
+
+  // Clear timers when screen loses focus — do NOT auto-rejoin matchmaking
   useEffect(() => {
-    const onFocus = () => {
-      // clear timers and retries
+    const onBlur = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -123,53 +136,48 @@ export default function MatchmakingScreen() {
         clearTimeout(pendingRetryTimeoutRef.current);
         pendingRetryTimeoutRef.current = null;
       }
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-        setSearchTimeout(null);
-      }
-      hasStartedSearch.current = false;
-      matchStartRetriesRef.current = 0;
-      setMatchmakingState({
-        status: 'searching',
-        timeElapsed: 0,
-        estimatedWait: 30
-      });
-      setError(null);
-
-      // Re-start matchmaking when returning to this screen
-      const s = socketRef.current;
-      if (s?.connected && category) {
-        searchStartTime.current = Date.now();
-        hasStartedSearch.current = true;
-
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setMatchmakingState(prev => ({
-            ...prev,
-            timeElapsed: Math.floor((Date.now() - searchStartTime.current) / 1000)
-          }));
-        }, 1000);
-
-        if (user?.id) s.emit('register_user', user.id);
-        s.emit('join_matchmaking', {
-          categoryId: category,
-          mode: mode || 'quick',
-          amount: amount ? parseFloat(amount) : undefined
-        });
-
-        const timeout = setTimeout(() => {
-          setError('No opponent found within 2 minutes. Please try again.');
-          setMatchmakingState(prev => ({ ...prev, status: 'error' }));
-        }, 120000);
-        setSearchTimeout(timeout);
-      }
     };
 
-    const unsub = navigation?.addListener?.('focus', onFocus);
+    const unsub = navigation?.addListener?.('blur', onBlur);
     return () => {
-      try { unsub(); } catch (err) {}
+      try { unsub?.(); } catch (err) {}
     };
-  }, [navigation, searchTimeout, category, mode, amount, user?.id]);
+  }, [navigation]);
+
+  // Fresh matchmaking session — cancel stale queue, clear listeners, reset UI
+  useEffect(() => {
+    markReadyForNewMatch();
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setSearchTimeout((prev) => {
+      if (prev) clearTimeout(prev);
+      return null;
+    });
+
+    const s = socketRef.current;
+    detachMatchmakingListeners(s);
+    if (s?.connected) {
+      s.emit('cancel_matchmaking');
+    }
+
+    hasStartedSearch.current = false;
+    matchStartRetriesRef.current = 0;
+    setCountdown(3);
+    setMatchmakingState({
+      status: 'searching',
+      timeElapsed: 0,
+      estimatedWait: 30,
+    });
+    setError(null);
+    searchStartTime.current = Date.now();
+  }, [category, amount, mode, session]);
 
 
 
@@ -393,8 +401,6 @@ export default function MatchmakingScreen() {
     });
 
     socket.on('match_ready', (data: { matchId: string; roomCode?: string }) => {
-
-      
       // Clear timers
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -410,21 +416,21 @@ export default function MatchmakingScreen() {
         clearTimeout(searchTimeout);
         setSearchTimeout(null);
       }
-      
-      // Navigate to battle
-      if (data.roomCode) {
 
-        router.push({
-          pathname: '/(tabs)/battle-room',
-          params: { roomCode: data.roomCode }
-        } as any);
-      } else {
+      // Lock search — detach listeners only; keep socket alive until battle-room opens
+      hasStartedSearch.current = true;
+      detachMatchmakingListeners(socket);
 
-        router.push({
-          pathname: '/(tabs)/battle-room',
-          params: { matchId: data.matchId }
-        } as any);
-      }
+      const battleParams: Record<string, string> = {
+        session: Date.now().toString(),
+      };
+      if (data.matchId) battleParams.matchId = data.matchId;
+      if (data.roomCode) battleParams.roomCode = data.roomCode;
+
+      router.push({
+        pathname: '/(tabs)/battle-room',
+        params: battleParams,
+      } as any);
     });
 
     socket.on('matchmaking_error', (data: { message: string }) => {
@@ -458,15 +464,9 @@ export default function MatchmakingScreen() {
         countdownRef.current = null;
       }
       
-      // Clean up socket listeners
-      socket.off('matchmaking_update');
-      socket.off('opponent_found');
-      socket.off('match_starting');
-      socket.off('match_ready');
-      socket.off('matchmaking_error');
-      socket.off('opponent_cancelled');
+      detachMatchmakingListeners(socket);
     };
-  }, [socket, isConnected, category, mode, amount, router, user?.id]);
+  }, [socket, isConnected, category, mode, amount, session, router, user?.id]);
 
   // Enhanced animations
   useEffect(() => {
@@ -589,9 +589,6 @@ export default function MatchmakingScreen() {
   // 🧹 Cleanup on component unmount
   useEffect(() => {
     return () => {
-
-      
-      // Clear timers
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -602,13 +599,13 @@ export default function MatchmakingScreen() {
         setSearchTimeout(null);
       }
       
-      // Reset state
       hasStartedSearch.current = false;
       
-      // Disconnect socket if needed
-      if (socket && socket.connected) {
-
-        socket.disconnect();
+      const s = socketRef.current;
+      if (s?.connected) {
+        s.emit('cancel_matchmaking');
+        detachMatchmakingListeners(s);
+        s.disconnect();
       }
     };
   }, [socket]);

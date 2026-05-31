@@ -1,15 +1,15 @@
+import { HomeTheme } from '@/constants/HomeTheme';
 import { QuizTheme } from '@/constants/QuizTheme';
 import { FontFamily } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
-import { Calendar } from 'lucide-react-native';
+import { ArrowRight, Calendar, HelpCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-    Animated,
     Dimensions,
-    Easing,
     Image,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -23,24 +23,6 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const QuestionOfTheDayPreview = ({ variant = 'default' }: { variant?: 'default' | 'quiz' }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [timerElement, setTimerElement] = useState<React.ReactNode>(null);
-  
-  // Animated values for background elements
-  const animatedValue1 = useRef(new Animated.Value(0)).current;
-  const animatedValue2 = useRef(new Animated.Value(0)).current;
-  const animatedValue3 = useRef(new Animated.Value(0)).current;
-  const pulseValue = useRef(new Animated.Value(1)).current;
-  const progressRing = useRef(new Animated.Value(0)).current;
-  const dailyIndicator = useRef(new Animated.Value(0)).current;
-  const sparkleAnim1 = useRef(new Animated.Value(0)).current;
-  const sparkleAnim2 = useRef(new Animated.Value(0)).current;
-  const sparkleAnim3 = useRef(new Animated.Value(0)).current;
-  const sparkleAnim4 = useRef(new Animated.Value(0)).current;
-  const floatingAnim1 = useRef(new Animated.Value(0)).current;
-  const floatingAnim2 = useRef(new Animated.Value(0)).current;
-  const floatingAnim3 = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   const openModal = () => {
     setIsModalVisible(true);
@@ -50,279 +32,15 @@ const QuestionOfTheDayPreview = ({ variant = 'default' }: { variant?: 'default' 
     setIsModalVisible(false);
   };
 
-  // Start background animations
+  // Legacy animations removed for cleaner home card
   useEffect(() => {
-    const startAnimations = () => {
-      // Floating animation for pattern circles
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animatedValue1, {
-            toValue: 1,
-            duration: 3000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(animatedValue1, {
-            toValue: 0,
-            duration: 3000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+    if (variant !== '__legacy__') return;
+  }, [variant]);
 
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animatedValue2, {
-            toValue: 1,
-            duration: 4000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(animatedValue2, {
-            toValue: 0,
-            duration: 4000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animatedValue3, {
-            toValue: 1,
-            duration: 5000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(animatedValue3, {
-            toValue: 0,
-            duration: 5000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Pulse animation for main icon
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseValue, {
-            toValue: 1.1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseValue, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Progress ring animation (daily progress)
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(progressRing, {
-            toValue: 1,
-            duration: 3000,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(progressRing, {
-            toValue: 0,
-            duration: 1000,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Daily indicator blinking
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(dailyIndicator, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dailyIndicator, {
-            toValue: 0.3,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Enhanced Sparkle animations
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(sparkleAnim1, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(sparkleAnim1, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(400),
-          Animated.timing(sparkleAnim2, {
-            toValue: 1,
-            duration: 1300,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(sparkleAnim2, {
-            toValue: 0,
-            duration: 1300,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(800),
-          Animated.timing(sparkleAnim3, {
-            toValue: 1,
-            duration: 1700,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(sparkleAnim3, {
-            toValue: 0,
-            duration: 1700,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(1200),
-          Animated.timing(sparkleAnim4, {
-            toValue: 1,
-            duration: 1600,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(sparkleAnim4, {
-            toValue: 0,
-            duration: 1600,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Enhanced Floating particles
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatingAnim1, {
-            toValue: 1,
-            duration: 4000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatingAnim1, {
-            toValue: 0,
-            duration: 4000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(1000),
-          Animated.timing(floatingAnim2, {
-            toValue: 1,
-            duration: 3500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatingAnim2, {
-            toValue: 0,
-            duration: 3500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(2000),
-          Animated.timing(floatingAnim3, {
-            toValue: 1,
-            duration: 3000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(floatingAnim3, {
-            toValue: 0,
-            duration: 3000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Continuous rotation
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 6000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
-
-      // Glow pulse effect
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Shimmer sweep effect
-      Animated.loop(
-        Animated.timing(shimmerAnim, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
-    };
-
-    startAnimations();
-  }, []);
+  const todayLabel = new Date().toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  });
 
   return (
     <>
@@ -354,290 +72,39 @@ const QuestionOfTheDayPreview = ({ variant = 'default' }: { variant?: 'default' 
           </LinearGradient>
         </TouchableOpacity>
       ) : (
-      <>
-      {/* Compact Enhanced Preview Section */}
-      <View style={styles.previewContainer}>
-                        <LinearGradient
-                          colors={['#EA580C', '#F97316', '#FB923C']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.previewGradient}
-                        >
-          {/* Enhanced Animated Background Pattern */}
-          <View style={styles.backgroundPattern}>
-            <Animated.View 
-              style={[
-                styles.patternCircle1,
-                {
-                  transform: [{
-                    translateY: animatedValue1.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -15],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.patternCircle2,
-                {
-                  transform: [{
-                    translateY: animatedValue2.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -20],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.patternCircle3,
-                {
-                  transform: [{
-                    translateY: animatedValue3.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0, -25],
-                    })
-                  }]
-                }
-              ]} 
-            />
-
-            {/* Enhanced Sparkle Elements */}
-            <Animated.View 
-              style={[
-                styles.sparkleElement1,
-                {
-                  opacity: sparkleAnim1,
-                  transform: [{
-                    scale: sparkleAnim1.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.5, 1.5],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.sparkleElement2,
-                {
-                  opacity: sparkleAnim2,
-                  transform: [{
-                    scale: sparkleAnim2.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.3, 1.2],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.sparkleElement3,
-                {
-                  opacity: sparkleAnim3,
-                  transform: [{
-                    scale: sparkleAnim3.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.6, 1.4],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.sparkleElement4,
-                {
-                  opacity: sparkleAnim4,
-                  transform: [{
-                    scale: sparkleAnim4.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.4, 1.3],
-                    })
-                  }]
-                }
-              ]} 
-            />
-
-            {/* Enhanced Floating Particles */}
-            <Animated.View 
-              style={[
-                styles.floatingParticle1,
-                {
-                  opacity: floatingAnim1.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, 1, 0],
-                  }),
-                  transform: [
-                    {
-                      translateY: floatingAnim1.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -40],
-                      })
-                    },
-                    {
-                      translateX: floatingAnim1.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 20],
-                      })
-                    }
-                  ]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.floatingParticle2,
-                {
-                  opacity: floatingAnim2.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, 1, 0],
-                  }),
-                  transform: [
-                    {
-                      translateY: floatingAnim2.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -35],
-                      })
-                    },
-                    {
-                      translateX: floatingAnim2.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -15],
-                      })
-                    }
-                  ]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.floatingParticle3,
-                {
-                  opacity: floatingAnim3.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0, 1, 0],
-                  }),
-                  transform: [
-                    {
-                      translateY: floatingAnim3.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -30],
-                      })
-                    },
-                    {
-                      translateX: floatingAnim3.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, 25],
-                      })
-                    }
-                  ]
-                }
-              ]} 
-            />
-
-            {/* Rotating Ring */}
-            <Animated.View 
-              style={[
-                styles.rotatingRing,
-                {
-                  transform: [{
-                    rotate: rotateAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    })
-                  }]
-                }
-              ]} 
-            />
-
-            {/* Glowing Orbs */}
-            <Animated.View 
-              style={[
-                styles.glowOrb1,
-                {
-                  opacity: glowAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.3, 1, 0.3],
-                  }),
-                  transform: [{
-                    scale: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1.2],
-                    })
-                  }]
-                }
-              ]} 
-            />
-            <Animated.View 
-              style={[
-                styles.glowOrb2,
-                {
-                  opacity: glowAnim.interpolate({
-                    inputRange: [0, 0.5, 1],
-                    outputRange: [0.2, 0.8, 0.2],
-                  }),
-                  transform: [{
-                    scale: glowAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1.2, 0.8],
-                    })
-                  }]
-                }
-              ]} 
-            />
-
-            {/* Shimmer Effect */}
-            <Animated.View 
-              style={[
-                styles.shimmerBar,
-                {
-                  transform: [{
-                    translateX: shimmerAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-150, 500],
-                    })
-                  }]
-                }
-              ]} 
-            />
-
-            <View style={styles.patternDots} />
-          </View>
-
-          <View style={styles.previewContent}>
-            <View style={styles.largeImageContainer}>
-              <Image 
-                source={require('../assets/images/icons/question-girl.png')}
-                style={styles.largeQuestionGirlIcon}
-                resizeMode="contain"
-              />
-            </View>
-            <View style={styles.previewLeft}>
-              <View style={styles.previewTextContainer}>
-                <View style={styles.titleWithButtonRow}>
-                  <Text style={styles.previewTitle} numberOfLines={1}>Question of the Day</Text>
-                  <TouchableOpacity style={styles.rightViewButton} onPress={openModal}>
-                    <LinearGradient
-                      colors={['#DB2777', '#BE185D']}
-                      style={styles.rightViewButtonGradient}
-                    >
-                      <Text style={styles.viewButtonText}>View</Text>
-                      <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                    </LinearGradient>
-                  </TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.92} onPress={openModal} style={homePreviewStyles.wrap}>
+          <LinearGradient
+            colors={['#EA580C', '#F97316', '#FB923C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={homePreviewStyles.card}
+          >
+            <View style={homePreviewStyles.orb} />
+            <View style={homePreviewStyles.row}>
+              <View style={homePreviewStyles.left}>
+                <View style={homePreviewStyles.dailyBadge}>
+                  <Calendar size={12} color="#FFF" strokeWidth={2.2} />
+                  <Text style={homePreviewStyles.dailyText}>DAILY · {todayLabel}</Text>
                 </View>
-                <Text style={styles.previewSubtitle}>Test your knowledge daily!</Text>
+                <Text style={homePreviewStyles.title}>Question of the Day</Text>
+                <Text style={homePreviewStyles.sub} numberOfLines={1}>
+                  Test your knowledge daily!
+                </Text>
+                <View style={homePreviewStyles.cta}>
+                  <Text style={homePreviewStyles.ctaText}>Solve Now</Text>
+                  <ArrowRight size={14} color="#FFF" strokeWidth={2.5} />
+                </View>
+              </View>
+              <View style={homePreviewStyles.imageClip}>
+                <Image
+                  source={require('../assets/images/icons/question-girl.png')}
+                  style={homePreviewStyles.image}
+                  resizeMode="contain"
+                />
               </View>
             </View>
-          </View>
-        </LinearGradient>
-      </View>
-      </>
+          </LinearGradient>
+        </TouchableOpacity>
       )}
 
       {/* Enhanced Modal */}
@@ -650,22 +117,24 @@ const QuestionOfTheDayPreview = ({ variant = 'default' }: { variant?: 'default' 
         <View style={styles.centeredOverlay}>
           <View style={styles.centeredCard}>
             <LinearGradient
-              colors={['#6366F1', '#7C3AED', '#8B5CF6']}
+              colors={[...HomeTheme.heroCta]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.cardGradient}
             >
-              {/* Modal Header - compact */}
               <View style={styles.modalHeader}>
                 <View style={styles.headerContent}>
-                  {timerElement}
+                  <View style={styles.modalHeaderIcon}>
+                    <HelpCircle size={18} color="#FFF" strokeWidth={2.2} />
+                  </View>
                   <View style={styles.headerText}>
+                    {timerElement}
                     <Text style={styles.modalTitle} numberOfLines={1}>Question of the Day</Text>
-                    <Text style={styles.modalSubtitle} numberOfLines={1}>Test your knowledge daily</Text>
+                    <Text style={styles.modalSubtitle} numberOfLines={1}>Daily challenge · {todayLabel}</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeButton} onPress={closeModal} activeOpacity={0.8}>
-                  <Ionicons name="close" size={20} color="#64748B" />
+                  <Ionicons name="close" size={20} color={HomeTheme.ink} />
                 </TouchableOpacity>
               </View>
 
@@ -1015,6 +484,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
+  modalHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
   headerIcon: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: 12,
@@ -1257,6 +735,121 @@ const quizBannerStyles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: 11,
     color: '#FFFFFF',
+  },
+});
+
+const homePreviewStyles = StyleSheet.create({
+  wrap: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 88, 12, 0.25)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#EA580C',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 14,
+      },
+      android: { elevation: 6 },
+    }),
+  },
+  card: {
+    borderRadius: 20,
+    paddingTop: 14,
+    paddingBottom: 0,
+    paddingLeft: 16,
+    paddingRight: 0,
+    minHeight: 142,
+    overflow: 'hidden',
+  },
+  orb: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    top: -20,
+    right: 40,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  left: { flex: 1, paddingRight: 6, minWidth: 0, zIndex: 1, paddingBottom: 14 },
+  dailyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#B91C1C',
+  },
+  dailyText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 10,
+    color: '#FFF',
+    marginLeft: 5,
+    letterSpacing: 0.3,
+  },
+  title: {
+    fontFamily: FontFamily.bold,
+    fontSize: 17,
+    color: '#FFF',
+    marginBottom: 4,
+    lineHeight: Platform.OS === 'android' ? 24 : 22,
+  },
+  sub: {
+    fontFamily: FontFamily.medium,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.92)',
+    marginBottom: 10,
+    lineHeight: Platform.OS === 'android' ? 18 : 16,
+  },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  ctaText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 12,
+    color: '#FFF',
+    marginRight: 4,
+  },
+  imageClip: {
+    alignSelf: 'flex-end',
+    width: 114,
+    height: 152,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: -12,
+    marginRight: -2,
+    overflow: 'hidden',
+  },
+  image: {
+    width: 150,
+    height: 150,
   },
 });
 
