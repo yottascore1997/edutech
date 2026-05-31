@@ -1,7 +1,7 @@
 {
   "name": "exam-frontend",
   "main": "expo-router/entry",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "scripts": {
     "start": "node scripts/start-lan.js",
     "start:lan": "node scripts/start-lan.js",
@@ -50,7 +50,6 @@
     "expo-modules-core": "^3.0.29",
     "expo-notifications": "~0.32.14",
     "expo-router": "~6.0.23",
-    "expo-screen-capture": "~8.0.9",
     "expo-secure-store": "~15.0.8",
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.12",
