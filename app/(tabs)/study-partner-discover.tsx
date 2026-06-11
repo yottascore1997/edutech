@@ -83,8 +83,7 @@ export default function StudyPartnerDiscoverScreen() {
         setIndex(0);
       } catch (e: any) {
         if (!isMounted) return;
-        console.error('StudyPartnerDiscover load error:', e);
-        setError('Unable to load profiles. Please try again.');
+                setError('Unable to load profiles. Please try again.');
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -185,8 +184,7 @@ export default function StudyPartnerDiscoverScreen() {
 
       setIndex(prev => prev + 1);
     } catch (e: any) {
-      console.error('StudyPartnerDiscover action error:', e);
-      setError('Something went wrong. Please try again.');
+            setError('Something went wrong. Please try again.');
     } finally {
       setActionLoading(false);
     }

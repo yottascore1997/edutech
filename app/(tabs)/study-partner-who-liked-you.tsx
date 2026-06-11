@@ -74,8 +74,7 @@ export default function StudyPartnerWhoLikedYouScreen() {
       setList(mapped);
       setLikesCount(mapped.length);
     } catch (e: any) {
-      console.error('StudyPartnerWhoLikedYou load error:', e);
-      setError('Unable to load data. Please try again.');
+            setError('Unable to load data. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,8 +111,7 @@ export default function StudyPartnerWhoLikedYouScreen() {
         return next;
       });
     } catch (e: any) {
-      console.error('StudyPartnerWhoLikedYou like back error:', e);
-      setError('Failed to like back. Please try again.');
+            setError('Failed to like back. Please try again.');
     }
   };
 

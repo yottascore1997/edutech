@@ -48,8 +48,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     // Set up global event handlers
     webSocketService.on('onConnect', () => {
-      console.log('WebSocket connected globally');
-      setIsConnected(true);
+            setIsConnected(true);
       // Register user automatically when connected
       if (user?.id) {
         webSocketService.registerUser(user.id);
@@ -57,8 +56,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     });
 
     webSocketService.on('onDisconnect', () => {
-      console.log('WebSocket disconnected globally');
-      setIsConnected(false);
+            setIsConnected(false);
     });
 
     webSocketService.on('onError', (error: any) => {

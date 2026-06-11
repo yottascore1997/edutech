@@ -1,5 +1,6 @@
 import KYCDocumentForm from '@/components/KYCDocumentForm';
 import RazorpayPaymentModal from '@/components/RazorpayPaymentModal';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { apiFetchAuth } from '@/constants/api';
 import { HomeTheme } from '@/constants/HomeTheme';
 import { FontFamily } from '@/constants/Typography';
@@ -58,10 +59,14 @@ function formatDate(dateString: string) {
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
-  const { refreshWalletAmount } = useWallet();
+  const { refreshWalletAmount, walletAmount } = useWallet();
   const router = useRouter();
+  const { beginFetch, endFetch, shouldBlockUI } = useScreenLoadState();
 
-  const [walletData, setWalletData] = React.useState<{ balance: number; transactions: Transaction[] } | null>(null);
+  const [walletData, setWalletData] = React.useState<{ balance: number; transactions: Transaction[] } | null>(() => ({
+    balance: Number.parseFloat(walletAmount) || 0,
+    transactions: [],
+  }));
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -77,7 +82,7 @@ export default function WalletScreen() {
       return;
     }
     try {
-      setLoading(true);
+      beginFetch(setLoading, setRefreshing);
       const response = await apiFetchAuth('/student/wallet', user.token);
       if (response.ok) {
         setWalletData({
@@ -96,9 +101,9 @@ export default function WalletScreen() {
         setError(err.data?.message || 'Failed to fetch wallet data.');
       }
     } finally {
-      setLoading(false);
+      endFetch(setLoading, setRefreshing);
     }
-  }, [user, logout]);
+  }, [user, logout, beginFetch, endFetch]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -168,7 +173,7 @@ export default function WalletScreen() {
     setRazorpayModalVisible(false);
   };
 
-  if (loading) {
+  if (shouldBlockUI(loading)) {
     return (
       <View style={styles.centered}>
         <StatusBar barStyle="dark-content" />
@@ -379,6 +384,7 @@ export default function WalletScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+              {/* Deposit Now — disabled; use Razorpay only
               <TouchableOpacity
                 style={[styles.primaryBtn, depositLoading && styles.btnDisabled]}
                 onPress={handleDeposit}
@@ -395,6 +401,7 @@ export default function WalletScreen() {
                 <Text style={styles.orText}>OR</Text>
                 <View style={styles.orLine} />
               </View>
+              */}
               <TouchableOpacity
                 style={styles.razorpayBtn}
                 onPress={() => {

@@ -238,8 +238,7 @@ const JobCompetitionBanner: React.FC<JobCompetitionBannerProps> = ({ onPress }) 
     if (onPress) {
       onPress();
     } else {
-      console.log('Job Competition banner pressed');
-    }
+          }
   };
 
   return (

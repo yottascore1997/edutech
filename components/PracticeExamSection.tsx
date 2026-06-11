@@ -125,8 +125,7 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
         setExams(response.data);
       }
     } catch (error) {
-      console.error('Error fetching practice exams:', error);
-      Alert.alert('Error', 'Failed to load practice exams. Please try again.');
+            Alert.alert('Error', 'Failed to load practice exams. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -241,8 +240,7 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
     try {
       return getImageUrlFromApi(logoUrl);
     } catch (error) {
-      console.error('Error getting image URL:', error);
-      return null;
+            return null;
     }
   };
 
@@ -368,11 +366,9 @@ const PracticeExamSection = forwardRef<any, {}>((props, ref) => {
                               style={{ width: 48, height: 48, borderRadius: 8 }}
                               resizeMode="cover"
                               onError={(error) => {
-                                console.error('❌ Image load error for category:', category.name, 'URL:', category.categoryLogoUrl, 'Processed URL:', getImageUrl(category.categoryLogoUrl));
-                              }}
+                                                              }}
                               onLoad={() => {
-                                console.log('✅ Image loaded successfully for category:', category.name, 'URL:', category.categoryLogoUrl);
-                              }}
+                                                              }}
                             />
                           ) : (
                             <Ionicons 

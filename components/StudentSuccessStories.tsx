@@ -138,8 +138,7 @@ export default function StudentSuccessStories() {
         if (mapped.length > 0) setStories(mapped);
       }
     } catch (e) {
-      console.warn('Success stories API not available, using defaults:', e);
-      setError(null);
+            setError(null);
       setStories(defaultStories);
     } finally {
       setLoading(false);

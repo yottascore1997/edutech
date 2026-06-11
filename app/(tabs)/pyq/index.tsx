@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { PYQExam } from '@/types/pyq';
 import { fetchPYQList } from '@/utils/pyqApi';
 import { Ionicons } from '@expo/vector-icons';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -132,12 +133,12 @@ export default function PYQListScreen() {
   const [examTypeFilter, setExamTypeFilter] = useState('');
   const [activeChip, setActiveChip] = useState<string>('All');
   const [fadeAnim] = useState(new Animated.Value(0));
+  const { beginFetch, endFetch, hasLoadedOnceRef } = useScreenLoadState();
 
   const loadList = useCallback(
     async (refresh = false, overrides?: { examType?: string; year?: string }) => {
       if (!user?.token) return;
-      if (refresh) setRefreshing(true);
-      else setLoading(true);
+      beginFetch(setLoading, setRefreshing, { refresh });
       setError(null);
       try {
         const typeVal = overrides?.examType ?? examTypeFilter;
@@ -152,14 +153,13 @@ export default function PYQListScreen() {
         const msg = e instanceof Error ? e.message : 'Failed to load';
         setError(msg);
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        endFetch(setLoading, setRefreshing);
       }
     },
-    [user?.token, yearFilter, examTypeFilter, fadeAnim]
+    [user?.token, yearFilter, examTypeFilter, fadeAnim, beginFetch, endFetch]
   );
 
-  useFocusEffect(useCallback(() => { loadList(false); }, [loadList]));
+  useFocusEffect(useCallback(() => { loadList(hasLoadedOnceRef.current); }, [loadList]));
 
   const firstName = user?.name?.split(' ')[0];
 

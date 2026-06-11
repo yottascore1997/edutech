@@ -185,8 +185,7 @@ export default function ReferScreen() {
         Alert.alert('Error', 'Failed to load referral data.');
       }
     } catch (error) {
-      console.error('Error fetching referral data:', error);
-      Alert.alert('Error', 'Failed to load referral data. Please try again.');
+            Alert.alert('Error', 'Failed to load referral data. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -205,8 +204,7 @@ export default function ReferScreen() {
         Alert.alert('Error', 'Failed to generate referral code. Please try again.');
       }
     } catch (error) {
-      console.error('Error generating referral code:', error);
-      Alert.alert('Error', 'Failed to generate referral code. Please try again.');
+            Alert.alert('Error', 'Failed to generate referral code. Please try again.');
     } finally {
       setGeneratingCode(false);
     }

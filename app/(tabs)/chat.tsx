@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -49,14 +50,23 @@ export default function ChatScreen() {
   } = useWebSocket();
 
   const route = useRoute();
-  const { userId, userName, messages: initialMessages } = route.params as { 
-    userId: string; 
-    userName: string; 
-    messages: any[] 
+  const searchParams = useLocalSearchParams<{
+    userId?: string;
+    userName?: string;
+    messages?: string;
+  }>();
+  const routeParams = (route.params ?? {}) as {
+    userId?: string;
+    userName?: string;
+    messages?: Message[];
   };
-  
+  const userId = searchParams.userId ?? routeParams.userId;
+  const userName = searchParams.userName ?? routeParams.userName ?? 'User';
+  const initialMessages = routeParams.messages;
+  const hasChatTarget = Boolean(userId);
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasChatTarget);
 
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -99,8 +109,7 @@ export default function ChatScreen() {
           setMessages([]);
         }
       } catch (error) {
-        console.error('❌ Error fetching messages:', error);
-        setMessages([]);
+                setMessages([]);
       } finally {
         setLoading(false);
       }
@@ -324,13 +333,11 @@ export default function ChatScreen() {
            }
         }
       } else {
-        console.error('API error:', response);
-        // Error case mai optimistic message remove karta hai
+                // Error case mai optimistic message remove karta hai
         setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
       }
     } catch (error) {
-      console.error('Send message error:', error);
-      // Error case mai optimistic message remove karta hai
+            // Error case mai optimistic message remove karta hai
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
     } finally {
       setSending(false);
@@ -376,8 +383,7 @@ export default function ChatScreen() {
         Alert.alert('Error', 'Failed to delete message. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting message:', error);
-      Alert.alert('Error', 'Failed to delete message. Please try again.');
+            Alert.alert('Error', 'Failed to delete message. Please try again.');
     } finally {
       setDeleting(false);
     }
@@ -406,13 +412,7 @@ export default function ChatScreen() {
 
   // Render message
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
-    console.log(`🎨 Rendering message ${index}:`, {
-      content: item.content,
-      senderId: item.senderId,
-      isMyMessage: item.senderId === user?.id,
-      user: user?.id
-    });
-    
+        
     const isMyMessage = item.senderId === user?.id;
     const showTime = index === messages.length - 1 || 
       new Date(messages[index + 1]?.createdAt).getTime() - new Date(item.createdAt).getTime() > 300000;
@@ -494,6 +494,10 @@ export default function ChatScreen() {
       </View>
     );
   };
+
+  if (!hasChatTarget) {
+    return null;
+  }
 
   return (
     <KeyboardAvoidingView

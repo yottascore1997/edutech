@@ -203,7 +203,7 @@ export default function TransactionsScreen() {
       <View style={styles.centered}>
         <Ionicons name="person-circle-outline" size={56} color={C.inkMuted} />
         <Text style={styles.msgText}>Please log in to view transactions</Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/login')}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/phone-login')}>
           <Text style={styles.primaryBtnText}>Go to Login</Text>
         </TouchableOpacity>
       </View>

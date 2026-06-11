@@ -214,7 +214,7 @@ export default function LiveQuizPlayScreen() {
           return;
         }
         setCurrentQuestion(q);
-        setQuestionEndsAt(endsAtMs);
+          setQuestionEndsAt(endsAtMs);
         refetchedAtZeroForQuestionRef.current = null;
       }
       if (Array.isArray(data.leaderboard)) {
@@ -334,13 +334,13 @@ export default function LiveQuizPlayScreen() {
       endsAtMs: number | null,
       opts: { fromRoundStart?: boolean; delayFeedback?: boolean },
     ) => {
-      const prevIndex = currentQuestionRef.current?.questionIndex;
+        const prevIndex = currentQuestionRef.current?.questionIndex;
       const newIndex = q.questionIndex;
-      const justAnswered = lastAnsweredQuestionIndexRef.current;
+        const justAnswered = lastAnsweredQuestionIndexRef.current;
 
       setBetweenRounds(false);
 
-      const shouldDelayForFeedback =
+        const shouldDelayForFeedback =
         !!opts.delayFeedback &&
         justAnswered !== null &&
         prevIndex !== undefined &&
@@ -351,10 +351,10 @@ export default function LiveQuizPlayScreen() {
         setCurrentQuestion(q);
         setAnswerFeedback(null);
         setCorrectAnswerIndex(null);
-        setQuestionEndsAt(endsAtMs);
-        lastAnsweredQuestionIndexRef.current = null;
-        refetchedAtZeroForQuestionRef.current = null;
-      };
+          setQuestionEndsAt(endsAtMs);
+          lastAnsweredQuestionIndexRef.current = null;
+          refetchedAtZeroForQuestionRef.current = null;
+        };
 
       // Server catch-up: skip intermediate questions (only show latest)
       if (
@@ -368,10 +368,10 @@ export default function LiveQuizPlayScreen() {
         return;
       }
 
-      if (shouldDelayForFeedback) {
-        if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
+        if (shouldDelayForFeedback) {
+          if (nextQuestionDelayTimerRef.current) clearTimeout(nextQuestionDelayTimerRef.current);
         nextQuestionDelayTimerRef.current = setTimeout(apply, NEXT_QUESTION_DELAY_MS);
-      } else {
+        } else {
         if (catchUpDebounceRef.current) {
           clearTimeout(catchUpDebounceRef.current);
           catchUpDebounceRef.current = null;
@@ -459,9 +459,9 @@ export default function LiveQuizPlayScreen() {
       if (payload?.session) {
         applySocketSession(payload.session, true);
       } else {
-        setAnsweredMap({});
-        setAnswerFeedback(null);
-        setCorrectAnswerIndex(null);
+      setAnsweredMap({});
+      setAnswerFeedback(null);
+      setCorrectAnswerIndex(null);
         lastAnsweredQuestionIndexRef.current = null;
       }
       handleState(payload);

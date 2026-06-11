@@ -10,6 +10,7 @@ import {
 } from '@/utils/joinedLiveExams';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -47,14 +48,15 @@ export default function ExamScreen() {
     const [categories, setCategories] = useState<string[]>([]);
     const [remainingTime, setRemainingTime] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const { beginFetch, endFetch, shouldBlockUI } = useScreenLoadState();
 
-    const fetchExams = async () => {
+    const fetchExams = async (refresh = false) => {
         if (!user?.token) {
             setLoading(false);
             return;
         }
         try {
-            setLoading(true);
+            beginFetch(setLoading, setRefreshing, { refresh });
             const response = await apiFetchAuth('/student/exams', user.token);
             const joinedIds =
                 user.id ? await syncJoinedLiveExamIds(user.token, String(user.id)) : [];
@@ -84,19 +86,15 @@ export default function ExamScreen() {
         } catch (err: any) {
             setError(err.data?.message || 'An unknown error occurred');
         } finally {
-            setLoading(false);
+            endFetch(setLoading, setRefreshing);
         }
     };
 
     const onRefresh = async () => {
-        setRefreshing(true);
         try {
-            await fetchExams();
+            await fetchExams(true);
         } catch (e) {
-            console.error('Error refreshing:', e);
-        } finally {
-            setRefreshing(false);
-        }
+                    }
     };
 
     useEffect(() => {
@@ -162,7 +160,7 @@ export default function ExamScreen() {
         setFilteredExams(filtered);
     }, [globalCategory, selectedCategory, exams, searchQuery, joinedLiveExamIds, user?.id]);
 
-    if (loading) {
+    if (shouldBlockUI(loading)) {
         return (
             <View style={styles.centered}>
                 <StatusBar barStyle="dark-content" />

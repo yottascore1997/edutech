@@ -116,8 +116,7 @@ export default function CreatePost({ visible, onClose, onPostCreated }: CreatePo
         setImage(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -196,8 +195,7 @@ export default function CreatePost({ visible, onClose, onPostCreated }: CreatePo
           const uploadedImageUrl = await uploadFile(image, user?.token || '');
           imageUrl = uploadedImageUrl;
         } catch (uploadError) {
-          console.error('Upload error:', uploadError);
-          Alert.alert('Error', 'Failed to upload image. Please try again.');
+                    Alert.alert('Error', 'Failed to upload image. Please try again.');
           return;
         } finally {
           setUploadingImage(false);
@@ -243,8 +241,7 @@ export default function CreatePost({ visible, onClose, onPostCreated }: CreatePo
         Alert.alert('Error', 'Failed to create post. Please try again.');
       }
     } catch (error) {
-      console.error('Error creating post:', error);
-      Alert.alert('Error', 'Failed to create post. Please try again.');
+            Alert.alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -591,7 +588,6 @@ export default function CreatePost({ visible, onClose, onPostCreated }: CreatePo
               </View>
             )}
           </Animated.View>
-
 
           {/* Poll Options Section */}
           {postType === 'POLL' && (

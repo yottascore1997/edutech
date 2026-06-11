@@ -117,8 +117,7 @@ const OurFeaturesSection: React.FC = () => {
   }, []);
 
   const handleFeaturePress = (feature: FeatureItem) => {
-    console.log(`Navigate to ${feature.title}`);
-    router.push(feature.route as any);
+        router.push(feature.route as any);
   };
 
   const renderFeatureItem = (feature: FeatureItem, index: number, type: 'main' | 'secondary' | 'additional') => {

@@ -208,8 +208,7 @@ export default function WeeklyLeaderboardScreen() {
         setLeaderboardData(response.data);
       }
     } catch (e) {
-      console.error('Leaderboard fetch error:', e);
-    } finally {
+          } finally {
       setLoading(false);
       setRefreshing(false);
     }

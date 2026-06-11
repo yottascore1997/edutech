@@ -6,8 +6,7 @@ class RefreshManager {
 
   // Register a screen for auto-refresh
   registerScreen(screenName: string, refreshCallback: () => void, intervalMs: number = 30000) {
-    console.log(`📱 Registering ${screenName} for auto-refresh`);
-    
+        
     // Store the callback
     this.refreshCallbacks.set(screenName, refreshCallback);
     
@@ -15,8 +14,7 @@ class RefreshManager {
     const interval = setInterval(() => {
       const callback = this.refreshCallbacks.get(screenName);
       if (callback) {
-        console.log(`🔄 Auto-refreshing ${screenName}`);
-        callback();
+                callback();
       }
     }, intervalMs);
     
@@ -25,8 +23,7 @@ class RefreshManager {
 
   // Unregister a screen
   unregisterScreen(screenName: string) {
-    console.log(`📱 Unregistering ${screenName} from auto-refresh`);
-    
+        
     const interval = this.intervals.get(screenName);
     if (interval) {
       clearInterval(interval);
@@ -40,8 +37,7 @@ class RefreshManager {
   triggerRefresh(screenName: string) {
     const callback = this.refreshCallbacks.get(screenName);
     if (callback) {
-      console.log(`🔄 Manually refreshing ${screenName}`);
-      callback();
+            callback();
     }
   }
 

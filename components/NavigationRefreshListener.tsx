@@ -16,8 +16,7 @@ const NavigationRefreshListener: React.FC<NavigationRefreshListenerProps> = ({
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log(`🔄 Screen focused: ${screenName}`);
-      
+            
       // Trigger refresh for this specific screen
       refreshScreen(screenName);
       
@@ -34,8 +33,7 @@ const NavigationRefreshListener: React.FC<NavigationRefreshListenerProps> = ({
   useEffect(() => {
     const refreshKey = getRefreshKey(screenName);
     if (refreshKey > 0 && onRefresh) {
-      console.log(`🔄 Refreshing ${screenName} due to navigation`);
-      onRefresh();
+            onRefresh();
     }
   }, [getRefreshKey(screenName), screenName, onRefresh]);
 

@@ -76,8 +76,7 @@ export default function AddStory({ visible, onClose, onStoryCreated }: AddStoryP
 
       return result;
     } catch (error) {
-      console.error('Upload error:', error);
-      throw error;
+            throw error;
     }
   };
 
@@ -96,20 +95,16 @@ export default function AddStory({ visible, onClose, onStoryCreated }: AddStoryP
         body: payload,
       });
 
-
-
       if (response.ok) {
         Alert.alert('Success', 'Story created successfully!');
         onStoryCreated();
         resetForm();
         onClose();
       } else {
-        console.error('Story creation failed:', response);
-        throw new Error(`Failed to create story: ${response.status} - ${JSON.stringify(response.data)}`);
+                throw new Error(`Failed to create story: ${response.status} - ${JSON.stringify(response.data)}`);
       }
     } catch (error) {
-      console.error('Error in createStory:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Error', 'Failed to create story: ' + errorMessage);
     }
   };
@@ -134,16 +129,10 @@ export default function AddStory({ visible, onClose, onStoryCreated }: AddStoryP
       }
       
       // Then create the story
-      console.log('Creating story with payload:', {
-        mediaUrl,
-        mediaType: 'IMAGE',
-        caption: caption.trim(),
-      });
-      
+            
       await createStory(mediaUrl);
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert('Error', 'Failed to upload image or create story: ' + errorMessage);
     } finally {
       setUploading(false);

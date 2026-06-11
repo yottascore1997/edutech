@@ -56,8 +56,7 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
 
   useEffect(() => {
     if (questionData) {
-      console.log('Setting timer to:', questionData.timeLimit);
-      setTimeLeft(questionData.timeLimit);
+            setTimeLeft(questionData.timeLimit);
       // Start animations
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -102,8 +101,7 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
           );
           sound = created.sound;
         } catch (e) {
-          console.log('Primary tick sound failed, trying fallback...', e);
-          const fallback = await Audio.Sound.createAsync(
+                    const fallback = await Audio.Sound.createAsync(
             { uri: 'https://assets.mixkit.co/sfx/preview/mixkit-mechanical-click-1120.mp3' },
             { volume: 1.0, shouldPlay: false, isLooping: false }
           );
@@ -116,8 +114,7 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
         tickSoundRef.current = sound;
         setTickReady(true);
       } catch (e) {
-        console.log('Tick sound load failed:', e);
-      }
+              }
     })();
     return () => {
       isMounted = false;
@@ -129,11 +126,9 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
   }, []);
 
   useEffect(() => {
-    console.log('Timer effect - timeLeft:', timeLeft, 'isAnswered:', isAnswered, 'hasAttempted:', questionData?.hasAttempted);
-    if (timeLeft > 0 && !isAnswered && !questionData?.hasAttempted) {
+        if (timeLeft > 0 && !isAnswered && !questionData?.hasAttempted) {
       const timer = setTimeout(() => {
-        console.log('Timer tick - new timeLeft:', timeLeft - 1);
-        setTimeLeft(timeLeft - 1);
+                setTimeLeft(timeLeft - 1);
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -184,8 +179,7 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
         }
       }
     } catch (error) {
-      console.error('Error fetching question of the day:', error);
-    } finally {
+          } finally {
       setLoading(false);
     }
   };
@@ -211,26 +205,22 @@ const QuestionOfTheDay = ({ onTimerRender }: QuestionOfTheDayProps = {}) => {
       
       // After successful submission, fetch updated question data
       if (response.ok) {
-        console.log('Answer submitted successfully, fetching updated data...');
-        await fetchQuestionOfTheDay(); // Refresh the data
+                await fetchQuestionOfTheDay(); // Refresh the data
       }
     } catch (error) {
-      console.error('Error submitting answer:', error);
-    }
+          }
     
     // Show result immediately
     setShowResult(true);
   };
 
   const handleTimeout = () => {
-    console.log('Time up!');
-    setIsAnswered(true);
+        setIsAnswered(true);
     setShowResult(true);
   };
 
   const handleRefresh = () => {
-    console.log('Refreshing question...');
-    setSelectedOption(null);
+        setSelectedOption(null);
     setIsAnswered(false);
     setShowResult(false);
     setTimeLeft(0);

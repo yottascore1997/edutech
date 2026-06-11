@@ -95,8 +95,7 @@ const PracticeExamDetailsScreen = () => {
     // Fetch leaderboard when tab is clicked
     useEffect(() => {
         if (activeTab === 'Leaderboard' && id && user?.token) {
-            console.log('Leaderboard tab clicked, fetching data...');
-            fetchLeaderboard();
+                        fetchLeaderboard();
         }
     }, [activeTab, id, user?.token]);
 
@@ -109,7 +108,6 @@ const PracticeExamDetailsScreen = () => {
             }
         }, [id, user?.token])
     );
-
 
     const fetchExamDetails = async () => {
         if (!user?.token || !id) {
@@ -136,8 +134,7 @@ const PracticeExamDetailsScreen = () => {
                 Alert.alert('Error', 'Failed to load exam details.');
             }
         } catch (error) {
-            console.error('Error fetching exam details:', error);
-            Alert.alert('Error', 'Failed to load exam details. Please try again.');
+                        Alert.alert('Error', 'Failed to load exam details. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -148,10 +145,8 @@ const PracticeExamDetailsScreen = () => {
 
         try {
             setLeaderboardLoading(true);
-            console.log('Fetching practice exam leaderboard for ID:', id);
-            const response = await apiFetchAuth(`/student/practice-exams/${id}/leaderboard`, user.token);
-            console.log('Practice exam leaderboard response:', response);
-            
+                        const response = await apiFetchAuth(`/student/practice-exams/${id}/leaderboard`, user.token);
+                        
             if (response.ok) {
                 const data: LeaderboardResponse = response.data;
                 setCurrentUser(data.currentUser);
@@ -165,13 +160,11 @@ const PracticeExamDetailsScreen = () => {
                 
                 setLeaderboard(sortedLeaderboard);
             } else {
-                console.error('Failed to fetch practice exam leaderboard:', response.data);
-                setCurrentUser(null);
+                                setCurrentUser(null);
                 setLeaderboard([]);
             }
         } catch (error) {
-            console.error('Error fetching practice exam leaderboard:', error);
-            setCurrentUser(null);
+                        setCurrentUser(null);
             setLeaderboard([]);
         } finally {
             setLeaderboardLoading(false);
@@ -183,8 +176,7 @@ const PracticeExamDetailsScreen = () => {
         try {
             await Promise.all([fetchExamDetails(), fetchLeaderboard()]);
         } catch (error) {
-            console.error('Error refreshing data:', error);
-        } finally {
+                    } finally {
             setRefreshing(false);
         }
     };
@@ -206,8 +198,7 @@ const PracticeExamDetailsScreen = () => {
 
     const handleStartExam = async () => {
         if (!id || !user?.token || !exam) return;
-        console.log('Starting exam with user ID:', user.id, 'Exam ID:', id);
-        setJoiningExam(true);
+                setJoiningExam(true);
         try {
             const joinRes = await apiFetchAuth('/student/practice-exams/join', user.token, {
                 method: 'POST',
@@ -215,24 +206,21 @@ const PracticeExamDetailsScreen = () => {
                 headers: { 'Content-Type': 'application/json' },
             });
             if (joinRes.ok) {
-                console.log('Successfully joined exam');
-                setJoiningExam(false);
+                                setJoiningExam(false);
                 router.push({ pathname: '/(tabs)/practice-exam/questions', params: { id, duration: String(exam.duration) } });
             } else {
                 setJoiningExam(false);
                 Alert.alert('Error', 'Could not join the exam.');
             }
         } catch (e) {
-            console.error('Error joining exam:', e);
-            setJoiningExam(false);
+                        setJoiningExam(false);
             Alert.alert('Error', 'Could not join the exam.');
         }
     };
 
     const handleBeginExam = async () => {
         if (!id || !user?.token || !exam) return;
-        console.log('Starting exam with user ID:', user.id, 'Exam ID:', id);
-        setJoiningExam(true);
+                setJoiningExam(true);
         try {
             const joinRes = await apiFetchAuth('/student/practice-exams/join', user.token, {
                 method: 'POST',
@@ -240,8 +228,7 @@ const PracticeExamDetailsScreen = () => {
                 headers: { 'Content-Type': 'application/json' },
             });
             if (joinRes.ok) {
-                console.log('Successfully joined exam');
-                setShowInstructionsModal(false);
+                                setShowInstructionsModal(false);
                 setJoiningExam(false);
                 router.push({ pathname: '/(tabs)/practice-exam/questions', params: { id, duration: String(exam.duration) } });
             } else {
@@ -249,8 +236,7 @@ const PracticeExamDetailsScreen = () => {
                 Alert.alert('Error', 'Could not join the exam.');
             }
         } catch (e) {
-            console.error('Error joining exam:', e);
-            setJoiningExam(false);
+                        setJoiningExam(false);
             Alert.alert('Error', 'Could not join the exam.');
         }
     };
@@ -264,8 +250,7 @@ const PracticeExamDetailsScreen = () => {
                 { 
                     text: 'Review', 
                     onPress: () => {
-                        console.log('Reviewing practice exam:', exam?.id);
-                        Alert.alert('Success', 'Opening review...');
+                                                Alert.alert('Success', 'Opening review...');
                     }
                 }
             ]
@@ -626,7 +611,6 @@ const PracticeExamDetailsScreen = () => {
                           contentContainerStyle={styles.leaderboardScrollContent}
                         >
 
-
                           {/* Current User Section */}
                           {currentUser && (
                             <View style={styles.currentUserSection}>
@@ -649,7 +633,6 @@ const PracticeExamDetailsScreen = () => {
                                   </View>
                             </View>
                           )}
-
 
                           {/* All Participants */}
                           {leaderboard.length > 0 && (

@@ -84,8 +84,7 @@ export default function EditProfileScreen() {
         }
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      // Fallback to user context data
+            // Fallback to user context data
       if (user) {
         setProfileData({
           name: user.name || '',
@@ -169,15 +168,13 @@ export default function EditProfileScreen() {
           
           Alert.alert('Success', 'Profile picture updated successfully!');
         } catch (uploadError) {
-          console.error('Upload error:', uploadError);
-          Alert.alert('Error', 'Failed to upload image. Please try again.');
+                    Alert.alert('Error', 'Failed to upload image. Please try again.');
         } finally {
           setUploadingPhoto(false);
         }
       }
     } catch (error) {
-      console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
       setUploadingPhoto(false);
     }
   };
@@ -224,13 +221,11 @@ export default function EditProfileScreen() {
           { text: 'OK', onPress: () => navigation.goBack() }
         ]);
       } else {
-        console.error('Update failed:', updateResponse);
-        const errorMessage = updateResponse.data?.message || updateResponse.data?.error || updateResponse.data || 'Failed to update profile. Please try again.';
+                const errorMessage = updateResponse.data?.message || updateResponse.data?.error || updateResponse.data || 'Failed to update profile. Please try again.';
         Alert.alert('Error', String(errorMessage));
       }
     } catch (error) {
-      console.error('Update error:', error);
-      Alert.alert('Error', 'Failed to update profile. Please try again.');
+            Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setLoading(false);
     }

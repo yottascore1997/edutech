@@ -78,7 +78,8 @@ function RootNavigator() {
     // If the user is not logged in, show the authentication screens.
     if (!user) {
         return (
-            <Stack>
+            <Stack initialRouteName="phone-login">
+                <Stack.Screen name="phone-login" options={{ headerShown: false }} />
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ headerShown: false }} />
                 <Stack.Screen name="register" options={{ headerShown: false }} />

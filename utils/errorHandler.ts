@@ -24,10 +24,8 @@ class GlobalErrorHandler {
   private handleError(errorInfo: ErrorInfo) {
     // Simple logging without loops
     if (this.isDevelopment) {
-      console.log('🔴 Error Handler:', errorInfo.message);
-      if (errorInfo.stack) {
-        console.log('Stack:', errorInfo.stack);
-      }
+            if (errorInfo.stack) {
+              }
     }
   }
 

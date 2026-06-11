@@ -8,6 +8,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -110,8 +111,7 @@ const BookDetailsScreen = () => {
         router.back();
       }
     } catch (error) {
-      console.error('Error fetching book details:', error);
-      Alert.alert('Error', 'Failed to fetch book details');
+            Alert.alert('Error', 'Failed to fetch book details');
       router.back();
     } finally {
       setLoading(false);
@@ -130,7 +130,13 @@ const BookDetailsScreen = () => {
         `Call ${book.seller.name} at ${book.seller.phoneNumber}?`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Call', onPress: () => console.log('Calling seller') }
+          {
+            text: 'Call',
+            onPress: () => {
+              const phone = book.seller.phoneNumber?.replace(/\s/g, '');
+              if (phone) Linking.openURL(`tel:${phone}`);
+            },
+          },
         ]
       );
     }
@@ -154,8 +160,7 @@ const BookDetailsScreen = () => {
         });
       }
     } catch (error) {
-      console.error('Error opening chat with seller:', error);
-      Alert.alert('Error', 'Could not open chat. Please try again.');
+            Alert.alert('Error', 'Could not open chat. Please try again.');
     }
   };
 
@@ -183,8 +188,7 @@ const BookDetailsScreen = () => {
                 Alert.alert('Error', 'Failed to delete listing');
               }
             } catch (error) {
-              console.error('Error deleting book:', error);
-              Alert.alert('Error', 'Failed to delete listing');
+                            Alert.alert('Error', 'Failed to delete listing');
             }
           }
         }

@@ -2,6 +2,7 @@ import { apiFetchAuth, getImageUrl } from '@/constants/api';
 import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -214,12 +215,12 @@ export default function CurrentAffairsScreen() {
   const [fadeAnim] = useState(new Animated.Value(1));
   const selectedMonthRef = useRef<string | null>(null);
   selectedMonthRef.current = selectedMonth;
+  const { beginFetch, endFetch, hasLoadedOnceRef } = useScreenLoadState();
 
   const loadData = useCallback(
     async (refresh = false, monthOverride?: string) => {
       if (!user?.token) { setLoading(false); return; }
-      if (refresh) setRefreshing(true);
-      else setLoading(true);
+      beginFetch(setLoading, setRefreshing, { refresh });
       setError(null);
       try {
         const monthsRes = await apiFetchAuth('/student/current-affairs/months', user.token);
@@ -242,15 +243,14 @@ export default function CurrentAffairsScreen() {
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        endFetch(setLoading, setRefreshing);
         Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
       }
     },
-    [user?.token, fadeAnim]
+    [user?.token, fadeAnim, beginFetch, endFetch]
   );
 
-  useFocusEffect(useCallback(() => { loadData(false); }, [user?.token, loadData]));
+  useFocusEffect(useCallback(() => { loadData(hasLoadedOnceRef.current); }, [loadData]));
 
   const visibleCategories = useMemo(() => UI_CATEGORIES.filter((c) => {
     if (c.key === 'ALL') return true;

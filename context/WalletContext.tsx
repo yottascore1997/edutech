@@ -35,8 +35,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         setWalletAmount(response.data.balance.toFixed(2));
       }
     } catch (error) {
-      console.error('Error fetching wallet amount:', error);
-    }
+          }
   };
 
   const updateWalletAmount = (amount: number) => {

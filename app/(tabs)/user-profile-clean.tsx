@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -35,12 +36,29 @@ function timeAgo(dateString: string) {
 export default function UserProfileScreen() {
   const { user } = useAuth();
   const route = useRoute();
-  const { userId, originalUserData } = route.params as { userId: string; originalUserData?: any };
+  const searchParams = useLocalSearchParams<{ userId?: string; originalUserData?: string }>();
+  const routeParams = (route.params ?? {}) as { userId?: string; originalUserData?: unknown };
+  const userId = searchParams.userId ?? routeParams.userId;
+  const originalUserData = searchParams.originalUserData ?? routeParams.originalUserData;
   const navigation = useNavigation<any>();
-  
-  const [profile, setProfile] = useState<any>(originalUserData || null);
+
+  const parsedOriginalUserData = useMemo(() => {
+    if (!originalUserData) return null;
+    if (typeof originalUserData === 'string') {
+      try {
+        return JSON.parse(originalUserData);
+      } catch {
+        return null;
+      }
+    }
+    return originalUserData;
+  }, [originalUserData]);
+
+  const hasTargetUser = Boolean(userId);
+
+  const [profile, setProfile] = useState<any>(parsedOriginalUserData || null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasTargetUser);
   const [postsLoading, setPostsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -56,8 +74,13 @@ export default function UserProfileScreen() {
   const [blocking, setBlocking] = useState(false);
 
   const fetchUserProfile = async () => {
-    if (originalUserData) {
-      setProfile(originalUserData);
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    if (parsedOriginalUserData) {
+      setProfile(parsedOriginalUserData);
       setLoading(false);
       return;
     }
@@ -87,8 +110,7 @@ export default function UserProfileScreen() {
         setUserPosts(res.data || []);
       }
     } catch (error) {
-      console.error('Error fetching user posts:', error);
-    } finally {
+          } finally {
       setPostsLoading(false);
     }
   };
@@ -100,6 +122,10 @@ export default function UserProfileScreen() {
   };
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     fetchUserProfile();
   }, [userId, originalUserData]);
 
@@ -130,8 +156,7 @@ export default function UserProfileScreen() {
                   fetchUserProfile();
                 }
               } catch (error) {
-                console.error('Error unfollowing user:', error);
-              }
+                              }
             }
           }
         ]
@@ -148,8 +173,7 @@ export default function UserProfileScreen() {
           fetchUserProfile();
         }
       } catch (error) {
-        console.error('Error following user:', error);
-      }
+              }
     }
   };
 
@@ -182,8 +206,7 @@ export default function UserProfileScreen() {
         Alert.alert('Error', 'Failed to block user. Please try again.');
       }
     } catch (error) {
-      console.error('Error blocking user:', error);
-      Alert.alert('Error', 'Failed to block user. Please try again.');
+            Alert.alert('Error', 'Failed to block user. Please try again.');
     } finally {
       setBlocking(false);
     }
@@ -213,8 +236,7 @@ export default function UserProfileScreen() {
                 Alert.alert('Error', 'Failed to unblock user. Please try again.');
               }
             } catch (error) {
-              console.error('Error unblocking user:', error);
-              Alert.alert('Error', 'Failed to unblock user. Please try again.');
+                            Alert.alert('Error', 'Failed to unblock user. Please try again.');
             }
           }
         }
@@ -249,6 +271,10 @@ export default function UserProfileScreen() {
       )}
     </View>
   );
+
+  if (!hasTargetUser) {
+    return null;
+  }
 
   if (loading) {
     return (

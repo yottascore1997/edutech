@@ -58,15 +58,10 @@ class WebSocketService {
 
   connect(token: string, userId: string) {
     if (this.socket?.connected) {
-      console.log('WebSocket already connected');
-      return;
+            return;
     }
 
-    console.log('🔌 Attempting to connect to WebSocket server...');
-    console.log('📍 Server URL:', WEBSOCKET_CONFIG.SERVER_URL);
-    console.log('👤 User ID:', userId);
-    console.log('🔑 Token available:', !!token);
-
+                
     try {
       // For React Native, we need to handle connection differently
       this.socket = io(WEBSOCKET_CONFIG.SERVER_URL, {
@@ -90,8 +85,7 @@ class WebSocketService {
       this.setupEventListeners();
     } catch (error) {
       // Silently handle connection errors - no console logging
-      // console.error('❌ WebSocket connection error:', error);
-      this.events.onError?.(error);
+      //       this.events.onError?.(error);
     }
   }
 
@@ -99,17 +93,13 @@ class WebSocketService {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket connected successfully!');
-      console.log('🆔 Socket ID:', this.socket?.id);
-      console.log('🔗 Transport:', this.socket?.io?.engine?.transport?.name);
-      this.isConnected = true;
+                        this.isConnected = true;
       this.reconnectAttempts = 0;
       this.events.onConnect?.();
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('❌ WebSocket disconnected:', reason);
-      this.isConnected = false;
+            this.isConnected = false;
       this.events.onDisconnect?.();
     });
 
@@ -120,87 +110,71 @@ class WebSocketService {
 
     this.socket.on('error', (error) => {
       // Silently handle general errors - no console logging
-      // console.error('❌ WebSocket general error:', error);
-      this.events.onError?.(error);
+      //       this.events.onError?.(error);
     });
 
     // Message events - matching your backend
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.NEW_MESSAGE, (message: Message) => {
-      console.log('📨 New message received:', message);
-      this.events.onMessageReceived?.(message);
+            this.events.onMessageReceived?.(message);
     });
 
     // Typing events
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.USER_TYPING, (data: { userId: string; isTyping: boolean }) => {
-      console.log('⌨️ User typing:', data);
-      this.events.onUserTyping?.(data.userId, true);
+            this.events.onUserTyping?.(data.userId, true);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.USER_STOPPED_TYPING, (data: { userId: string; isTyping: boolean }) => {
-      console.log('⌨️ User stopped typing:', data);
-      this.events.onUserTyping?.(data.userId, false);
+            this.events.onUserTyping?.(data.userId, false);
     });
 
     // Read receipt events
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.MESSAGES_WERE_READ, (data: { readerId: string }) => {
-      console.log('✅ Messages were read by:', data.readerId);
-      // You can add a callback for this if needed
+            // You can add a callback for this if needed
     });
 
     // Battle Events
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.BATTLE_ROOM_CREATED, (data: any) => {
-      console.log('⚔️ Battle room created:', data);
-      this.events.onBattleRoomCreated?.(data);
+            this.events.onBattleRoomCreated?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.BATTLE_ROOM_JOINED, (data: any) => {
-      console.log('⚔️ Battle room joined:', data);
-      this.events.onBattleRoomJoined?.(data);
+            this.events.onBattleRoomJoined?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.BATTLE_ROOM_LEFT, (data: any) => {
-      console.log('⚔️ Battle room left:', data);
-      this.events.onBattleRoomLeft?.(data);
+            this.events.onBattleRoomLeft?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.PLAYER_JOINED, (data: any) => {
-      console.log('👤 Player joined battle:', data);
-      this.events.onPlayerJoined?.(data);
+            this.events.onPlayerJoined?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.PLAYER_LEFT, (data: any) => {
-      console.log('👤 Player left battle:', data);
-      this.events.onPlayerLeft?.(data);
+            this.events.onPlayerLeft?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.PLAYER_READY_UPDATE, (data: any) => {
-      console.log('✅ Player ready update:', data);
-      this.events.onPlayerReady?.(data);
+            this.events.onPlayerReady?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.BATTLE_STARTED, (data: any) => {
-      console.log('⚔️ Battle started:', data);
-      this.events.onBattleStarted?.(data);
+            this.events.onBattleStarted?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.QUESTION_STARTED, (data: any) => {
-      console.log('📝 Question started:', data);
-      this.events.onQuestionStarted?.(data);
+            this.events.onQuestionStarted?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.QUESTION_ENDED, (data: any) => {
-      console.log('✅ Question ended:', data);
-      this.events.onQuestionEnded?.(data);
+            this.events.onQuestionEnded?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.BATTLE_ENDED, (data: any) => {
-      console.log('🏆 Battle ended:', data);
-      this.events.onBattleEnded?.(data);
+            this.events.onBattleEnded?.(data);
     });
 
     this.socket.on(WEBSOCKET_CONFIG.EVENTS.TIME_UPDATE, (data: any) => {
-      console.log('⏰ Time update:', data);
-      this.events.onTimeUpdate?.(data);
+            this.events.onTimeUpdate?.(data);
     });
 
     // Generic passthrough for arbitrary server events (e.g., spy game events)
@@ -211,8 +185,7 @@ class WebSocketService {
           // Convention: pass first arg payload if present
           handler(args && args.length > 0 ? args[0] : undefined);
         } catch (err) {
-          console.error(`❌ Error in handler for event "${event}":`, err);
-        }
+                  }
       }
     });
   }
@@ -225,8 +198,7 @@ class WebSocketService {
     }
 
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.REGISTER_USER, userId);
-    console.log('👤 User registered:', userId);
-  }
+      }
 
   // Join a chat room with another user
   joinChat(chatId: string) {
@@ -236,8 +208,7 @@ class WebSocketService {
     }
 
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.JOIN_CHAT, { chatId });
-    console.log('Joined chat:', chatId);
-  }
+      }
 
   // Send a private message
   sendMessage(message: {
@@ -267,8 +238,7 @@ class WebSocketService {
     };
 
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.PRIVATE_MESSAGE, messageData);
-    console.log('📤 Private message sent via WebSocket:', messageData);
-    return true;
+        return true;
   }
 
   // Send typing indicator
@@ -299,8 +269,7 @@ class WebSocketService {
       return;
     }
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.CREATE_BATTLE_ROOM, { name });
-    console.log('⚔️ Creating battle room:', name);
-  }
+      }
 
   joinBattleRoom(roomId: string) {
     if (!this.socket?.connected) {
@@ -308,8 +277,7 @@ class WebSocketService {
       return;
     }
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.JOIN_BATTLE_ROOM, { roomId });
-    console.log('⚔️ Joining battle room:', roomId);
-  }
+      }
 
   leaveBattleRoom(roomId: string) {
     if (!this.socket?.connected) {
@@ -317,8 +285,7 @@ class WebSocketService {
       return;
     }
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.LEAVE_BATTLE_ROOM, { roomId });
-    console.log('⚔️ Leaving battle room:', roomId);
-  }
+      }
 
   playerReady(roomId: string) {
     if (!this.socket?.connected) {
@@ -326,8 +293,7 @@ class WebSocketService {
       return;
     }
     this.socket.emit(WEBSOCKET_CONFIG.EVENTS.PLAYER_READY, { roomId });
-    console.log('✅ Player ready in room:', roomId);
-  }
+      }
 
   submitAnswer(roomId: string, questionIndex: number, answerIndex: number, timeRemaining: number) {
     if (!this.socket?.connected) {
@@ -340,8 +306,7 @@ class WebSocketService {
       answerIndex,
       timeRemaining
     });
-    console.log('📝 Submitted answer:', { roomId, questionIndex, answerIndex, timeRemaining });
-  }
+      }
 
   // Set event handlers
   on(event: keyof WebSocketEvents, handler: any) {
@@ -364,8 +329,7 @@ class WebSocketService {
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      console.log('WebSocket disconnected');
-    }
+          }
   }
 
   // Get socket instance (for advanced usage)

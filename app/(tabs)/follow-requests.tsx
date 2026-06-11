@@ -46,34 +46,27 @@ export default function FollowRequestsScreen() {
     setLoading(true);
     try {
       const response = await apiFetchAuth('/student/follow-requests', user?.token || '');
-      console.log('📥 Follow Requests API Response:', response);
-      if (response.ok) {
+            if (response.ok) {
         const requests = response.data || [];
-        console.log('📥 All Follow Requests:', requests);
-        
+                
         // Filter only pending requests where current user is the receiver
         const pendingRequests = requests.filter((req: FollowRequest) => {
           const isPending = req.status === 'pending' || req.status === 'PENDING' || req.status === 'waiting' || req.status === 'WAITING';
           const isReceiver = req.receiverId === user?.id;
-          console.log(`Request ${req.id}: status=${req.status}, receiverId=${req.receiverId}, userId=${user?.id}, isPending=${isPending}, isReceiver=${isReceiver}`);
-          return isPending && isReceiver;
+                    return isPending && isReceiver;
         });
         
-        console.log('📥 Filtered Pending Requests (for current user):', pendingRequests);
-        setFollowRequests(pendingRequests);
+                setFollowRequests(pendingRequests);
         updateStats(requests); // Keep all requests for stats
       } else {
-        console.error('❌ Follow Requests API Error:', response);
-      }
+              }
     } catch (error) {
-      console.error('❌ Error fetching follow requests:', error);
-    } finally {
+          } finally {
       setLoading(false);
     }
   };
 
   const updateStats = (requests: FollowRequest[]) => {
-
 
     
     setStats({
@@ -113,8 +106,7 @@ export default function FollowRequestsScreen() {
         Alert.alert('Error', 'Failed to accept follow request. Please try again.');
       }
     } catch (error) {
-      console.error('Error accepting follow request:', error);
-      Alert.alert('Error', 'An error occurred while accepting the request.');
+            Alert.alert('Error', 'An error occurred while accepting the request.');
     } finally {
       setProcessingRequest(null);
     }
@@ -152,8 +144,7 @@ export default function FollowRequestsScreen() {
                 Alert.alert('Error', 'Failed to reject follow request. Please try again.');
               }
             } catch (error) {
-              console.error('Error rejecting follow request:', error);
-              Alert.alert('Error', 'An error occurred while rejecting the request.');
+                            Alert.alert('Error', 'An error occurred while rejecting the request.');
             } finally {
               setProcessingRequest(null);
             }
@@ -327,8 +318,6 @@ export default function FollowRequestsScreen() {
           <View style={styles.headerRight} />
         </View>
       </LinearGradient>
-
-
 
       {/* Follow Requests List */}
       <FlatList

@@ -139,11 +139,9 @@ export default function QuizScreen() {
           setSelectedCategory((prev) => prev || categories[0].id);
         }
       } else {
-        console.error('Failed to fetch battle quiz categories - response not ok');
-      }
+              }
     } catch (error) {
-      console.error('Failed to fetch battle quiz categories:', error);
-    }
+          }
   };
 
   const fetchWalletBalance = async () => {
@@ -155,8 +153,7 @@ export default function QuizScreen() {
         setWalletBalance(response.data.balance || 0);
       }
     } catch (error) {
-      console.error('Failed to fetch wallet balance:', error);
-    }
+          }
   };
 
   const fetchBattleAmounts = async (categoryId: string) => {
@@ -172,12 +169,10 @@ export default function QuizScreen() {
         setBattleAmounts(amounts);
         return amounts;
       } else {
-        console.error('Failed to fetch battle amounts - response not ok');
-        return [];
+                return [];
       }
     } catch (error) {
-      console.error('Failed to fetch battle amounts:', error);
-      return [];
+            return [];
     } finally {
       setLoadingAmounts(false);
     }
@@ -244,7 +239,6 @@ export default function QuizScreen() {
       Alert.alert('Error', 'Not connected to server');
       return;
     }
-
 
     closeAmountModal();
     markReadyForNewMatch();
@@ -449,7 +443,6 @@ export default function QuizScreen() {
       return;
     }
 
-
     Alert.alert('Create Room', 'Private room creation feature coming soon!');
   };
 
@@ -463,7 +456,6 @@ export default function QuizScreen() {
       Alert.alert('Error', 'Not connected to server');
       return;
     }
-
 
     router.push({
       pathname: '/(tabs)/battle-room',
@@ -570,11 +562,7 @@ export default function QuizScreen() {
                 source={require('../../assets/images/3d-character.png')} 
                 style={{ width: '100%', height: '80%', marginBottom: 8 }}
                 resizeMode="contain"
-                onLoad={() => console.log('3D character loaded successfully!')}
-                onError={() => {
-
-                  setImageLoadError(true);
-                }}
+                onError={() => setImageLoadError(true)}
               />
             );
           }
@@ -586,7 +574,6 @@ export default function QuizScreen() {
               source={require('../../assets/images/sports-icon.png')} 
               style={{ width: 60, height: 60 }}
               resizeMode="contain"
-              onError={() => console.log('Sports image loading error')}
             />
           );
         
@@ -596,7 +583,6 @@ export default function QuizScreen() {
               source={require('../../assets/images/history-icon.png')} 
               style={{ width: 60, height: 60 }}
               resizeMode="contain"
-              onError={() => console.log('History image loading error')}
             />
           );
         
@@ -607,10 +593,7 @@ export default function QuizScreen() {
                 source={require('../../assets/images/science-icon.png')} 
                 style={{ width: 50, height: 50 }}
                 resizeMode="contain"
-                onError={() => {
-
-                  setScienceImageLoadError(true);
-                }}
+                onError={() => setScienceImageLoadError(true)}
               />
             );
           }
@@ -623,11 +606,7 @@ export default function QuizScreen() {
                 source={require('../../assets/images/math-icon.png')} 
                 style={{ width: 60, height: 60 }}
                 resizeMode="contain"
-                onLoad={() => console.log('Math image loaded successfully!')}
-                onError={() => {
-
-                  setMathImageLoadError(true);
-                }}
+                onError={() => setMathImageLoadError(true)}
               />
             );
           }
@@ -702,7 +681,6 @@ export default function QuizScreen() {
         onQuickQuiz={handleQuickMatch}
         onDailyQuiz={() => router.push('/(tabs)/live-quiz-categories' as any)}
       />
-
 
       {/* Enhanced Amount Selection Modal */}
       <Modal

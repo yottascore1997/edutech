@@ -29,7 +29,7 @@ export default function DeactivateAccountScreen() {
 
   const handleDeactivate = () => {
     if (!user?.token) {
-      router.push('/login');
+      router.push('/phone-login');
       return;
     }
     if (!confirmed) {
@@ -127,7 +127,7 @@ export default function DeactivateAccountScreen() {
             <Text style={styles.body}>
               To deactivate your account, please sign in first so we can verify it is you.
             </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/login')}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/phone-login')}>
               <LinearGradient colors={['#FDBA74', '#F97316', '#EA580C']} style={styles.primaryGrad}>
                 <Text style={styles.primaryTxt}>Go to Login</Text>
               </LinearGradient>

@@ -1,5 +1,4 @@
 import { useAuth } from '@/context/AuthContext';
-import authService from '@/services/authServiceFirebaseJS';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
@@ -111,38 +110,15 @@ const OTPVerification: React.FC<OTPVerificationProps> = ({
     setLoading(true);
 
     try {
-      console.log('🔥 Verifying OTP in component:', otpToVerify);
-      const result = await authService.verifyOTP(otpToVerify);
+      const authContextResult = await authContextVerifyOTP(otpToVerify);
 
-      if (result.success) {
-        console.log('✅ OTP verification successful in component');
-
-        // 🔥 STEP 1: Firebase OTP verification successful
-        // 🔥 STEP 2: Now call AuthContext verifyOTP to set user in context and storage
-        try {
-          console.log('🔄 Calling AuthContext verifyOTP...');
-          const authContextResult = await authContextVerifyOTP(otpToVerify);
-
-          if (authContextResult.success) {
-            console.log('✅ AuthContext verifyOTP successful');
-            onVerificationSuccess(result.user);
-          } else {
-            console.error('❌ AuthContext verifyOTP failed:', authContextResult);
-            Alert.alert('Error', 'Authentication failed. Please try again.');
-          }
-        } catch (authContextError) {
-          console.error('❌ AuthContext verifyOTP error:', authContextError);
-          Alert.alert('Error', 'Authentication failed. Please try again.');
-        }
+      if (authContextResult.success) {
+        onVerificationSuccess(authContextResult.user);
       } else {
-        Alert.alert('Verification Failed', result.message || 'Invalid OTP');
-        // Clear OTP on failure
-        setOtp(['', '', '', '', '', '']);
-        inputRefs.current[0]?.focus();
+        Alert.alert('Error', 'Authentication failed. Please try again.');
       }
-    } catch (error) {
-      console.error('❌ OTP verification error in component:', error);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Authentication failed. Please try again.');
       // Clear OTP on error
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();

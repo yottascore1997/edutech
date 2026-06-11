@@ -35,8 +35,7 @@ export default function SimpleAgoraVoice({
   // Initialize Agora Engine
   const initAgora = async () => {
     try {
-      console.log('🎤 Initializing Agora Engine...');
-      
+            
       engine.current = await RtcEngine.create(AGORA_APP_ID);
       
       if (!engine.current) {
@@ -49,29 +48,23 @@ export default function SimpleAgoraVoice({
 
       // Register event handlers
       engine.current.addListener('JoinChannelSuccess', (channel, uid, elapsed) => {
-        console.log('🎤 Successfully joined channel:', channel, 'uid:', uid);
-        setIsConnected(true);
+                setIsConnected(true);
       });
 
       engine.current.addListener('UserJoined', (uid, elapsed) => {
-        console.log('🎤 User joined:', uid);
-      });
+              });
 
       engine.current.addListener('UserOffline', (uid, reason) => {
-        console.log('🎤 User offline:', uid);
-      });
+              });
 
       engine.current.addListener('Error', (err) => {
-        console.error('🎤 Agora error:', err);
-        Alert.alert('Voice Error', 'Voice chat connection failed');
+                Alert.alert('Voice Error', 'Voice chat connection failed');
       });
 
       setIsInitialized(true);
-      console.log('🎤 Agora Engine initialized successfully');
-      
+            
     } catch (error) {
-      console.error('❌ Failed to initialize Agora:', error);
-      Alert.alert('Voice Error', 'Failed to initialize voice chat');
+            Alert.alert('Voice Error', 'Failed to initialize voice chat');
     }
   };
 
@@ -83,8 +76,7 @@ export default function SimpleAgoraVoice({
     }
 
     try {
-      console.log('🎤 Joining channel:', CHANNEL_NAME);
-      
+            
       const token = null;
       
       await engine.current.joinChannel(
@@ -99,8 +91,7 @@ export default function SimpleAgoraVoice({
       );
       
     } catch (error) {
-      console.error('❌ Failed to join channel:', error);
-      Alert.alert('Voice Error', 'Failed to join voice room');
+            Alert.alert('Voice Error', 'Failed to join voice room');
     }
   };
 
@@ -109,12 +100,10 @@ export default function SimpleAgoraVoice({
     if (!engine.current) return;
 
     try {
-      console.log('🎤 Leaving channel...');
-      await engine.current.leaveChannel();
+            await engine.current.leaveChannel();
       setIsConnected(false);
     } catch (error) {
-      console.error('❌ Failed to leave channel:', error);
-    }
+          }
   };
 
   // Toggle microphone
@@ -125,15 +114,12 @@ export default function SimpleAgoraVoice({
       if (micOn) {
         await engine.current.muteLocalAudioStream(true);
         setMicOn(false);
-        console.log('🎤 Microphone muted');
-      } else {
+              } else {
         await engine.current.muteLocalAudioStream(false);
         setMicOn(true);
-        console.log('🎤 Microphone unmuted');
-      }
+              }
     } catch (error) {
-      console.error('❌ Failed to toggle mic:', error);
-    }
+          }
   };
 
   // Toggle speaker
@@ -144,15 +130,12 @@ export default function SimpleAgoraVoice({
       if (speakerOn) {
         await engine.current.setEnableSpeakerphone(false);
         setSpeakerOn(false);
-        console.log('🔊 Speaker off');
-      } else {
+              } else {
         await engine.current.setEnableSpeakerphone(true);
         setSpeakerOn(true);
-        console.log('🔊 Speaker on');
-      }
+              }
     } catch (error) {
-      console.error('❌ Failed to toggle speaker:', error);
-    }
+          }
   };
 
   // Initialize when component mounts
@@ -225,5 +208,4 @@ export default function SimpleAgoraVoice({
     </View>
   );
 }
-
 

@@ -57,8 +57,7 @@ class RazorpayService {
         };
       }
     } catch (error) {
-      console.error('Error initializing Razorpay:', error);
-    }
+          }
   }
 
   public async createOrder(amount: number, currency: string = 'INR', userToken: string): Promise<any> {
@@ -77,8 +76,7 @@ class RazorpayService {
         throw new Error(response.data?.message || 'Failed to create order');
       }
     } catch (error) {
-      console.error('Error creating Razorpay order:', error);
-      throw error;
+            throw error;
     }
   }
 
@@ -95,8 +93,7 @@ class RazorpayService {
         throw new Error(response.data?.message || 'Payment verification failed');
       }
     } catch (error) {
-      console.error('Error verifying payment:', error);
-      throw error;
+            throw error;
     }
   }
 
@@ -166,8 +163,7 @@ class RazorpayService {
         verification: verificationResult
       };
     } catch (error) {
-      console.error('Payment processing error:', error);
-      throw error;
+            throw error;
     }
   }
 }

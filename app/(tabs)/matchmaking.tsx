@@ -179,8 +179,6 @@ export default function MatchmakingScreen() {
     searchStartTime.current = Date.now();
   }, [category, amount, mode, session]);
 
-
-
   // Fetch user profile like web version
   const fetchUserProfile = async () => {
     try {
@@ -190,8 +188,7 @@ export default function MatchmakingScreen() {
 
       }
     } catch (error) {
-      console.error('❌ Error decoding token:', error);
-    }
+          }
   };
 
   // Initialize matchmaking state
@@ -248,8 +245,6 @@ export default function MatchmakingScreen() {
   // Initialize socket connection - Enhanced like web version
   useEffect(() => {
 
-
-
     
     if (user?.token) {
 
@@ -261,12 +256,6 @@ export default function MatchmakingScreen() {
       });
 
       newSocket.on('connect', () => {
-
-
-
-
-
-
 
         setIsConnected(true);
         
@@ -284,8 +273,7 @@ export default function MatchmakingScreen() {
 
       newSocket.on('connect_error', (error) => {
         // Silently handle socket errors - no console logging
-        // console.error('🔥 Socket connection error:', error);
-        setError('Connection failed. Please check your internet connection and try again.');
+        //         setError('Connection failed. Please check your internet connection and try again.');
       });
 
       newSocket.on('pong', () => {
@@ -308,7 +296,6 @@ export default function MatchmakingScreen() {
   // Start matchmaking - Simplified like web version
   useEffect(() => {
     if (!socket || !isConnected || hasStartedSearch.current) return;
-
 
     hasStartedSearch.current = true;
     searchStartTime.current = Date.now();
@@ -434,8 +421,7 @@ export default function MatchmakingScreen() {
     });
 
     socket.on('matchmaking_error', (data: { message: string }) => {
-      console.error('❌ Matchmaking error:', data);
-      setError(data.message || 'Matchmaking failed. Please try again.');
+            setError(data.message || 'Matchmaking failed. Please try again.');
       setMatchmakingState(prev => ({ ...prev, status: 'error' }));
     });
 
@@ -449,8 +435,7 @@ export default function MatchmakingScreen() {
     });
 
     socket.on('connect_error', (error) => {
-      console.error('🔥 Socket connection error:', error);
-      setError('Connection failed. Please check your internet connection and try again.');
+            setError('Connection failed. Please check your internet connection and try again.');
     });
 
     return () => {
@@ -732,8 +717,6 @@ export default function MatchmakingScreen() {
       useNativeDriver: true,
     }).start();
   }, [countdown, matchmakingState.status, countdownScale]);
-
-
 
   if (error) {
     // Check if it's an insufficient balance error

@@ -8,6 +8,7 @@ import {
 } from '@/utils/joinedLiveExams';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -202,11 +203,12 @@ export default function MyExamsScreen() {
     const [fadeAnim] = useState(new Animated.Value(0));
     const [showDetails, setShowDetails] = useState(false);
     const [selectedExam, setSelectedExam] = useState<MyExam | null>(null);
+    const { beginFetch, endFetch, shouldBlockUI, hasLoadedOnceRef } = useScreenLoadState();
 
-    const fetchMyExams = async () => {
+    const fetchMyExams = async (refresh = false) => {
         if (!user?.token) return;
         try {
-            setLoading(true);
+            beginFetch(setLoading, setRefreshing, { refresh });
             setError(null);
       const res = await apiFetchAuth('/student/my-exams', user.token);
       if (res.ok) {
@@ -229,11 +231,11 @@ export default function MyExamsScreen() {
     } catch {
             setError('Failed to load exams');
         } finally {
-            setLoading(false);
+            endFetch(setLoading, setRefreshing);
         }
     };
 
-  useFocusEffect(useCallback(() => { fetchMyExams(); }, [user?.token]));
+  useFocusEffect(useCallback(() => { fetchMyExams(hasLoadedOnceRef.current); }, [user?.token]));
 
   const safeExams = useMemo(() => (Array.isArray(exams) ? exams : []), [exams]);
 
@@ -289,7 +291,7 @@ export default function MyExamsScreen() {
         }
     };
 
-    if (loading) {
+    if (shouldBlockUI(loading)) {
         return (
       <View style={[st.centered, { backgroundColor: C.bg }]}>
         <StatusBar barStyle="dark-content" />
@@ -332,9 +334,7 @@ export default function MyExamsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={async () => {
-                setRefreshing(true);
-                await fetchMyExams();
-                setRefreshing(false);
+                await fetchMyExams(true);
               }}
               tintColor={C.primary}
             />

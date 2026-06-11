@@ -23,8 +23,7 @@ class AuthService {
 
   // Initialize reCAPTCHA verifier for React Native (Not used in current implementation)
   initializeRecaptcha(containerId: string = 'recaptcha-container') {
-    console.log('reCAPTCHA not needed for React Native OTP');
-    this.recaptchaVerifier = null;
+        this.recaptchaVerifier = null;
   }
 
   // Send OTP to phone number
@@ -35,8 +34,7 @@ class AuthService {
         ? phoneNumber 
         : `+91${phoneNumber}`;
 
-      console.log('Sending OTP to:', formattedPhoneNumber);
-      
+            
       // For React Native, use signInWithPhoneNumber without reCAPTCHA
       // reCAPTCHA is not needed for React Native in most cases
       this.confirmationResult = await signInWithPhoneNumber(
@@ -50,8 +48,7 @@ class AuthService {
         verificationId: this.confirmationResult.verificationId
       };
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -61,8 +58,7 @@ class AuthService {
   // Verify OTP
   async verifyOTP(otp: string): Promise<VerifyOTPResult> {
     try {
-      console.log('Verifying OTP:', otp);
-      
+            
       // Real Firebase verification
       if (!this.confirmationResult) {
         return {
@@ -79,8 +75,7 @@ class AuthService {
         user: result.user
       };
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -113,8 +108,7 @@ class AuthService {
       await auth.signOut();
       this.confirmationResult = null;
     } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
+            throw error;
     }
   }
 
@@ -130,8 +124,7 @@ class AuthService {
 
   // Clean up reCAPTCHA (Not needed for React Native)
   cleanup() {
-    console.log('reCAPTCHA cleanup not needed for React Native');
-    this.recaptchaVerifier = null;
+        this.recaptchaVerifier = null;
   }
 }
 

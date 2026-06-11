@@ -43,8 +43,7 @@ export default function PendingPostsScreen() {
         setPendingPosts(res.data);
       }
     } catch (e) {
-      console.error('Error fetching pending posts:', e);
-    } finally {
+          } finally {
       setLoading(false);
     }
   };

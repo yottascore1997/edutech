@@ -45,8 +45,7 @@ export default function PreviousYearPapersPreview() {
           ]);
         }
       } catch (e) {
-        console.warn('Failed to load PYQ list', e);
-      } finally {
+              } finally {
         if (mounted) setLoading(false);
       }
     }

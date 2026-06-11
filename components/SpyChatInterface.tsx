@@ -512,86 +512,55 @@ export default function SpyChatInterface({
           allowsAirPlayForMediaPlayback
           ref={webViewRef}
           onLoadStart={() => {
-            console.log('🎤 Voice WebView loading...');
-            console.log('🎤 Daily URL:', dailyUrl);
-          }}
+                                  }}
           onLoadEnd={() => {
-            console.log('🎤 Voice WebView loaded successfully');
-            console.log('🎤 Current turn:', currentTurn, 'Is my turn:', isMyTurn);
-            
+                                    
             // Request mic permission after WebView loads
             setTimeout(() => {
-              console.log('🎤 Attempting to request mic permission...');
-              try {
+                            try {
                 const js = `
                   try {
-                    console.log('Requesting mic permission...');
-                    navigator.mediaDevices.getUserMedia({ audio: true })
+                                        navigator.mediaDevices.getUserMedia({ audio: true })
                       .then(stream => {
-                        console.log('Mic permission granted');
-                        stream.getTracks().forEach(track => track.stop());
+                                                stream.getTracks().forEach(track => track.stop());
                       })
                       .catch(err => {
-                        console.log('Mic permission denied:', err);
-                      });
+                                              });
                   } catch(e) {
-                    console.log('Mic permission error:', e);
-                  }
+                                      }
                 `;
-                console.log('🎤 Injecting mic permission JavaScript...');
-                webViewRef.current?.injectJavaScript(js);
-                console.log('🎤 Mic permission JavaScript injected');
-              } catch (error) {
-                console.error('🎤 Error requesting mic permission:', error);
-              }
+                                webViewRef.current?.injectJavaScript(js);
+                              } catch (error) {
+                              }
             }, 3000);
             
             // Try to access Daily.co API directly
             setTimeout(() => {
-              console.log('🎤 Attempting to access Daily.co API...');
-              try {
+                            try {
                 const js = `
                   try {
-                    console.log('Checking Daily.co API...');
-                    console.log('Window object:', typeof window);
-                    console.log('CallFrame available:', typeof window.callFrame);
-                    console.log('Daily available:', typeof window.daily);
-                    
+                                                                                                    
                     if (window.callFrame) {
-                      console.log('CallFrame found, enabling audio...');
-                      window.callFrame.setLocalAudio(true);
-                      console.log('Audio enabled via CallFrame');
-                    } else if (window.daily) {
-                      console.log('Daily found, enabling audio...');
-                      window.daily.setLocalAudio(true);
-                      console.log('Audio enabled via Daily');
-                    } else {
-                      console.log('No Daily.co API found');
-                    }
+                                            window.callFrame.setLocalAudio(true);
+                                          } else if (window.daily) {
+                                            window.daily.setLocalAudio(true);
+                                          } else {
+                                          }
                   } catch(e) {
-                    console.log('Daily.co API error:', e);
-                  }
+                                      }
                 `;
-                console.log('🎤 Injecting Daily.co API JavaScript...');
-                webViewRef.current?.injectJavaScript(js);
-                console.log('🎤 Daily.co API JavaScript injected');
-              } catch (error) {
-                console.error('🎤 Error accessing Daily.co API:', error);
-              }
+                                webViewRef.current?.injectJavaScript(js);
+                              } catch (error) {
+                              }
             }, 5000);
           }}
           onError={(error) => {
-            console.error('🎤 Voice WebView error:', error);
-            console.error('🎤 Error details:', error.nativeEvent);
-          }}
+                                  }}
           onMessage={(event) => {
-            console.log('🎤 Voice WebView message:', event.nativeEvent.data);
-            try {
+                        try {
               const data = JSON.parse(event.nativeEvent.data);
-              console.log('🎤 Parsed WebView message:', data);
-            } catch (e) {
-              console.log('🎤 Raw WebView message:', event.nativeEvent.data);
-            }
+                          } catch (e) {
+                          }
           }}
         />
       )}
@@ -636,5 +605,4 @@ export default function SpyChatInterface({
     </LinearGradient>
   );
 }
-
 

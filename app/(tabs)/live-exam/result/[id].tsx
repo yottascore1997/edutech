@@ -180,8 +180,7 @@ export default function LiveExamResultScreen() {
         }
 
       } catch (e) {
-        console.error('Error parsing result data:', e);
-      }
+              }
     }
 
     return () => {
@@ -197,34 +196,23 @@ export default function LiveExamResultScreen() {
   const fetchImprovementSuggestions = useCallback(async () => {
     try {
       if (!user?.token) {
-        console.log('âš ï¸ No token available for fetching improvement suggestions');
-        return;
+                return;
       }
 
       setLoadingImprovements(true);
-      console.log('ðŸ“¡ Fetching improvement suggestions...');
-      const response = await apiFetchAuth('/student/performance/improvement-suggestions', user.token);
+            const response = await apiFetchAuth('/student/performance/improvement-suggestions', user.token);
       
-      console.log('ðŸ“¡ API Response:', {
-        ok: response.ok,
-        status: response.status,
-        hasData: !!response.data,
-        dataKeys: response.data ? Object.keys(response.data) : []
-      });
-      
+            
       if (response.ok && response.data) {
         // Handle different response structures
         const data = response.data.data || response.data;
-        console.log('âœ… Improvement suggestions data:', data);
-        setImprovementData(data);
+                setImprovementData(data);
       } else {
-        console.error('âŒ Failed to fetch improvement suggestions:', response);
-        // Set empty state to show the card
+                // Set empty state to show the card
         setImprovementData({ hasEnoughData: false, message: 'Unable to fetch suggestions at this time' });
       }
     } catch (err) {
-      console.error('âŒ Error fetching improvement suggestions:', err);
-      // Set empty state to show the card
+            // Set empty state to show the card
       setImprovementData({ hasEnoughData: false, message: 'Error loading suggestions. Please try again.' });
     } finally {
       setLoadingImprovements(false);
@@ -277,8 +265,7 @@ export default function LiveExamResultScreen() {
         title: 'My Exam Result',
       });
     } catch (error) {
-      console.error('Error sharing:', error);
-    }
+          }
   };
 
   const getPercentile = () => {

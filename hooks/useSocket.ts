@@ -37,8 +37,7 @@ export const useSocket = (options: UseSocketOptions = {}) => {
 
   useEffect(() => {
     if (!socketInstance) {
-      console.log('🔌 Initializing socket connection to:', SOCKET_SERVER_URL);
-      socketInstance = io(SOCKET_SERVER_URL, {
+            socketInstance = io(SOCKET_SERVER_URL, {
         ...(WEBSOCKET_CONFIG.CONNECTION_OPTIONS as object),
         auth: options.token
           ? { token: options.token, ...(options.userId ? { userId: options.userId } : {}) }

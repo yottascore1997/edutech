@@ -153,8 +153,7 @@ export default function StoryViewer({ visible, onClose, initialStoryIndex = 0, s
         );
       }
     } catch (error) {
-      console.error('Error liking story:', error);
-    } finally {
+          } finally {
       setLikingStory(false);
     }
   };

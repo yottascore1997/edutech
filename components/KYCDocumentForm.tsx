@@ -33,7 +33,7 @@ const documentTypes = [
 ];
 
 export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocumentFormProps) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [documentType, setDocumentType] = useState('AADHAR_CARD');
   const [documentNumber, setDocumentNumber] = useState('');
   const [documentImage, setDocumentImage] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -59,8 +59,7 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
         setDocumentImage(base64Image);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -84,8 +83,7 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
         setDocumentImage(base64Image);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+            Alert.alert('Error', 'Failed to take photo. Please try again.');
     }
   };
 
@@ -187,8 +185,7 @@ export default function KYCDocumentForm({ visible, onClose, onSuccess }: KYCDocu
         );
       }
     } catch (error: any) {
-      console.error('Error uploading KYC document:', error);
-      if (error.status === 401) {
+            if (error.status === 401) {
         Alert.alert(
           '⚠️ Session Expired',
           'Your session has expired. Please log in again to continue.',

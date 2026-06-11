@@ -34,7 +34,6 @@ function timeAgo(dateString: string) {
   return date.toLocaleDateString();
 }
 
-
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { user, updateUser } = useAuth();
@@ -72,7 +71,6 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
-
 
   const handleProfilePhotoUpload = async () => {
     try {
@@ -114,15 +112,13 @@ export default function ProfileScreen() {
             Alert.alert('Error', 'Failed to update profile picture. Please try again.');
           }
         } catch (uploadError) {
-          console.error('Upload error:', uploadError);
-          Alert.alert('Error', 'Failed to upload image. Please try again.');
+                    Alert.alert('Error', 'Failed to upload image. Please try again.');
         } finally {
           setUploadingPhoto(false);
         }
       }
     } catch (error) {
-      console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
       setUploadingPhoto(false);
     }
   };
@@ -137,8 +133,7 @@ export default function ProfileScreen() {
         setUserPosts(posts);
       }
     } catch (e) {
-      console.error('Error fetching user posts:', e);
-    } finally {
+          } finally {
       setPostsLoading(false);
     }
   };
@@ -151,8 +146,7 @@ export default function ProfileScreen() {
         setPendingPosts(res.data);
       }
     } catch (e) {
-      console.error('Error fetching pending posts:', e);
-    } finally {
+          } finally {
       setPendingPostsLoading(false);
     }
   };
@@ -177,8 +171,7 @@ export default function ProfileScreen() {
         setFollowRequestsCount(pendingCount);
       }
     } catch (error) {
-      console.error('Error fetching follow requests count:', error);
-    }
+          }
   };
 
   // Refresh profile data every time the screen comes into focus
@@ -292,8 +285,7 @@ export default function ProfileScreen() {
         Alert.alert('Error', 'Failed to delete post. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting post:', error);
-      Alert.alert('Error', 'Failed to delete post. Please try again.');
+            Alert.alert('Error', 'Failed to delete post. Please try again.');
     } finally {
       setDeleting(false);
     }
@@ -319,8 +311,7 @@ export default function ProfileScreen() {
         fetchProfile();
       }
     } catch (error) {
-      console.error('Error following user:', error);
-    }
+          }
   };
 
   const renderUserPost = ({ item }: { item: any }) => (
@@ -440,7 +431,6 @@ export default function ProfileScreen() {
       </View>
     </TouchableOpacity>
   );
-
 
   return (
     <View style={styles.container}>
@@ -632,8 +622,6 @@ export default function ProfileScreen() {
             </LinearGradient>
           </View>
         )}
-
-
 
         {/* Enhanced Pending Posts Section */}
         {pendingPosts.length > 0 && (

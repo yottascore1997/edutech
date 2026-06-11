@@ -22,26 +22,20 @@ export default function WebSocketStatus() {
   const handleManualTest = async () => {
     setTesting(true);
     try {
-      console.log('🔍 Manual connection test starting...');
-      console.log('📍 Server URL:', WEBSOCKET_CONFIG.SERVER_URL);
-      
+                  
       // Test basic connectivity to the same server but different port
       const apiUrl = WEBSOCKET_CONFIG.SERVER_URL.replace(':3001', ':3000');
-      console.log('🌐 Testing API connectivity to:', apiUrl);
-      
+            
       try {
         const apiResponse = await fetch(`${apiUrl}/api/health`, {
           method: 'GET',
         });
-        console.log('✅ API connection successful:', apiResponse.status);
-      } catch (apiError) {
-        console.log('⚠️ API connection failed:', apiError);
-      }
+              } catch (apiError) {
+              }
       
       // Test WebSocket server connectivity
       const wsUrl = WEBSOCKET_CONFIG.SERVER_URL.replace('http://', 'ws://');
-      console.log('🔌 Testing WebSocket server at:', wsUrl);
-      
+            
       try {
         const response = await fetch(WEBSOCKET_CONFIG.SERVER_URL, {
           method: 'GET',
@@ -52,15 +46,13 @@ export default function WebSocketStatus() {
           `✅ Server is reachable!\n\nHTTP Response: ${response.status}\n\nIf WebSocket still doesn't work, check:\n1. WebSocket server is running on port 3001\n2. CORS settings allow React Native\n3. Network firewall allows WebSocket connections`
         );
       } catch (error) {
-        console.error('Connection test failed:', error);
-        Alert.alert(
+                Alert.alert(
           'Connection Failed', 
           `❌ Cannot reach server at ${WEBSOCKET_CONFIG.SERVER_URL}\n\nPossible issues:\n1. Server not running on port 3001\n2. Wrong IP address\n3. Network firewall blocking\n4. Device not on same network`
         );
       }
     } catch (error) {
-      console.error('Test failed:', error);
-      Alert.alert('Test Error', 'Failed to run connection test');
+            Alert.alert('Test Error', 'Failed to run connection test');
     } finally {
       setTesting(false);
     }

@@ -232,11 +232,9 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress, re
                 }
                 setLeaderboardData(response.data);
             } else {
-                console.error('Failed to fetch leaderboard data:', response.data);
-            }
+                            }
         } catch (error) {
-            console.error('Error fetching leaderboard data:', error);
-        } finally {
+                    } finally {
             setLoading(false);
         }
     };
@@ -320,10 +318,6 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress, re
 
     // All animation interpolations removed for better performance
 
-
-
-
-
     return (
         <View style={styles.container}>
             <LinearGradient
@@ -355,15 +349,6 @@ const TopPerformersSection: React.FC<TopPerformersSectionProps> = ({ onPress, re
                 end={{ x: 1, y: 1 }}
                 style={styles.sectionBackground}
             >
-
-
-
-
-
-
-
-
-
 
                 {loading ? (
                     <View style={styles.loadingContainer}>
@@ -515,8 +500,6 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     // sparkleText style removed
-
-
 
     headerGradient: {
         flexDirection: 'row',

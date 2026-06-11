@@ -21,8 +21,7 @@ export class SoundManager {
         playThroughEarpieceAndroid: false,
       });
     } catch (error) {
-      console.log('Audio initialization error:', error);
-    }
+          }
   }
 
   // Play match found sound - Victory/celebration sound
@@ -60,8 +59,7 @@ export class SoundManager {
           });
         } catch (localError) {
           // If local file fails, try online URLs
-          console.log('Local sound file failed, trying online:', localError);
-          
+                    
           const soundUrls = [
             'https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3',
             'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
@@ -95,12 +93,10 @@ export class SoundManager {
           }
 
           if (!soundCreated) {
-            console.log('All match found sound sources failed');
-          }
+                      }
         }
       } catch (audioError) {
-        console.log('Match found audio error:', audioError);
-      }
+              }
     } catch (error) {
       // Silent fail
     }
@@ -139,8 +135,7 @@ export class SoundManager {
           });
         } catch (localError) {
           // Fallback to online
-          console.log('Local sound file failed, trying online:', localError);
-          
+                    
           const soundUrls = [
             'https://assets.mixkit.co/sfx/preview/mixkit-game-show-intro-331.mp3',
             'https://www.soundjay.com/misc/sounds/fail-buzzer-02.wav',
@@ -174,12 +169,10 @@ export class SoundManager {
           }
 
           if (!soundCreated) {
-            console.log('All question start sound sources failed');
-          }
+                      }
         }
       } catch (audioError) {
-        console.log('Question start audio error:', audioError);
-      }
+              }
     } catch (error) {
       // Silent fail
     }
@@ -219,8 +212,7 @@ export class SoundManager {
           });
         } catch (localError) {
           // Fallback to online
-          console.log('Local sound file failed, trying online:', localError);
-          
+                    
           const soundUrls = [
             'https://assets.mixkit.co/sfx/preview/mixkit-select-click-1109.mp3',
             'https://www.soundjay.com/misc/sounds/click-09.wav',
@@ -254,12 +246,10 @@ export class SoundManager {
           }
 
           if (!soundCreated) {
-            console.log('All answer sound sources failed');
-          }
+                      }
         }
       } catch (audioError) {
-        console.log('Answer audio error:', audioError);
-      }
+              }
     } catch (error) {
       // Silent fail
     }

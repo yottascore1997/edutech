@@ -3,12 +3,13 @@ import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import StudyPartnerBottomNav from '@/components/StudyPartnerBottomNav';
 import { Ionicons } from '@expo/vector-icons';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
   ArrowRight,
-  Calendar,
+  ChevronRight,
   Flame,
   Heart,
   MapPin,
@@ -40,7 +41,7 @@ import Svg, { Circle } from 'react-native-svg';
 const { width: SCREEN_W } = Dimensions.get('window');
 const PAD = 16;
 const BUDDY_W = 168;
-const DISCOVER_CARD_H = Math.min(440, SCREEN_W * 1.12);
+const DISCOVER_CARD_H = Math.min(400, SCREEN_W * 1.02);
 
 const INTEREST_TAGS: Record<string, string[]> = {
   JEE: ['Physics', 'Mathematics', 'Mock Tests'],
@@ -176,10 +177,12 @@ function StatCard({ icon, value, label, colors }: {
   colors: readonly [string, string];
 }) {
   return (
-    <View style={st.statCard}>
-      <LinearGradient colors={colors} style={st.statIcon}>{icon}</LinearGradient>
-      <Text style={st.statVal}>{value}</Text>
-      <Text style={st.statLbl} numberOfLines={2}>{label}</Text>
+    <View style={st.statCardOuter}>
+      <LinearGradient colors={['#FFFFFF', '#FAFAFF']} style={st.statCard}>
+        <LinearGradient colors={colors} style={st.statIcon}>{icon}</LinearGradient>
+        <Text style={st.statVal}>{value}</Text>
+        <Text style={st.statLbl} numberOfLines={2}>{label}</Text>
+      </LinearGradient>
     </View>
   );
 }
@@ -276,17 +279,23 @@ function DiscoverSwipeCard({
 
       <View style={st.actionRow}>
         <TouchableOpacity style={st.actBtnPass} onPress={onPass} disabled={actionLoading} activeOpacity={0.9}>
-          <X size={26} color={C.primary} strokeWidth={2.5} />
+          <LinearGradient colors={['#FFFFFF', '#F8F4FF']} style={st.actBtnInner}>
+            <X size={24} color={C.primary} strokeWidth={2.5} />
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={st.actBtnStar} onPress={onSuperLike} disabled={actionLoading} activeOpacity={0.9}>
-          <Star size={24} color={C.primary} strokeWidth={2.5} />
+          <LinearGradient colors={['#FEF9C3', '#FDE68A']} style={st.actBtnInner}>
+            <Star size={22} color="#B45309" strokeWidth={2.5} fill="#FBBF24" />
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity style={st.actBtnLike} onPress={onLike} disabled={actionLoading} activeOpacity={0.9}>
-          {actionLoading ? (
-            <ActivityIndicator color={C.pink} />
-          ) : (
-            <Heart size={28} color={C.pink} fill={C.pink} strokeWidth={2} />
-          )}
+          <LinearGradient colors={['#F472B6', '#EC4899', '#DB2777']} style={st.actBtnLikeGrad}>
+            {actionLoading ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Heart size={26} color="#FFF" fill="#FFF" strokeWidth={2} />
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </View>
@@ -314,10 +323,10 @@ function CardOverlays({
     <>
       <LinearGradient colors={['rgba(0,0,0,0.35)', 'transparent']} style={st.swipeTopGrad} />
       <View style={st.swipeTopRow}>
-        <View style={st.matchPill}>
-          <Star size={10} color="#FBBF24" fill="#FBBF24" />
+        <LinearGradient colors={['#FDE047', '#FBBF24']} style={st.matchPill}>
+          <Star size={10} color="#78350F" fill="#78350F" />
           <Text style={st.matchPillTxt}>{current.matchPct}% Match</Text>
-        </View>
+        </LinearGradient>
         <View style={st.countPill}>
           <Text style={st.countPillTxt}>{cardIndex + 1}/{total}</Text>
         </View>
@@ -374,11 +383,11 @@ export default function StudyPartnerHomeScreen() {
   const [profileDone, setProfileDone] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(1));
   const actionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { beginFetch, endFetch, shouldBlockUI, hasLoadedOnceRef } = useScreenLoadState();
 
   const load = useCallback(async (refresh = false) => {
     if (!user?.token) { setLoading(false); return; }
-    if (refresh) setRefreshing(true);
-    else setLoading(true);
+    beginFetch(setLoading, setRefreshing, { refresh });
       setError(null);
       try {
       const [profRes, matchesRes, whoRes, discRes] = await Promise.all([
@@ -410,13 +419,12 @@ export default function StudyPartnerHomeScreen() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load');
       } finally {
-          setLoading(false);
-      setRefreshing(false);
+      endFetch(setLoading, setRefreshing);
       Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: true }).start();
     }
-  }, [user?.token, fadeAnim]);
+  }, [user?.token, fadeAnim, beginFetch, endFetch]);
 
-  useFocusEffect(useCallback(() => { load(false); }, [load]));
+  useFocusEffect(useCallback(() => { load(hasLoadedOnceRef.current); }, [load]));
 
   const sendDiscoverAction = async (action: 'like' | 'pass') => {
     const current = discoveryProfiles[cardIndex];
@@ -444,8 +452,7 @@ export default function StudyPartnerHomeScreen() {
       actionTimerRef.current = setTimeout(() => setLastAction(null), 1400);
       setCardIndex((i) => i + 1);
     } catch (e) {
-      console.error('Discover action error', e);
-    } finally {
+          } finally {
       setActionLoading(false);
     }
   };
@@ -468,7 +475,7 @@ export default function StudyPartnerHomeScreen() {
     );
   }
 
-  if (loading && !refreshing) {
+  if (shouldBlockUI(loading)) {
   return (
       <LinearGradient colors={[...C.bg]} style={[st.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={C.primary} />
@@ -495,24 +502,45 @@ export default function StudyPartnerHomeScreen() {
               </TouchableOpacity>
             ) : null}
 
+            {/* Screen header */}
+            <View style={st.screenHeader}>
+              <View style={st.screenHeaderLeft}>
+                <LinearGradient colors={['#FDE047', '#FACC15']} style={st.screenBadge}>
+                  <Sparkles size={11} color="#713F12" strokeWidth={2.2} />
+                  <Text style={st.screenBadgeTxt}>Study Partner</Text>
+                </LinearGradient>
+                <Text style={st.screenTitle}>Find your study partner</Text>
+                <Text style={st.screenSub}>Match with students preparing for the same goals</Text>
+              </View>
+              {matchesCount > 0 ? (
+                <TouchableOpacity
+                  style={st.matchChip}
+                  activeOpacity={0.88}
+                  onPress={() => router.push('/(tabs)/study-partner-matches' as any)}
+                >
+                  <Heart size={14} color={C.pink} fill={C.pink} />
+                  <Text style={st.matchChipTxt}>{matchesCount}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
             {/* Hero */}
             <View style={st.heroWrap}>
-              <LinearGradient colors={['#E9D5FF', '#FBCFE8', '#EDE9FE']} style={st.heroBorder}>
+              <LinearGradient colors={['#C4B5FD', '#F0ABFC', '#DDD6FE']} style={st.heroBorder}>
                 <LinearGradient colors={[...C.heroGrad]} style={st.heroCard}>
-                  <View style={st.heroOrb} />
                   <View style={st.heroRow}>
                     <View style={st.heroCopy}>
                       <Text style={st.heroTitle}>
-                        Study <Text style={st.heroAccent}>Buddy</Text>
-                  </Text>
-                      <Text style={st.heroSub}>Connect. Collaborate. Achieve.</Text>
+                        Study <Text style={st.heroAccent}>Together</Text>
+                      </Text>
+                      <Text style={st.heroSub}>Swipe, match & grow with the perfect buddy</Text>
                       <TouchableOpacity activeOpacity={0.92} onPress={() => router.push('/(tabs)/study-partner-discover' as any)}>
-                        <LinearGradient colors={[...C.ctaGrad]} style={st.heroCta}>
-                          <Text style={st.heroCtaTxt}>Find a Study Buddy</Text>
+                        <LinearGradient colors={[...C.heroCta]} style={st.heroCta}>
+                          <Text style={st.heroCtaTxt}>Start Discovering</Text>
                           <ArrowRight size={16} color="#FFF" strokeWidth={2.5} />
                         </LinearGradient>
                       </TouchableOpacity>
-                </View>
+                    </View>
                     <Image
                       source={require('@/assets/images/icons/partner.png')}
                       style={st.heroImg}
@@ -521,15 +549,14 @@ export default function StudyPartnerHomeScreen() {
                   </View>
                 </LinearGradient>
               </LinearGradient>
-                  </View>
+            </View>
 
-            {/* Stats */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.statsRow}>
-              <StatCard icon={<Users size={18} color="#FFF" strokeWidth={2.2} />} value="12K+" label="Active Buddies" colors={['#8E78E7', C.primary]} />
-              <StatCard icon={<Target size={18} color="#FFF" strokeWidth={2.2} />} value={formatCount(Math.max(matchesCount, 8500), '+')} label="Matches Made" colors={['#F472B6', C.pink]} />
-              <StatCard icon={<Calendar size={18} color="#FFF" strokeWidth={2.2} />} value="1.2M+" label="Study Sessions" colors={['#60A5FA', '#3B82F6']} />
-              <StatCard icon={<TrendingUp size={18} color="#FFF" strokeWidth={2.2} />} value="95%" label="Success Rate" colors={['#34D399', '#10B981']} />
-            </ScrollView>
+            {/* Stats — 3 blocks, no scroll */}
+            <View style={st.statsRow}>
+              <StatCard icon={<Users size={15} color="#FFF" strokeWidth={2.2} />} value="12K+" label="Active Buddies" colors={['#8E78E7', C.primary]} />
+              <StatCard icon={<Target size={15} color="#FFF" strokeWidth={2.2} />} value={formatCount(Math.max(matchesCount, 8500), '+')} label="Matches Made" colors={['#F472B6', C.pink]} />
+              <StatCard icon={<TrendingUp size={15} color="#FFF" strokeWidth={2.2} />} value="95%" label="Success Rate" colors={['#34D399', '#10B981']} />
+            </View>
 
             {/* Study Journey */}
             <View style={st.secHead}>
@@ -539,31 +566,27 @@ export default function StudyPartnerHomeScreen() {
                 <ArrowRight size={14} color={C.primary} strokeWidth={2.5} />
               </TouchableOpacity>
                   </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.journeyRow}>
+            <View style={st.journeyRow}>
               <LinearGradient colors={['#FFF7ED', '#FFEDD5']} style={st.journeyCard}>
-                <View style={st.journeyIconWrap}><Flame size={22} color="#EA580C" fill="#F97316" /></View>
+                <View style={st.journeyIconWrap}>
+                  <Flame size={16} color="#EA580C" fill="#F97316" />
+                </View>
                 <Text style={st.journeyVal}>7 Days</Text>
-                <Text style={st.journeyLbl}>Study Streak</Text>
-                <Text style={st.journeyHint}>Keep it up! 🔥</Text>
+                <Text style={st.journeyLbl} numberOfLines={1}>Streak</Text>
               </LinearGradient>
               <View style={[st.journeyCard, st.journeyCardWhite]}>
-                <ProgressRing pct={(matchesCount % 7) / 7 * 100 || 57} />
+                <ProgressRing pct={(matchesCount % 7) / 7 * 100 || 57} size={36} />
                 <Text style={st.journeyVal}>{Math.min(matchesCount, 7)}/7</Text>
-                <Text style={st.journeyLbl}>Weekly Goal</Text>
-                <Text style={st.journeyHint}>Almost there!</Text>
-                </View>
+                <Text style={st.journeyLbl} numberOfLines={1}>Weekly</Text>
+              </View>
               <LinearGradient colors={['#ECFDF5', '#D1FAE5']} style={st.journeyCard}>
                 <View style={[st.journeyIconWrap, { backgroundColor: '#D1FAE5' }]}>
-                  <Ionicons name="time-outline" size={22} color="#059669" />
-              </View>
-                <Text style={st.journeyVal}>12h 30m</Text>
-                <Text style={st.journeyLbl}>This Week</Text>
-                <View style={st.trendRow}>
-                  <TrendingUp size={12} color="#059669" />
-                  <Text style={st.trendTxt}>↗ 15% from last week</Text>
-              </View>
+                  <Ionicons name="time-outline" size={16} color="#059669" />
+                </View>
+                <Text style={st.journeyVal}>12h</Text>
+                <Text style={st.journeyLbl} numberOfLines={1}>This Week</Text>
               </LinearGradient>
-            </ScrollView>
+            </View>
 
             {/* Discover swipe card — like & profile */}
             <View style={st.secHead}>
@@ -621,18 +644,29 @@ export default function StudyPartnerHomeScreen() {
                     key={b.id}
                     activeOpacity={0.92}
                     style={st.buddyCard}
-                    onPress={() => router.push({ pathname: '/(tabs)/study-partner-liked-user' as any, params: { userId: b.id, userName: b.name } })}
+                    onPress={() => router.push({
+                      pathname: '/(tabs)/study-partner-liked-user' as any,
+                      params: {
+                        userId: b.id,
+                        name: b.name,
+                        profilePhoto: b.profilePhoto || '',
+                        examType: b.examType || '',
+                        fromMatchOrChat: 'true',
+                      },
+                    })}
                   >
-                    <View style={st.buddyPhotoWrap}>
-                      {photo ? (
-                        <Image source={{ uri: photo }} style={st.buddyPhoto} />
-                      ) : (
-                        <LinearGradient colors={['#C4B5FD', '#8E78E7']} style={st.buddyPhoto}>
-                          <Text style={st.buddyInitial}>{b.name.charAt(0)}</Text>
-                        </LinearGradient>
-                      )}
-                      <View style={st.onlineDot} />
-                </View>
+                    <View style={st.buddyPhotoRing}>
+                      <View style={st.buddyPhotoWrap}>
+                        {photo ? (
+                          <Image source={{ uri: photo }} style={st.buddyPhoto} />
+                        ) : (
+                          <LinearGradient colors={['#C4B5FD', '#8E78E7', '#6344D4']} style={st.buddyPhoto}>
+                            <Text style={st.buddyInitial}>{b.name.charAt(0)}</Text>
+                          </LinearGradient>
+                        )}
+                        <View style={st.onlineDot} />
+                      </View>
+                    </View>
                     <Text style={st.buddyName} numberOfLines={1}>{b.name}</Text>
                     <Text style={st.buddyMeta} numberOfLines={1}>{b.examType || 'Exam Prep'}</Text>
                     <View style={[st.buddyTag, { backgroundColor: tag.bg }]}>
@@ -665,23 +699,26 @@ export default function StudyPartnerHomeScreen() {
           )}
 
             {/* How it works */}
-            <Text style={[st.secTitle, { paddingHorizontal: PAD, marginTop: 8, marginBottom: 14 }]}>How It Works?</Text>
-            <View style={st.howWrap}>
+            <Text style={[st.secTitle, { paddingHorizontal: PAD, marginTop: 8, marginBottom: 12 }]}>How It Works</Text>
+            <View style={st.howList}>
               {[
-                { step: '1', icon: 'person-circle-outline' as const, title: 'Create Profile', sub: 'Set goals & exam preferences', color: '#6344D4', bg: '#F3EEFF' },
-                { step: '2', icon: 'heart' as const, title: 'Find a Match', sub: 'Swipe & connect with buddies', color: '#EC4899', bg: '#FCE7F3' },
-                { step: '3', icon: 'people' as const, title: 'Study Together', sub: 'Chat, plan & grow together', color: '#2563EB', bg: '#EFF6FF' },
-              ].map((item, i) => (
-                <View key={item.step} style={st.howStepWrap}>
-                  {i < 2 && <View style={st.howDots}><View style={st.howDotLine} /></View>}
-                  <View style={st.howStep}>
-                    <View style={[st.howIcon, { backgroundColor: item.bg }]}>
-                      <Ionicons name={item.icon} size={24} color={item.color} />
-              </View>
-                    <Text style={st.howTitle}>{item.title}</Text>
+                { step: '01', icon: 'person-circle-outline' as const, title: 'Create Profile', sub: 'Set goals & exam preferences', color: '#6344D4', bg: '#F3EEFF' },
+                { step: '02', icon: 'heart' as const, title: 'Find a Match', sub: 'Swipe & connect with buddies', color: '#EC4899', bg: '#FCE7F3' },
+                { step: '03', icon: 'people' as const, title: 'Study Together', sub: 'Chat, plan & grow together', color: '#2563EB', bg: '#EFF6FF' },
+              ].map((item) => (
+                <View key={item.step} style={st.howCard}>
+                  <View style={[st.howIcon, { backgroundColor: item.bg }]}>
+                    <Ionicons name={item.icon} size={22} color={item.color} />
+                  </View>
+                  <View style={st.howCardBody}>
+                    <View style={st.howStepRow}>
+                      <Text style={st.howStepNum}>{item.step}</Text>
+                      <Text style={st.howTitle}>{item.title}</Text>
+                    </View>
                     <Text style={st.howSub}>{item.sub}</Text>
-              </View>
-            </View>
+                  </View>
+                  <ChevronRight size={16} color={C.muted} strokeWidth={2} />
+                </View>
               ))}
             </View>
 
@@ -727,48 +764,127 @@ const st = StyleSheet.create({
   orb2: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: '#FBCFE8', top: 400, left: -70, opacity: 0.35 },
   errBox: { marginHorizontal: PAD, padding: 12, backgroundColor: '#FEF2F2', borderRadius: 12, marginBottom: 10, marginTop: 4 },
   errTxt: { fontFamily: FontFamily.medium, fontSize: 13, color: '#DC2626', textAlign: 'center' },
-  heroWrap: { marginHorizontal: PAD, marginBottom: 16, ...purpleSh },
-  heroBorder: { borderRadius: 24, padding: 2 },
-  heroCard: { borderRadius: 22, padding: 18, overflow: 'hidden', minHeight: 168 },
-  heroOrb: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(255,255,255,0.5)', top: -20, right: 40 },
-  heroRow: { flexDirection: 'row', alignItems: 'center' },
-  heroCopy: { flex: 1, paddingRight: 4 },
-  heroTitle: { fontFamily: FontFamily.extraBold, fontSize: 22, color: C.ink, lineHeight: 28 },
-  heroAccent: { color: C.primary },
-  heroSub: { fontFamily: FontFamily.regular, fontSize: 12, color: C.muted, marginTop: 4, marginBottom: 12 },
-  heroCta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 11, borderRadius: 22, gap: 6 },
-  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 13, color: '#FFF' },
-  heroImg: { width: 110, height: 120 },
-  statsRow: { paddingHorizontal: PAD, gap: 10, paddingBottom: 18 },
-  statCard: {
-    width: (SCREEN_W - PAD * 2 - 30) / 4 + 8,
-    minWidth: 88,
-    backgroundColor: C.card,
-    borderRadius: 16,
-    padding: 12,
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: PAD,
+    marginBottom: 12,
+    marginTop: 6,
+  },
+  screenHeaderLeft: { flex: 1, paddingRight: 10 },
+  screenBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  screenBadgeTxt: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 10,
+    color: '#713F12',
+    letterSpacing: 0.3,
+  },
+  screenTitle: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: 24,
+    color: C.ink,
+    lineHeight: 30,
+    letterSpacing: -0.5,
+  },
+  screenSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  matchChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFF',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: '#FBCFE8',
     ...purpleSh,
   },
-  statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  statVal: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink },
-  statLbl: { fontFamily: FontFamily.regular, fontSize: 9, color: C.muted, textAlign: 'center', marginTop: 2 },
+  matchChipTxt: { fontFamily: FontFamily.bold, fontSize: 14, color: C.pink },
+  heroWrap: { marginHorizontal: PAD, marginBottom: 16, ...purpleSh },
+  heroBorder: { borderRadius: 22, padding: 2 },
+  heroCard: { borderRadius: 20, padding: 16, overflow: 'hidden', minHeight: 152 },
+  heroOrb: { position: 'absolute', width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(255,255,255,0.45)', top: -28, right: 24 },
+  heroOrb2: { position: 'absolute', width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(236,72,153,0.12)', bottom: 8, left: 12 },
+  heroRow: { flexDirection: 'row', alignItems: 'center' },
+  heroCopy: { flex: 1, paddingRight: 4 },
+  heroTitle: { fontFamily: FontFamily.extraBold, fontSize: 20, color: C.ink, lineHeight: 26 },
+  heroAccent: { color: C.primary },
+  heroSub: { fontFamily: FontFamily.regular, fontSize: 11, color: C.muted, marginTop: 4, marginBottom: 10, lineHeight: 16 },
+  heroCta: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, gap: 6 },
+  heroCtaTxt: { fontFamily: FontFamily.bold, fontSize: 12, color: '#FFF' },
+  heroImg: { width: 130, height: 130 },
+  statsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: PAD,
+    gap: 8,
+    paddingBottom: 14,
+  },
+  statCardOuter: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 14,
+    padding: 1.5,
+    backgroundColor: '#EDE9FE',
+    ...purpleSh,
+  },
+  statCard: {
+    borderRadius: 12,
+    padding: 8,
+    alignItems: 'center',
+    minHeight: 72,
+  },
+  statIcon: { width: 28, height: 28, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  statVal: { fontFamily: FontFamily.bold, fontSize: 12, color: C.ink },
+  statLbl: { fontFamily: FontFamily.regular, fontSize: 8, color: C.muted, textAlign: 'center', marginTop: 1 },
   secHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAD, marginBottom: 12 },
   secTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: C.ink },
   viewProgress: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   viewProgressTxt: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.primary },
   seeAll: { fontFamily: FontFamily.semiBold, fontSize: 13, color: C.primaryLight },
-  journeyRow: { paddingHorizontal: PAD, gap: 12, paddingBottom: 18 },
-  journeyCard: { width: 140, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)' },
-  journeyCardWhite: { backgroundColor: C.card, borderColor: C.border, alignItems: 'center', ...purpleSh },
-  journeyIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.6)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  journeyVal: { fontFamily: FontFamily.bold, fontSize: 18, color: C.ink },
-  journeyLbl: { fontFamily: FontFamily.medium, fontSize: 11, color: C.muted, marginTop: 2 },
-  journeyHint: { fontFamily: FontFamily.regular, fontSize: 10, color: C.muted, marginTop: 4 },
-  ringTxt: { position: 'absolute', fontFamily: FontFamily.bold, fontSize: 11, color: C.primary },
-  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
-  trendTxt: { fontFamily: FontFamily.medium, fontSize: 9, color: '#059669' },
+  journeyRow: {
+    flexDirection: 'row',
+    paddingHorizontal: PAD,
+    gap: 8,
+    paddingBottom: 14,
+  },
+  journeyCard: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    alignItems: 'center',
+  },
+  journeyCardWhite: { backgroundColor: C.card, borderColor: C.border, ...purpleSh },
+  journeyIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  journeyVal: { fontFamily: FontFamily.bold, fontSize: 13, color: C.ink },
+  journeyLbl: { fontFamily: FontFamily.medium, fontSize: 9, color: C.muted, marginTop: 1, textAlign: 'center' },
+  ringTxt: { position: 'absolute', fontFamily: FontFamily.bold, fontSize: 9, color: C.primary },
   buddyRow: { paddingHorizontal: PAD, gap: 12, paddingBottom: 16 },
   buddyCard: {
     width: BUDDY_W,
@@ -779,8 +895,15 @@ const st = StyleSheet.create({
     borderColor: C.border,
     ...purpleSh,
   },
-  buddyPhotoWrap: { alignSelf: 'center', marginBottom: 10, position: 'relative' },
-  buddyPhoto: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  buddyPhotoRing: {
+    alignSelf: 'center',
+    marginBottom: 10,
+    padding: 2.5,
+    borderRadius: 40,
+    backgroundColor: '#EDE9FE',
+  },
+  buddyPhotoWrap: { position: 'relative' },
+  buddyPhoto: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
   buddyInitial: { fontFamily: FontFamily.bold, fontSize: 28, color: '#FFF' },
   onlineDot: {
     position: 'absolute', bottom: 4, right: 4, width: 14, height: 14, borderRadius: 7,
@@ -796,14 +919,24 @@ const st = StyleSheet.create({
   likedBanner: { marginHorizontal: PAD, marginBottom: 14, borderRadius: 16, overflow: 'hidden' },
   likedGrad: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10, borderWidth: 1, borderColor: '#FBCFE8', borderRadius: 16 },
   likedTxt: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: 13, color: C.ink },
-  howWrap: { flexDirection: 'row', paddingHorizontal: PAD, marginBottom: 20, justifyContent: 'space-between' },
-  howStepWrap: { flex: 1, alignItems: 'center', position: 'relative' },
-  howDots: { position: 'absolute', top: 28, left: '55%', right: '-45%', height: 2, zIndex: 0 },
-  howDotLine: { flex: 1, borderStyle: 'dotted', borderWidth: 1, borderColor: '#C4B5FD' },
-  howStep: { alignItems: 'center', zIndex: 1 },
-  howIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  howTitle: { fontFamily: FontFamily.bold, fontSize: 12, color: C.ink, textAlign: 'center' },
-  howSub: { fontFamily: FontFamily.regular, fontSize: 9, color: C.muted, textAlign: 'center', marginTop: 3, paddingHorizontal: 4 },
+  howList: { paddingHorizontal: PAD, gap: 10, marginBottom: 20 },
+  howCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    ...purpleSh,
+  },
+  howCardBody: { flex: 1, minWidth: 0 },
+  howStepRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  howStepNum: { fontFamily: FontFamily.bold, fontSize: 11, color: C.primaryLight },
+  howIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  howTitle: { fontFamily: FontFamily.bold, fontSize: 14, color: C.ink },
+  howSub: { fontFamily: FontFamily.regular, fontSize: 11, color: C.muted, lineHeight: 15 },
   profileCta: { marginHorizontal: PAD, marginBottom: 12, borderRadius: 18, overflow: 'hidden' },
   profileCtaGrad: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   profileCtaTitle: { fontFamily: FontFamily.bold, fontSize: 14, color: '#FFF' },
@@ -840,8 +973,8 @@ const st = StyleSheet.create({
   swipeInitial: { position: 'absolute', top: '40%', alignSelf: 'center', fontFamily: FontFamily.extraBold, fontSize: 64, color: 'rgba(255,255,255,0.5)' },
   swipeTopGrad: { ...StyleSheet.absoluteFillObject, height: 100 },
   swipeTopRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 14, zIndex: 2 },
-  matchPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
-  matchPillTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: C.ink },
+  matchPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
+  matchPillTxt: { fontFamily: FontFamily.bold, fontSize: 11, color: '#78350F' },
   countPill: { backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
   countPillTxt: { fontFamily: FontFamily.semiBold, fontSize: 11, color: '#FFF' },
   interestCol: { position: 'absolute', right: 12, top: 56, gap: 8, zIndex: 2 },
@@ -856,22 +989,37 @@ const st = StyleSheet.create({
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   locTxt: { fontFamily: FontFamily.regular, fontSize: 11, color: 'rgba(255,255,255,0.9)' },
   swipeBio: { fontFamily: FontFamily.regular, fontSize: 12, color: 'rgba(255,255,255,0.8)', lineHeight: 17 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: 12 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 18, paddingVertical: 10 },
   actBtnPass: {
-    width: 58, height: 58, borderRadius: 29, backgroundColor: C.card,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E9E0FF',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E9E0FF',
     ...purpleSh,
   },
   actBtnStar: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: C.card,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#E9E0FF',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#FDE68A',
     ...purpleSh,
   },
   actBtnLike: {
-    width: 62, height: 62, borderRadius: 31, backgroundColor: C.card,
-    alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FBCFE8',
-    ...purpleSh,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#EC4899', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12 },
+      android: { elevation: 8 },
+    }),
   },
+  actBtnInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  actBtnLikeGrad: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   discoverEmpty: { alignItems: 'center', padding: 28, backgroundColor: C.card, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: C.border },
   discoverEmptyTitle: { fontFamily: FontFamily.semiBold, fontSize: 14, color: C.muted, marginTop: 10, marginBottom: 12 },
   discoverEmptyBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16 },

@@ -77,8 +77,7 @@ export default function AgoraNativeVoiceChat({
 
       
     } catch (error) {
-      console.error('❌ Failed to initialize Agora:', error);
-      onError?.(error);
+            onError?.(error);
     }
   };
 
@@ -102,8 +101,7 @@ export default function AgoraNativeVoiceChat({
       },
       
       onError: (err: number, msg: string) => {
-        console.error('❌ Agora error:', err, msg);
-        onError?.(err);
+                onError?.(err);
       },
       
       onUserJoined: (connection: RtcConnection, remoteUid: number, elapsed: number) => {
@@ -143,8 +141,7 @@ export default function AgoraNativeVoiceChat({
       );
       
     } catch (error) {
-      console.error('❌ Failed to join channel:', error);
-      onError?.(error);
+            onError?.(error);
     }
   };
 
@@ -156,8 +153,7 @@ export default function AgoraNativeVoiceChat({
 
       await engine.current.leaveChannel();
     } catch (error) {
-      console.error('❌ Failed to leave channel:', error);
-    }
+          }
   };
 
   // Toggle microphone
@@ -175,8 +171,7 @@ export default function AgoraNativeVoiceChat({
 
       }
     } catch (error) {
-      console.error('❌ Failed to toggle mic:', error);
-    }
+          }
   };
 
   // Toggle speaker
@@ -188,8 +183,7 @@ export default function AgoraNativeVoiceChat({
       setSpeakerOn(!speakerOn);
 
     } catch (error) {
-      console.error('❌ Failed to toggle speaker:', error);
-    }
+          }
   };
 
   // End turn manually

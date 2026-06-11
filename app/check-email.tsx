@@ -42,7 +42,7 @@ export default function CheckEmail() {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/login')} style={styles.signInLink}>
+        <TouchableOpacity onPress={() => router.push('/phone-login')} style={styles.signInLink}>
           <Text style={styles.signInText}>Already verified? Sign in</Text>
         </TouchableOpacity>
       </View>

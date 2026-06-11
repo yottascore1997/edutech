@@ -32,8 +32,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     // registerForPushNotificationsAsync().then(token => {
     //   if (token) {
     //     setExpoPushToken(token);
-    //     console.log('Expo push token:', token);
-    //   }
+    //         //   }
     // });
 
     // Setup notification handler
@@ -47,17 +46,14 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     // Listen for notifications
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
-    });
+          });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response:', response);
-    });
+          });
 
     // Setup socket notification handler
     SocketService.setNotificationHandler((notification) => {
-      console.log('Socket notification:', notification);
-      // You can add local notification here if needed
+            // You can add local notification here if needed
     });
 
     return () => {
@@ -98,8 +94,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       }
       
       if (finalStatus !== 'granted') {
-        console.log('Failed to get push token for push notification!');
-        return null;
+                return null;
       }
       
       try {
@@ -107,13 +102,11 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           projectId: 'your-project-id' // Add your Expo project ID here
         })).data;
       } catch (error) {
-        console.error('Error getting push token:', error);
-        // Don't throw error, just continue without push notifications
+                // Don't throw error, just continue without push notifications
         return null;
       }
     } else {
-      console.log('Must use physical device for Push Notifications');
-    }
+          }
 
     if (Platform.OS === 'android') {
       Notifications.setNotificationChannelAsync('default', {
@@ -144,8 +137,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         setUnreadCount(data.unreadCount || 0);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
+          }
   };
 
   const markAsRead = (id: string) => {
@@ -185,5 +177,4 @@ export const useNotifications = () => {
   }
   return context;
 };
-
 

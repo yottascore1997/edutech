@@ -1,19 +1,23 @@
 import CommonHeader from '@/components/CommonHeader';
 import CustomTabBar from '@/components/CustomTabBar';
-import { Tabs } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 function TabLayout() {
+  const segments = useSegments();
+  const hideAppHeader = segments.includes('book-store');
+
   return (
     <View style={styles.container}>
-      <CommonHeader 
-        showMainOptions={false}
-      />
+      {!hideAppHeader ? <CommonHeader showMainOptions={false} /> : null}
       <Tabs
         screenOptions={{
           headerShown: false,
           tabBarStyle: { display: 'none' }, // Hide default tab bar
+          lazy: false,
+          freezeOnBlur: true,
         }}
+        detachInactiveScreens={false}
         tabBar={(props) => <CustomTabBar {...props} />}
       >
       <Tabs.Screen

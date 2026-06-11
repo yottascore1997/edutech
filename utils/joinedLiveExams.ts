@@ -60,8 +60,7 @@ export async function syncJoinedLiveExamIds(token: string, userId: string): Prom
       }
     }
   } catch (error) {
-    console.error('Error syncing joined live exams from API:', error);
-  }
+      }
 
   const merged = [...new Set([...stored, ...fromApi])];
   await AsyncStorage.setItem(storageKey(userId), JSON.stringify(merged));

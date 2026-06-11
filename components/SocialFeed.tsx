@@ -135,17 +135,11 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
   
   // Debug state changes
   useEffect(() => {
-    console.log('🔍 State changed - searchResults:', searchResults);
-    console.log('🔍 State changed - showSearchResults:', showSearchResults);
-    console.log('🔍 State changed - searching:', searching);
-  }, [searchResults, showSearchResults, searching]);
+              }, [searchResults, showSearchResults, searching]);
   
   // Debug state changes
   useEffect(() => {
-    console.log('🔍 State changed - searchResults:', searchResults);
-    console.log('🔍 State changed - showSearchResults:', showSearchResults);
-    console.log('🔍 State changed - searching:', searching);
-  }, [searchResults, showSearchResults, searching]);
+              }, [searchResults, showSearchResults, searching]);
 
   const resetAndFetchPosts = () => {
     if (isFetchingRef.current) return; // Prevent concurrent fetches
@@ -281,8 +275,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         setStories(storiesArray);
       }
     } catch (error) {
-      console.error('Error fetching stories:', error);
-    }
+          }
   };
 
   const onRefresh = async () => {
@@ -349,8 +342,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         setNewComment('');
       }
     } catch (e) {
-      console.error('Error adding comment:', e);
-      // Optionally show error message to user
+            // Optionally show error message to user
     } finally {
       setPostingComment(false);
     }
@@ -383,8 +375,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         );
       }
     } catch (error) {
-      console.error('Error liking post:', error);
-      // Optionally show error message to user
+            // Optionally show error message to user
     }
   };
 
@@ -414,8 +405,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         );
       }
     } catch (error) {
-      console.error('Error voting on poll:', error);
-      // Optionally show error message to user
+            // Optionally show error message to user
     }
   };
 
@@ -444,11 +434,9 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         );
       }
     } catch (error) {
-      console.error('Error answering question:', error);
-      // Optionally show error message to user
+            // Optionally show error message to user
     }
   };
-
 
   const handleMessageUser = async (authorId: string, authorName: string) => {
     try {
@@ -464,8 +452,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         }
       }
     } catch (error) {
-      console.error('Error loading messages:', error);
-    }
+          }
   };
 
   const handleAddStory = () => {
@@ -484,8 +471,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
       setSelectedStoryIndex(storyIndex);
       setStoryViewerVisible(true);
     } else {
-      console.log('No stories available for this user');
-    }
+          }
   };
 
   // Report functionality
@@ -523,8 +509,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         Alert.alert('Error', 'Failed to report post. Please try again.');
       }
     } catch (error) {
-      console.error('Error reporting post:', error);
-      Alert.alert('Error', 'Failed to report post. Please try again.');
+            Alert.alert('Error', 'Failed to report post. Please try again.');
     } finally {
       setReporting(false);
     }
@@ -571,8 +556,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         Alert.alert('Error', 'Failed to block user. Please try again.');
       }
     } catch (error) {
-      console.error('Error blocking user:', error);
-      Alert.alert('Error', 'Failed to block user. Please try again.');
+            Alert.alert('Error', 'Failed to block user. Please try again.');
     } finally {
       setBlocking(false);
     }
@@ -587,52 +571,43 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
 
   // Search functionality
   const handleSearch = async (query: string) => {
-    console.log('🔍 Search query:', query);
-    setSearchQuery(query);
+        setSearchQuery(query);
     
     if (query.trim().length === 0) {
       // If no query, hide search results
-      console.log('🔍 No query, hiding search results...');
-      setSearchResults([]);
+            setSearchResults([]);
       setShowSearchResults(false);
       return;
     }
 
     if (query.trim().length < 2) {
-      console.log('🔍 Query too short, clearing results');
-      setSearchResults([]);
+            setSearchResults([]);
       setShowSearchResults(false);
       return;
     }
 
     setSearching(true);
     try {
-      console.log('🔍 Making API call to search...');
-      const response = await apiFetchAuth(`/student/search?q=${encodeURIComponent(query)}`, user?.token || '');
-      console.log('🔍 Search API response:', response);
-      
+            const response = await apiFetchAuth(`/student/search?q=${encodeURIComponent(query)}`, user?.token || '');
+            
       if (response.ok) {
         const users = response.data.users || [];
-        console.log('🔍 Found users:', users);
-        
+                
         // Enhanced filtering to remove unwanted results
         const validUsers = users.filter((searchUser: any) => {
           // Basic validation
           if (!searchUser || !searchUser.id || !searchUser.name) {
-            console.log('🔍 Filtering out user with missing data:', searchUser);
-            return false;
+                        return false;
           }
           
           // Filter out current user (fix the variable reference)
           if (searchUser.id === user?.id) {
-            console.log('🔍 Filtering out current user:', searchUser.name);
-            return false;
+                        return false;
           }
           
           // Filter out users with incomplete profiles
           if (!searchUser.email || !searchUser.name.trim()) {
-            console.log('🔍 Filtering out incomplete profile:', searchUser);
-            return false;
+                        return false;
           }
           
           // Only filter out obvious test/dummy accounts (very minimal filtering)
@@ -646,26 +621,21 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
           );
           
           if (isUnwanted) {
-            console.log('🔍 Filtering out test account:', searchUser.email);
-            return false;
+                        return false;
           }
           
-          console.log('🔍 Valid user:', searchUser.name, searchUser.email);
-          return true;
+                    return true;
         });
         
-        console.log('🔍 Valid users after enhanced filtering:', validUsers);
-        
+                
         setSearchResults(validUsers);
         setShowSearchResults(true);
       } else {
-        console.log('🔍 Search API error:', response);
-        setSearchResults([]);
+                setSearchResults([]);
         setShowSearchResults(false);
       }
     } catch (error) {
-      console.error('🔍 Search error:', error);
-      setSearchResults([]);
+            setSearchResults([]);
       setShowSearchResults(false);
     } finally {
       setSearching(false);
@@ -680,19 +650,12 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
   };
 
   const handleUserPress = (searchUser: any) => {
-    console.log('🚀 handleUserPress called with:', searchUser);
-    
+        
     // Navigate to user profile using expo-router
     if (searchUser && searchUser.id) {
-      console.log('🔍 Navigating to user profile:', searchUser);
-      console.log('🔍 User ID:', searchUser.id);
-      console.log('🔍 User Name:', searchUser.name);
-      console.log('🔍 Router object:', router);
-      console.log('🔍 Navigation object:', navigation);
-      
+                                    
       try {
-        console.log('🚀 Attempting expo-router navigation...');
-        // Use expo-router for navigation
+                // Use expo-router for navigation
         router.push({
           pathname: '/(tabs)/user-profile',
           params: { 
@@ -701,36 +664,28 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
           }
         });
         
-        console.log('✅ Navigation successful using expo-router');
-        setShowSearchResults(false);
+                setShowSearchResults(false);
         setSearchQuery('');
       } catch (error) {
-        console.error('❌ Navigation error:', error);
-        
+                
         // Fallback: try navigation prop if available
         if (navigation) {
           try {
-            console.log('🚀 Attempting fallback navigation...');
-            navigation.navigate('UserProfile' as never, { 
+                        navigation.navigate('UserProfile' as never, { 
               userId: searchUser.id,
               originalUserData: searchUser
             } as never);
-            console.log('✅ Fallback navigation successful');
-            setShowSearchResults(false);
+                        setShowSearchResults(false);
             setSearchQuery('');
           } catch (fallbackError) {
-            console.error('❌ Fallback navigation also failed:', fallbackError);
-            alert('Navigation failed. Please try again.');
+                        alert('Navigation failed. Please try again.');
           }
         } else {
-          console.log('❌ No navigation object available');
-          alert('Navigation failed. Please try again.');
+                    alert('Navigation failed. Please try again.');
         }
       }
     } else {
-      console.log('❌ Invalid user data');
-      console.log('Search user:', searchUser);
-      alert('Cannot navigate: Invalid user data');
+                  alert('Cannot navigate: Invalid user data');
     }
   };
 
@@ -750,8 +705,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         setFollowRequests(response.data || []);
       }
     } catch (error) {
-      console.error('Error fetching follow requests:', error);
-    } finally {
+          } finally {
       setFollowRequestsLoading(false);
     }
   };
@@ -770,8 +724,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         fetchPosts();
       }
     } catch (error) {
-      console.error('Error accepting follow request:', error);
-    }
+          }
   };
 
   // Reject follow request
@@ -786,8 +739,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
         setFollowRequests(prev => prev.filter(req => req.id !== requestId));
       }
     } catch (error) {
-      console.error('Error rejecting follow request:', error);
-    }
+          }
   };
 
   if (loading) {
@@ -941,9 +893,7 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
             style={styles.premiumAuthorSection} 
             onPress={() => {
               if (item.author?.id) {
-                console.log('🔍 Navigating to user profile from post:', item.author.id);
-                console.log('🔍 Author data:', item.author);
-                
+                                                
                 try {
                   // Use expo-router for navigation (same as search results)
                   router.push({
@@ -953,10 +903,8 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
                       originalUserData: JSON.stringify(item.author)
                     }
                   });
-                  console.log('✅ Navigation successful');
-                } catch (error) {
-                  console.error('❌ Navigation error:', error);
-                  
+                                  } catch (error) {
+                                    
                   // Fallback to navigation prop if available
                   if (navigation) {
                     try {
@@ -964,10 +912,8 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
                         userId: item.author.id,
                         originalUserData: item.author 
                       });
-                      console.log('✅ Fallback navigation successful');
-                    } catch (fallbackError) {
-                      console.error('❌ Fallback navigation error:', fallbackError);
-                    }
+                                          } catch (fallbackError) {
+                                          }
                   }
                 }
               }
@@ -1373,8 +1319,6 @@ export default function SocialFeed({ refreshTrigger, navigation }: SocialFeedPro
                   renderItem={renderSearchResult}
                   showsVerticalScrollIndicator={false}
                   contentContainerStyle={styles.searchResultsList}
-                  onLayout={() => console.log('🔍 FlatList onLayout called')}
-                  onContentSizeChange={() => console.log('🔍 FlatList onContentSizeChange called')}
                 />
                </View>
             ) : searchQuery.trim().length >= 2 ? (

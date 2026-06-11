@@ -50,8 +50,7 @@ const ExamDetailScreen = () => {
             setResultError(null);
             setResultFetched(true);
         } catch (e) {
-            console.error('Failed to parse resultData param:', e);
-        }
+                    }
     }, [resultDataParam]);
 
     // Check if user is a participant in this exam
@@ -71,8 +70,7 @@ const ExamDetailScreen = () => {
                 }
             }
         } catch (error) {
-            console.error('Error checking participant status:', error);
-            const justJoined = joined === '1' || joined === 'true';
+                        const justJoined = joined === '1' || joined === 'true';
             if (!justJoined) {
                 setIsParticipant(false);
             }
@@ -189,12 +187,10 @@ const ExamDetailScreen = () => {
             try {
                 startTime = new Date(exam.startTime);
                 if (isNaN(startTime.getTime())) {
-                    console.error('Invalid start time:', exam.startTime);
-                    return;
+                                        return;
                 }
             } catch (error) {
-                console.error('Error parsing start time:', error);
-                return;
+                                return;
             }
             
             // Strict check: exam has started only if current time is >= start time
@@ -263,12 +259,10 @@ const ExamDetailScreen = () => {
                     setLeaderboard(rankedLeaderboard);
                     
                 } else {
-                    console.error("Failed to load leaderboard:", response.data);
-                    setLeaderboard([]);
+                                        setLeaderboard([]);
                 }
             } catch (e: any) {
-                console.error("An error occurred while fetching leaderboard", e);
-            } finally {
+                            } finally {
                 setLeaderboardLoading(false);
             }
         };
@@ -287,12 +281,10 @@ const ExamDetailScreen = () => {
                 if (response.ok) {
                     setWinnings(response.data || []);
                 } else {
-                    console.error("Failed to load winnings: ", response.data);
-                    setWinnings([]);
+                                        setWinnings([]);
                 }
             } catch (e: any) {
-                console.error("An error occurred while fetching winnings", e);
-            } finally {
+                            } finally {
                 setWinningsLoading(false);
             }
         };
@@ -311,12 +303,10 @@ const ExamDetailScreen = () => {
                 if (response.ok) {
                     setAttempts(response.data || null);
                 } else {
-                    console.error("Failed to load attempts: ", response.data);
-                    setAttempts(null);
+                                        setAttempts(null);
                 }
             } catch (e: any) {
-                console.error("An error occurred while fetching attempts", e);
-                setAttempts(null);
+                                setAttempts(null);
             } finally {
                 setAttemptsLoading(false);
             }
@@ -452,8 +442,7 @@ const ExamDetailScreen = () => {
                     }));
                 }
             } catch (error) {
-                console.error('Error refreshing spots:', error);
-            }
+                            }
         };
 
         const interval = setInterval(refreshSpots, 30000); // Refresh every 30 seconds

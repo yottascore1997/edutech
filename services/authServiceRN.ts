@@ -23,8 +23,7 @@ class AuthServiceRN {
         ? phoneNumber 
         : `+91${phoneNumber}`;
 
-      console.log('Sending OTP to:', formattedPhoneNumber);
-      
+            
       // Use React Native Firebase Auth
       const confirmation = await auth().signInWithPhoneNumber(formattedPhoneNumber);
       this.confirmationResult = confirmation;
@@ -35,8 +34,7 @@ class AuthServiceRN {
         verificationId: confirmation.verificationId
       };
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -46,8 +44,7 @@ class AuthServiceRN {
   // Verify OTP using React Native Firebase
   async verifyOTP(otp: string): Promise<VerifyOTPResult> {
     try {
-      console.log('Verifying OTP:', otp);
-      
+            
       if (!this.confirmationResult) {
         return {
           success: false,
@@ -63,8 +60,7 @@ class AuthServiceRN {
         user: result.user
       };
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -97,8 +93,7 @@ class AuthServiceRN {
       await auth().signOut();
       this.confirmationResult = null;
     } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
+            throw error;
     }
   }
 
@@ -119,17 +114,4 @@ class AuthServiceRN {
 }
 
 export default new AuthServiceRN();
-
-
-
-
-
-
-
-
-
-
-
-
-
 

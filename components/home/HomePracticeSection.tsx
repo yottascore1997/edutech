@@ -93,8 +93,7 @@ export default function HomePracticeSection() {
         setExams(response.data);
       }
     } catch (e) {
-      console.error(e);
-    } finally {
+          } finally {
       setLoading(false);
     }
   };

@@ -5,7 +5,7 @@ import { setApiAuthHandler } from '@/utils/apiAuthHandler';
 import { clearAuthData, getRefreshToken, getToken, getUser, storeAuthData } from '@/utils/storage';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'expo-router';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 interface User {
     id: string;
@@ -26,10 +26,10 @@ interface AuthContextType {
     loading: boolean;
     login: (email: string, password: string) => Promise<any>;
     register: (userData: { name: string; username: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => Promise<any>;
-    logout: () => void;
+    logout: () => Promise<void>;
     updateUser: (userData: Partial<User>) => void;
-    // Firebase OTP methods
-    loginWithOTP: (phoneNumber: string) => Promise<any>;
+    // Firebase OTP methods (same flow as web)
+    loginWithOTP: (phoneNumber: string, appVerifier: any) => Promise<any>;
     verifyOTP: (otp: string) => Promise<any>;
     firebaseUser: FirebaseUser | null;
 }
@@ -39,7 +39,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     login: async () => {},
     register: async () => {},
-    logout: () => {},
+    logout: async () => {},
     updateUser: () => {},
     loginWithOTP: async () => {},
     verifyOTP: async () => {},
@@ -53,6 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [userStateVersion, setUserStateVersion] = useState(0);
+    const isLoggingOutRef = useRef(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -61,17 +62,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
                 const token = await getToken();
                 const userData = await getUser();
-                if (__DEV__) {
-                    console.log('🔄 AuthContext - Loading from storage:', { hasToken: !!token, hasUserData: !!userData });
-                }
 
                 if (token && userData) {
                     const userWithToken = { ...userData, token };
                     setUser(userWithToken);
                     setUserStateVersion(prev => prev + 1);
                 }
-            } catch (e) {
-                console.error("❌ Failed to load user from storage:", e);
+            } catch {
             } finally {
                 setLoading(false);
             }
@@ -100,14 +97,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 return null;
             }
         };
-        const on401 = () => {
-            clearAuthData();
+        const on401 = async () => {
             setUser(null);
             setFirebaseUser(null);
+            await clearAuthData();
+            authService.clearSession();
             try {
                 auth.signOut();
             } catch {}
-            router.replace('/login');
+            router.replace('/phone-login');
         };
         setApiAuthHandler({ refreshAndGetToken, on401 });
         return () => setApiAuthHandler(null);
@@ -148,26 +146,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     body: attempt.body,
                 });
 
-
                 if (response.ok) {
                     const { token, refreshToken, user: userData } = response.data;
                     const userWithToken = { ...userData, token } as any;
 
-                    if (__DEV__) console.log('✅ Login - User state set and data stored');
-                    setUser(userWithToken);
+                                        setUser(userWithToken);
                     await storeAuthData(token, userData, refreshToken ?? null);
                     return userWithToken;
                 } else {
                     lastError = response.data || response;
                 }
             } catch (error: any) {
-                console.error('Login attempt failed for payload shape:', attempt.label, error);
-                lastError = error;
+                                lastError = error;
             }
         }
 
-        console.error('All login attempts failed. Last error:', lastError);
-        throw lastError || { message: 'Login failed. Please try again.' };
+                throw lastError || { message: 'Login failed. Please try again.' };
     };
 
     const register = async (userData: { name: string; username: string; email: string; password: string; phoneNumber: string; referralCode?: string }) => {
@@ -177,7 +171,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 method: 'POST',
                 body: userData,
             });
-
 
             if (response.ok) {
                 const { token, refreshToken, user: registeredUser } = response.data;
@@ -202,85 +195,92 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const logout = async () => {
-        try {
-            const refreshToken = await getRefreshToken();
-            if (refreshToken) {
-                await apiFetch('/auth/logout', {
-                    method: 'POST',
-                    body: { refreshToken },
-                });
-            }
-        } catch (e) {
-            if (__DEV__) console.warn('Logout API call failed:', e);
-        }
+        if (isLoggingOutRef.current) return;
+        isLoggingOutRef.current = true;
+
+        const refreshToken = await getRefreshToken();
+
+        // Local session clear first — don't block on slow/unreachable backend
         setUser(null);
         setFirebaseUser(null);
         await clearAuthData();
+        authService.clearSession();
+
         try {
             await auth.signOut();
-        } catch (error) {
-            console.error('Firebase sign out error:', error);
+        } catch {}
+
+        if (refreshToken) {
+            apiFetch('/auth/logout', {
+                method: 'POST',
+                body: { refreshToken },
+            }).catch(() => {});
         }
-        router.replace('/login');
+
+        try {
+            if (typeof router.canDismiss === 'function' && router.canDismiss()) {
+                router.dismissAll();
+            }
+        } catch {}
+
+        router.replace('/phone-login');
+        isLoggingOutRef.current = false;
     };
 
     const updateUser = (userData: Partial<User>) => {
         setUser(prevUser => prevUser ? { ...prevUser, ...userData } as User : null);
     };
 
-    // Firebase OTP Methods
-    const loginWithOTP = async (phoneNumber: string) => {
-        try {
-            if (__DEV__) console.log('🔥 Starting OTP login for:', phoneNumber);
-            const result = await authService.sendOTP(phoneNumber);
-            return result;
-        } catch (error) {
-            console.error('OTP login error:', error);
-            throw error;
+    // Firebase OTP — Step 1: backend validate, Step 2: Firebase SMS (web jaisa)
+    const loginWithOTP = async (phoneNumber: string, appVerifier: any) => {
+        const trimmed = (phoneNumber || '').trim();
+        const normalized = trimmed.startsWith('+') ? trimmed : `+91${trimmed.replace(/\D/g, '')}`;
+
+        const validateRes = await apiFetch('/auth/send-otp', {
+            method: 'POST',
+            headers: { 'X-App-Client': 'expo' },
+            body: { phoneNumber: normalized },
+        });
+
+        const validateData = validateRes.data;
+        if (!validateRes.ok || !validateData?.success) {
+            throw new Error(validateData?.error || validateData?.message || 'Phone validation failed');
         }
+
+        const validatedPhone = validateData.phoneNumber || normalized;
+        const result = await authService.sendOTP(validatedPhone, appVerifier);
+
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to send OTP');
+        }
+
+        return { ...result, phoneNumber: validatedPhone };
     };
 
     const verifyOTP = async (otp: string) => {
-        try {
-            if (__DEV__) console.log('🔥 Verifying OTP in AuthContext');
-            const result = await authService.verifyOTP(otp);
+        const result = await authService.verifyOTP(otp);
 
-            if (result.success && result.user) {
-                const firebaseToken = await result.user.getIdToken();
-                
-                try {
-                    const backendResponse = await apiFetch('/auth/firebase', {
-                        method: 'POST',
-                        body: {
-                            idToken: firebaseToken,
-                            phoneNumber: result.user.phoneNumber,
-                        },
-                    });
-
-                    if (backendResponse.ok) {
-                        const { token, refreshToken, user: userData } = backendResponse.data;
-                        const userWithToken = { ...userData, token };
-
-                        if (__DEV__) console.log('✅ OTP login complete - Backend token stored');
-                        setUser(userWithToken);
-                        setUserStateVersion(prev => prev + 1);
-                        await storeAuthData(token, userWithToken, refreshToken ?? null);
-                        return { success: true, user: userWithToken };
-                    } else {
-                        console.error('❌ Backend /auth/firebase failed:', backendResponse.data);
-                        throw new Error(backendResponse.data?.message || 'Backend authentication failed');
-                    }
-                } catch (backendError: any) {
-                    console.error('❌ Backend /auth/firebase error:', backendError);
-                    throw new Error(backendError.data?.message || backendError.message || 'Backend authentication failed');
-                }
-            } else {
-                throw new Error(result.message || 'OTP verification failed');
-            }
-        } catch (error) {
-            console.error('❌ OTP verification error in AuthContext:', error);
-            throw error;
+        if (!result.success || !result.user) {
+            throw new Error(result.message || 'OTP verification failed');
         }
+
+        const idToken = await result.user.getIdToken();
+        const backendResponse = await apiFetch('/auth/firebase', {
+            method: 'POST',
+            body: { idToken },
+        });
+
+        if (!backendResponse.ok) {
+            throw new Error(backendResponse.data?.error || backendResponse.data?.message || 'Login failed');
+        }
+
+        const { token, refreshToken, user: userData } = backendResponse.data;
+        const userWithToken = { ...userData, token };
+
+        setUser(userWithToken);
+        setUserStateVersion(prev => prev + 1);
+        await storeAuthData(token, userData, refreshToken ?? null);
+        return { success: true, user: userWithToken };
     };
 
     const value = {

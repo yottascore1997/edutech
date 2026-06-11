@@ -53,7 +53,7 @@ export default function ResetPassword() {
       const res = await apiFetch('/auth/reset-password', { method: 'POST', body: { token, newPassword: trimmedPassword } });
       if (res?.ok) {
         showSuccess('Password reset successfully. You can now sign in.');
-        router.replace('/login');
+        router.replace('/phone-login');
       }
     } catch (err: any) {
       const msg = err?.data?.message || err?.message;

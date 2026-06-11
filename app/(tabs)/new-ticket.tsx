@@ -92,8 +92,7 @@ const NewTicketScreen = () => {
                 }
             }
         } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image.');
+                        Alert.alert('Error', 'Failed to pick image.');
         } finally {
             setUploading(false);
         }
@@ -149,8 +148,7 @@ const NewTicketScreen = () => {
                 Alert.alert('Error', 'Failed to create support ticket.');
             }
         } catch (error) {
-            console.error('Error creating ticket:', error);
-            Alert.alert('Error', 'Failed to create support ticket. Please try again.');
+                        Alert.alert('Error', 'Failed to create support ticket. Please try again.');
         } finally {
             setLoading(false);
         }

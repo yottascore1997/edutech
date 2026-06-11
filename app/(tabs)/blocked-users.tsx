@@ -49,8 +49,7 @@ export default function BlockedUsersScreen() {
         Alert.alert('Error', 'Failed to load blocked users');
       }
     } catch (error) {
-      console.error('Error fetching blocked users:', error);
-      Alert.alert('Error', 'Failed to load blocked users');
+            Alert.alert('Error', 'Failed to load blocked users');
     } finally {
       setLoading(false);
     }
@@ -82,8 +81,7 @@ export default function BlockedUsersScreen() {
                 Alert.alert('Error', 'Failed to unblock user. Please try again.');
               }
             } catch (error) {
-              console.error('Error unblocking user:', error);
-              Alert.alert('Error', 'Failed to unblock user. Please try again.');
+                            Alert.alert('Error', 'Failed to unblock user. Please try again.');
             } finally {
               setUnblocking(null);
             }

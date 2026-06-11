@@ -80,8 +80,7 @@ const RazorpayPaymentModal: React.FC<RazorpayPaymentModalProps> = ({
         ]
       );
     } catch (error: any) {
-      console.error('Payment error:', error);
-      Alert.alert(
+            Alert.alert(
         'Payment Failed',
         error.message || 'Something went wrong. Please try again.'
       );

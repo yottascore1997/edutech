@@ -9,6 +9,7 @@ import {
   syncJoinedLiveExamIds,
 } from '@/utils/joinedLiveExams';
 import { useRouter } from 'expo-router';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import HomeScreenUI from '../../components/home/HomeScreenUI';
@@ -34,6 +35,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [weeklyToppersRefreshTrigger, setWeeklyToppersRefreshTrigger] = useState(0);
+  const { beginFetch, endFetch } = useScreenLoadState();
 
   const examSliderRef = useRef<FlatList<any>>(null);
   const [currentExamIndex, setCurrentExamIndex] = useState(0);
@@ -74,7 +76,7 @@ export default function HomeScreen() {
     }
 
     try {
-      setLoading(true);
+      beginFetch(setLoading, setRefreshing, { refresh: exams.length > 0 });
       const response = await apiFetchAuth('/student/exams', user.token);
       const joinedIds = user.id
         ? await syncJoinedLiveExamIds(user.token, String(user.id))
@@ -89,9 +91,8 @@ export default function HomeScreen() {
         setExams(merged);
       }
     } catch (error) {
-      console.error('Error fetching exams:', error);
-    } finally {
-      setLoading(false);
+          } finally {
+      endFetch(setLoading, setRefreshing);
     }
   };
 
@@ -101,8 +102,7 @@ export default function HomeScreen() {
       await fetchExams();
       setWeeklyToppersRefreshTrigger((t) => t + 1);
     } catch (error) {
-      console.error('Error refreshing home page:', error);
-    } finally {
+          } finally {
       setRefreshing(false);
     }
   };

@@ -73,8 +73,7 @@ export default function StudyPartnerMatchesScreen() {
       });
       setMatches(normalized.filter((m) => m.matchId && m.otherUser?.id));
     } catch (e: any) {
-      console.error('StudyPartnerMatches load error:', e);
-      setError('Unable to load matches. Please try again.');
+            setError('Unable to load matches. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -97,8 +96,7 @@ export default function StudyPartnerMatchesScreen() {
         prev.filter(m => m.otherUser && m.otherUser.id !== otherUserId),
       );
     } catch (e: any) {
-      console.error('StudyPartnerMatches unmatch error:', e);
-      setError('Failed to unmatch. Please try again.');
+            setError('Failed to unmatch. Please try again.');
     }
   };
 
@@ -124,6 +122,7 @@ export default function StudyPartnerMatchesScreen() {
         userId: other.id,
         name: other.name,
         profilePhoto: getDisplayPhotoUrl(other) || '',
+        fromMatchOrChat: 'true',
       },
     } as any);
   };

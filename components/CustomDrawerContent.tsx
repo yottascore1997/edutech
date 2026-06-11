@@ -167,8 +167,15 @@ const CustomDrawerContent = (props: any) => {
             'Logout',
             'Are you sure you want to logout?',
             [
-                { text: 'Logout', onPress: () => { navigation.closeDrawer(); logout(); } },
-                { text: 'Cancel', style: 'destructive', onPress: () => navigation.closeDrawer() },
+                { text: 'Cancel', style: 'cancel', onPress: () => navigation.closeDrawer() },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: () => {
+                        navigation.closeDrawer();
+                        void logout();
+                    },
+                },
             ]
         );
     };
@@ -219,7 +226,6 @@ const CustomDrawerContent = (props: any) => {
         navigation.closeDrawer();
         router.push('/deactivate-account' as const);
     };
-
 
     const displayName = user?.name || (user as any)?.user?.name || 'Student';
     const displayEmail = user?.email || '';
@@ -340,11 +346,23 @@ const CustomDrawerContent = (props: any) => {
                                 iconColor="#DB2777"
                                 iconImage={require('../assets/images/icons/budget.png')}
                             />
+                            <MenuItem
+                                icon="library-outline"
+                                label="Books"
+                                onPress={navigateToBookStore}
+                                isActive={activeMenu === 'book-store'}
+                                iconColor="#3B82F6"
+                                iconImage={require('../assets/images/icons/book.png')}
+                            />
+                            <MenuItem
+                                icon="trophy-outline"
+                                label="Winners"
+                                onPress={handleLeaderboardPress}
+                                isActive={activeMenu === 'leaderboard'}
+                                iconColor="#F59E0B"
+                            />
                         </MenuSection>
                     </View>
-
-
-
 
                     <View style={styles.footerCard}>
                         <View style={styles.privacyLinks}>

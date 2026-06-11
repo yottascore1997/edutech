@@ -101,8 +101,7 @@ export default function PYQResultScreen() {
         ).start();
       });
     } catch (e: any) {
-      console.error('Failed to load PYQ result', e);
-      setError(e?.message || 'Failed to load result');
+            setError(e?.message || 'Failed to load result');
     } finally {
       setLoading(false);
       setRefreshing(false);

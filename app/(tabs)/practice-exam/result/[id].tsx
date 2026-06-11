@@ -99,43 +99,25 @@ export default function PracticeExamResultScreen() {
         
         // First, try to parse from params
         if (resultData) {
-          console.log('📊 Result data from params (raw length):', resultData.length);
-          console.log('📊 Result data from params (first 500 chars):', resultData.substring(0, 500));
-          try {
+                              try {
             const parsed = JSON.parse(resultData);
-            console.log('📊 Parsed full response keys:', Object.keys(parsed));
-            console.log('📊 Parsed full response:', JSON.stringify(parsed, null, 2));
-            console.log('📊 parsed.result exists?', !!parsed.result);
-            console.log('📊 parsed.rankPreview exists?', !!parsed.rankPreview);
-            console.log('📊 parsed.rankPreview value:', parsed.rankPreview);
-            
+                                                                        
             // Handle nested response structure: { success, result: {...}, rankPreview: {...} } or direct result object
             parsedResult = parsed.result || parsed;
             
             // Extract rankPreview from response if available
             if (parsed.rankPreview) {
-              console.log('📊 Rank preview data found:', parsed.rankPreview);
-              console.log('📊 hasEnoughData:', parsed.rankPreview.hasEnoughData);
-              console.log('📊 Setting rankPreview state...');
-              setRankPreview(parsed.rankPreview);
-              console.log('✅ Rank preview extracted and set in state:', parsed.rankPreview);
-            } else {
-              console.log('⚠️ No rankPreview found in parsed data');
-              console.log('⚠️ Available keys in parsed:', Object.keys(parsed));
-              console.log('⚠️ Full parsed object:', parsed);
-            }
+                                                        setRankPreview(parsed.rankPreview);
+                          } else {
+                                                      }
             
-            console.log('✅ Parsed result data:', parsedResult);
-          } catch (parseError) {
-            console.error('❌ Error parsing result data from params:', parseError);
-            console.error('❌ Raw data that failed to parse:', resultData);
-          }
+                      } catch (parseError) {
+                                  }
         }
         
         // If no data from params, try to fetch from API
         if (!parsedResult && id && user?.token) {
-          console.log('📡 Fetching result from API for exam ID:', id);
-          const response = await apiFetchAuth(`/student/practice-exams/${id}/result`, user.token);
+                    const response = await apiFetchAuth(`/student/practice-exams/${id}/result`, user.token);
           
           if (response.ok && response.data) {
             // Handle nested response structure: { success, result: {...}, rankPreview: {...} } or direct result object
@@ -143,25 +125,18 @@ export default function PracticeExamResultScreen() {
             
             // Extract rankPreview from response if available
             if (response.data.rankPreview) {
-              console.log('📊 Rank preview data found in API:', response.data.rankPreview);
-              console.log('📊 hasEnoughData:', response.data.rankPreview.hasEnoughData);
-              setRankPreview(response.data.rankPreview);
-              console.log('✅ Rank preview extracted from API response:', response.data.rankPreview);
-            } else {
-              console.log('⚠️ No rankPreview found in API response');
-            }
+                                          setRankPreview(response.data.rankPreview);
+                          } else {
+                          }
             
-            console.log('✅ Fetched result from API:', parsedResult);
-          } else {
-            console.error('❌ Failed to fetch result from API:', response);
-          }
+                      } else {
+                      }
         }
         
         // Fetch exam details to get examDuration and examTitle if missing
         if (parsedResult && (!parsedResult.examDuration || !parsedResult.examTitle) && id && user?.token) {
           try {
-            console.log('📡 Fetching exam details for exam ID:', id);
-            const examResponse = await apiFetchAuth(`/student/practice-exams/${id}`, user.token);
+                        const examResponse = await apiFetchAuth(`/student/practice-exams/${id}`, user.token);
             if (examResponse.ok && examResponse.data) {
               const examData = examResponse.data;
               if (!parsedResult.examDuration && examData.duration) {
@@ -170,11 +145,9 @@ export default function PracticeExamResultScreen() {
               if (!parsedResult.examTitle && examData.title) {
                 parsedResult.examTitle = examData.title;
               }
-              console.log('✅ Fetched exam details:', examData);
-            }
+                          }
           } catch (error) {
-            console.error('❌ Error fetching exam details:', error);
-          }
+                      }
         }
         
         if (parsedResult) {
@@ -207,8 +180,7 @@ export default function PracticeExamResultScreen() {
             answers: parsedResult.answers,
           };
           
-          console.log('📊 Final result data:', finalResult);
-          setResult(finalResult);
+                    setResult(finalResult);
           
           // Fetch improvement suggestions after result is loaded
           if (user?.token) {
@@ -265,11 +237,9 @@ export default function PracticeExamResultScreen() {
             ])
           ).start();
         } else {
-          console.error('❌ No result data available');
-        }
+                  }
       } catch (error) {
-        console.error('❌ Error loading result data:', error);
-      } finally {
+              } finally {
         setLoading(false);
       }
     };
@@ -285,13 +255,10 @@ export default function PracticeExamResultScreen() {
       
       if (response.ok && response.data) {
         setImprovementData(response.data);
-        console.log('✅ Improvement suggestions fetched:', response.data);
-      } else {
-        console.error('❌ Failed to fetch improvement suggestions:', response);
-      }
+              } else {
+              }
     } catch (err) {
-      console.error('❌ Error fetching improvement suggestions:', err);
-    }
+          }
   };
 
   const startConfetti = () => {

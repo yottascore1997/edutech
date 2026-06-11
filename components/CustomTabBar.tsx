@@ -67,7 +67,6 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
             <View style={styles.whiteBackground} />
             
 
-
             <View style={styles.tabBarItemsContainer}>
                 {filteredRoutes.map((route: any) => {
                     const { options } = descriptors[route.key];

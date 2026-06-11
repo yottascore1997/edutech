@@ -149,15 +149,7 @@ export default function BattleRoomScreen() {
 
   // Monitor battle state changes
   useEffect(() => {
-    console.log('🔄 Battle state changed:', {
-      status: battleState.status,
-      currentQuestion: battleState.currentQuestion,
-      questionText: battleState.question?.text?.substring(0, 50) + '...',
-      questionOptions: battleState.question?.options,
-      optionsCount: battleState.question?.options?.length,
-      timeLeft: battleState.timeLeft
-    });
-    // Track finished state to avoid reacting to server "match_not_found" after match ends
+        // Track finished state to avoid reacting to server "match_not_found" after match ends
     hasFinishedRef.current = battleState.status === 'finished';
   }, [battleState]);
 
@@ -331,14 +323,8 @@ export default function BattleRoomScreen() {
   // Initialize socket connection
   useEffect(() => {
 
-
-
     
     if (user?.token) {
-
-
-
-
 
       
       const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
@@ -352,13 +338,6 @@ export default function BattleRoomScreen() {
       });
 
       newSocket.on('connect', () => {
-
-
-
-
-
-
-
 
         setIsConnected(true);
         setError(null);
@@ -377,14 +356,12 @@ export default function BattleRoomScreen() {
 
       newSocket.on('error', (error) => {
         // Silently handle socket errors - no console logging
-        // console.error('🔥 Battle Room Socket error:', error);
-        setError('Socket error occurred.');
+        //         setError('Socket error occurred.');
       });
       
       newSocket.on('connect_error', (error) => {
         // Silently handle socket errors - no console logging
-        // console.error('🔥 Battle Room Socket connection error:', error);
-        setError('Connection failed. Please check your internet connection and try again.');
+        //         setError('Connection failed. Please check your internet connection and try again.');
         setIsConnected(false);
       });
 
@@ -466,8 +443,7 @@ export default function BattleRoomScreen() {
           s.emit('cleanup_match_session', { matchId: mId, userId: uId });
           s.emit('leave_match', { matchId: mId, userId: uId });
         } catch (e) {
-          console.warn('performMatchCleanup emit failed', e);
-        }
+                  }
         hasCleanedUpRef.current = true;
       }
 
@@ -475,8 +451,7 @@ export default function BattleRoomScreen() {
         try {
           if (s.connected) s.disconnect();
         } catch (e) {
-          console.warn('socket disconnect failed', e);
-        }
+                  }
         socketRef.current = null;
         setSocket(null);
         setIsConnected(false);
@@ -548,9 +523,6 @@ export default function BattleRoomScreen() {
 
       return;
     }
-
-
-
 
     // Clean up existing listeners first
     cleanupSocketListeners();
@@ -681,12 +653,7 @@ export default function BattleRoomScreen() {
     //   winner: string; 
     //   isDraw: boolean 
     // }) => {
-    //   console.log('🏁 Match ended event received:', data);
-    //   console.log('   - My score:', data.myScore);
-    //   console.log('   - Opponent score:', data.opponentScore);
-    //   console.log('   - Winner:', data.winner);
-    //   console.log('   - Is draw:', data.isDraw);
-      
+    //       //       //       //       //         
     //   if (timerRef.current) {
     //     clearInterval(timerRef.current);
     //     timerRef.current = null;
@@ -748,10 +715,7 @@ const handleMatchEnded = (data: {
 };
     // Opponent answered event
     // const handleOpponentAnswered = (data: { questionIndex: number }) => {
-    //   console.log('👥 Opponent answered event received:', data);
-    //   console.log('   - Question index:', data.questionIndex);
-    //   console.log('   - Current question:', battleState.currentQuestion);
-      
+    //       //       //         
     //   setBattleState(prev => ({
     //     ...prev,
     //     opponentAnswers: {
@@ -760,12 +724,8 @@ const handleMatchEnded = (data: {
     //     }
     //   }));
       
-    //   console.log('✅ Opponent answered state updated');
-    // };
+    //       // };
     const handleOpponentAnswered = (data: { questionIndex: number; answer: number }) => {
-
-
-
 
       
       setBattleState(prev => ({
@@ -870,10 +830,6 @@ const handleMatchEnded = (data: {
   // Battle useEffect
   useEffect(() => {
 
-
-
-
-
     
     if (!socket || !isConnected) {
 
@@ -883,8 +839,6 @@ const handleMatchEnded = (data: {
     setupSocketListeners();
 
     return () => {
-
-
 
       cleanupSocketListeners();
       
@@ -1011,8 +965,6 @@ const handleMatchEnded = (data: {
     }
   }, [battleState.status, battleState.player1Score, battleState.player2Score]);
 
-
-
   const startQuestionTimer = (timeLimit: number) => {
     if (questionTimerRef.current) {
       clearInterval(questionTimerRef.current);
@@ -1052,9 +1004,6 @@ const handleMatchEnded = (data: {
     }
     const timeSpent = 10 - battleState.timeLeft;
     
-
-
-
 
     
     // Play answer sound
@@ -1174,7 +1123,6 @@ const handleMatchEnded = (data: {
     const isWinner = battleState.player1Score > battleState.player2Score;
     const isDraw = battleState.player1Score === battleState.player2Score;
     
-
 
     if (isWinner) {
 

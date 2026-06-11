@@ -111,8 +111,7 @@ const LiveExamQuestionsScreen = () => {
       await AsyncStorage.setItem(LIVE_EXAM_STATE_KEY(id), JSON.stringify(payload));
       lastSaveRef.current = Date.now();
     } catch (e) {
-      console.warn('Failed to save exam state', e);
-    }
+          }
   }, [id]);
 
   const clearExamState = useCallback(async () => {
@@ -120,8 +119,7 @@ const LiveExamQuestionsScreen = () => {
     try {
       await AsyncStorage.removeItem(LIVE_EXAM_STATE_KEY(id));
     } catch (e) {
-      console.warn('Failed to clear exam state', e);
-    }
+          }
   }, [id]);
 
   // Verify exam has started before showing questions
@@ -153,8 +151,7 @@ const LiveExamQuestionsScreen = () => {
       }
       return true; // If exam fetch fails, allow to proceed (backend will handle)
     } catch (error) {
-      console.error('Error verifying start time:', error);
-      return true; // Allow to proceed if verification fails
+            return true; // Allow to proceed if verification fails
     }
   };
 
@@ -294,8 +291,7 @@ const LiveExamQuestionsScreen = () => {
         setLoading(false);
       }
     } catch (e: any) {
-      console.error('Error fetching questions:', e);
-      // Check if error is about start time
+            // Check if error is about start time
       if (e?.data?.message?.includes('not started') || e?.data?.message?.includes('start time')) {
         Alert.alert(
           'Exam Not Started',
@@ -603,16 +599,14 @@ const LiveExamQuestionsScreen = () => {
         answers[questions[current].id] = currentSelection;
       }
 
-      console.log('Auto-submitting live exam (timer expired):', answers);
-
+      
       const response = await apiFetchAuth(`/student/live-exams/${id}/submit`, user!.token, {
         method: 'POST',
         body: { answers }
       });
 
       if (response.ok) {
-        console.log('Live exam auto-submitted successfully');
-        if (user?.id && id) await removeJoinedLiveExamId(String(user.id), String(id));
+                if (user?.id && id) await removeJoinedLiveExamId(String(user.id), String(id));
         await clearExamState();
         const resultData = response.data;
         router.push({
@@ -626,8 +620,7 @@ const LiveExamQuestionsScreen = () => {
         throw new Error(response.data?.message || 'Failed to submit exam');
       }
     } catch (error: any) {
-      console.error('❌ Error auto-submitting live exam:', error);
-      setSubmitting(false);
+            setSubmitting(false);
       Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
       await clearExamState();
       router.push({
@@ -658,8 +651,6 @@ const LiveExamQuestionsScreen = () => {
         answers[questions[current].id] = currentSelection;
       }
 
-
-
       const response = await apiFetchAuth(`/student/live-exams/${id}/submit`, user!.token, {
         method: 'POST',
         body: { answers }
@@ -680,14 +671,12 @@ const LiveExamQuestionsScreen = () => {
         throw new Error(response.data?.message || 'Failed to submit exam');
       }
     } catch (error: any) {
-      console.error('❌ Error submitting exam:', error);
-      Alert.alert('Error', error.message || 'Failed to submit exam. Please try again.');
+            Alert.alert('Error', error.message || 'Failed to submit exam. Please try again.');
     } finally {
       setSubmitting(false);
       setShowSubmitModal(false);
     }
   };
-
 
   // Summary counts
   const answered = statuses.filter(s => s.answered).length;
@@ -839,7 +828,6 @@ const LiveExamQuestionsScreen = () => {
               </Text>
             </ScrollView>
           </View>
-
 
           {/* Options */}
           <View style={styles.optionsContainer}>

@@ -18,6 +18,7 @@ import {
 import { apiFetchAuth, getImageUrl } from '../../constants/api';
 import { useAuth } from '../../context/AuthContext';
 import StudyPartnerBottomNav from '@/components/StudyPartnerBottomNav';
+import { useScreenLoadState } from '@/hooks/useScreenLoadState';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SP_BG = ['#EDE9FE', '#FDF2F8', '#FAFAFF'] as const;
@@ -120,6 +121,7 @@ export default function MessagesScreen() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState(0);
   const fetchedPhotoIds = useRef<Set<string>>(new Set());
+  const { beginFetch, endFetch, shouldBlockUI, hasLoadedOnceRef } = useScreenLoadState();
 
   // Step 1: Page Initialization
   useEffect(() => {
@@ -138,32 +140,29 @@ export default function MessagesScreen() {
         setCurrentUser(currentUserData);
 
       } catch (error) {
-        console.error('❌ Error decoding JWT token:', error);
-      }
+              }
     }
   }, [user?.token]);
 
-  // Refresh conversations only when screen comes into focus (not on initial mount)
+  // Refresh conversations when screen comes into focus (background refresh after first load)
   useFocusEffect(
     useCallback(() => {
-      if (user?.token && currentUser) {
-        const now = Date.now();
-        // Prevent refresh if last refresh was less than 2 seconds ago
-        if (now - lastRefreshTime > 2000) {
-          setLastRefreshTime(now);
-          fetchConversations();
-          fetchMessageRequests();
-        }
+      if (!user?.token) return;
+      const now = Date.now();
+      if (now - lastRefreshTime > 2000) {
+        setLastRefreshTime(now);
+        fetchConversations(hasLoadedOnceRef.current);
+        fetchMessageRequests();
       }
-    }, [user?.token, currentUser, lastRefreshTime])
+    }, [user?.token, lastRefreshTime])
   );
 
   // Step 2: (Not used on list screen - tap opens chat-screen)
   // Step 3: Messages Fetch - used only when opening a chat; list screen just shows conversations
 
   // Step 3: Conversations Fetch - Like React website
-  const fetchConversations = async () => {
-    setLoading(true);
+  const fetchConversations = async (background = false) => {
+    beginFetch(setLoading, setRefreshing, { refresh: background });
     try {
 
       const response = await apiFetchAuth('/student/messages', user?.token || '');
@@ -198,8 +197,7 @@ export default function MessagesScreen() {
         setConversations([]);
       }
     } catch (error) {
-      console.error('❌ Error fetching conversations:', error);
-      setConversations([
+            setConversations([
         {
           user: {
             id: 'user1',
@@ -318,7 +316,7 @@ export default function MessagesScreen() {
         }
       ]);
     } finally {
-      setLoading(false);
+      endFetch(setLoading, setRefreshing);
     }
   };
 
@@ -330,28 +328,22 @@ export default function MessagesScreen() {
         setMessageRequests(Array.isArray(data) ? data : []);
       }
     } catch (error) {
-      console.error('Error fetching message requests:', error);
-      setMessageRequests([]);
+            setMessageRequests([]);
     }
   };
 
   const onRefresh = async () => {
     const now = Date.now();
-    // Prevent refresh if last refresh was less than 1 second ago
     if (now - lastRefreshTime < 1000) {
       return;
     }
-    
-    setRefreshing(true);
+
     setLastRefreshTime(now);
     try {
-      await fetchConversations();
+      await fetchConversations(true);
       await fetchMessageRequests();
     } catch (error) {
-      console.error('Error refreshing messages:', error);
-    } finally {
-      setRefreshing(false);
-    }
+          }
   };
 
   // Same as chat-screen: fetch photo (study-partner profile then profile) for users missing photo in list
@@ -649,7 +641,7 @@ export default function MessagesScreen() {
     </>
   );
 
-  if (loading) {
+  if (shouldBlockUI(loading)) {
     return (
       <View style={styles.screen}>
         <LinearGradient colors={[...SP_BG]} style={StyleSheet.absoluteFill} />

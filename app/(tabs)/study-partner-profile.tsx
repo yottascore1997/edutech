@@ -1,8 +1,10 @@
-import { apiFetchAuth, uploadFile } from '@/constants/api';
-import { useAuth } from '@/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import StudyPartnerBottomNav from '@/components/StudyPartnerBottomNav';
+import { apiFetchAuth, getImageUrl, uploadFile } from '@/constants/api';
+import { HomeTheme } from '@/constants/HomeTheme';
+import { FontFamily } from '@/constants/Typography';
+import { useAuth } from '@/context/AuthContext';
+import { ensurePhotoLibraryPermission } from '@/utils/imagePickerPermissions';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,13 +24,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ensurePhotoLibraryPermission } from '@/utils/imagePickerPermissions';
 
 type StudyPartnerProfileResponse = {
-  id?: string;
-  userId?: string;
   bio?: string | null;
-  subjects?: string[];
   photos?: string[];
   examType?: string | null;
   goals?: string | null;
@@ -39,15 +37,8 @@ type StudyPartnerProfileResponse = {
   dateOfBirth?: string | null;
   language?: string | null;
   isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
   age?: number;
-  user?: {
-    name?: string;
-    profilePhoto?: string | null;
-    emailVerified?: boolean;
-    hasPhone?: boolean;
-  };
+  user?: { name?: string; profilePhoto?: string | null };
 };
 
 const EXAM_TYPES = ['Railway', 'SSC CGL', 'SSC CHSL', 'Bank PO', 'Other'];
@@ -56,20 +47,45 @@ const STUDY_TIME_SLOTS = ['Morning', 'Afternoon', 'Evening', 'Night'];
 const GENDERS = ['Male', 'Female', 'Other'];
 const MAX_PHOTOS = 4;
 const MIN_PHOTOS = 1;
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CONTENT_PAD = 16 * 2;
-const CARD_PAD = 20 * 2;
-const PHOTO_GAP = 12;
-const PHOTO_SIZE = (SCREEN_WIDTH - CONTENT_PAD - CARD_PAD - PHOTO_GAP) / 2;
+const { width: SW } = Dimensions.get('window');
+const PHOTO_W = (SW - 32 - 36) / 2.2;
+
+const C = { primary: HomeTheme.primary, ink: HomeTheme.ink, muted: HomeTheme.inkMuted };
+
+function SectionCard({
+  icon,
+  iconBg,
+  iconColor,
+  title,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={st.sectionCard}>
+      <View style={st.sectionHead}>
+        <View style={[st.sectionIcon, { backgroundColor: iconBg }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <Text style={st.sectionTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
 
 export default function StudyPartnerProfileScreen() {
   const { user } = useAuth();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const [bio, setBio] = useState('');
   const [examType, setExamType] = useState('');
@@ -87,18 +103,11 @@ export default function StudyPartnerProfileScreen() {
 
   useEffect(() => {
     let isMounted = true;
-
     const load = async () => {
-      if (!user?.token) {
-        setLoading(false);
-        return;
-      }
+      if (!user?.token) { setLoading(false); return; }
       setError(null);
       try {
-        const res = await apiFetchAuth(
-          '/student/study-partner/profile',
-          user.token,
-        );
+        const res = await apiFetchAuth('/student/study-partner/profile', user.token);
         if (!isMounted) return;
         const data = (res.data || {}) as StudyPartnerProfileResponse;
         setBio(data.bio || '');
@@ -109,44 +118,29 @@ export default function StudyPartnerProfileScreen() {
         setStudyTimeSlot(data.studyTimeSlot || '');
         setLanguage(data.language || '');
         setGender(data.gender || '');
-        if (data.dateOfBirth) {
-          const d = data.dateOfBirth.split('T')[0];
-          setDateOfBirth(d);
-        } else {
-          setDateOfBirth('');
-        }
+        setDateOfBirth(data.dateOfBirth ? data.dateOfBirth.split('T')[0] : '');
         setPhotos(Array.isArray(data.photos) ? [...data.photos] : []);
         setIsActive(data.isActive !== false);
-      } catch (e: any) {
-        if (!isMounted) return;
-        console.error('StudyPartnerProfile load error:', e);
-        setError('Unable to load profile. Please try again.');
+      } catch {
+        if (isMounted) setError('Unable to load profile. Please try again.');
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     };
-
     load();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [user?.token]);
 
   const handleSave = async () => {
     if (!user?.token) return;
-    if (!bio.trim()) {
-      setError('Please add a short bio about yourself.');
-      return;
-    }
+    if (!bio.trim()) { setError('Please add a short bio about yourself.'); return; }
     if (photos.length < MIN_PHOTOS) {
       setError(`At least ${MIN_PHOTOS} photo is required (max ${MAX_PHOTOS}).`);
       return;
     }
     setSaving(true);
     setError(null);
+    setSuccess(null);
     try {
       await apiFetchAuth('/student/study-partner/profile', user.token, {
         method: 'PATCH',
@@ -164,10 +158,8 @@ export default function StudyPartnerProfileScreen() {
           photos,
         },
       });
-
-      router.back();
-    } catch (e: any) {
-      console.error('StudyPartnerProfile save error:', e);
+      setSuccess('Profile saved successfully!');
+    } catch {
       setError('Failed to save profile. Please try again.');
     } finally {
       setSaving(false);
@@ -185,24 +177,19 @@ export default function StudyPartnerProfileScreen() {
         quality: 0.8,
       });
       if (result.canceled || !result.assets[0]) return;
-      const uri = result.assets[0].uri;
       setUploadingPhotoIndex(photos.length);
-      const url = await uploadFile(uri, user.token);
-      setPhotos(prev => [...prev, url]);
+      const url = await uploadFile(result.assets[0].uri, user.token);
+      setPhotos((prev) => [...prev, url]);
     } catch (e: any) {
-      Alert.alert('Upload failed', e?.message || 'Failed to upload photo. Please try again.');
+      Alert.alert('Upload failed', e?.message || 'Failed to upload photo.');
     } finally {
       setUploadingPhotoIndex(null);
     }
   };
 
-  const removePhoto = (index: number) => {
-    setPhotos(photos.filter((_, i) => i !== index));
-  };
+  const removePhoto = (index: number) => setPhotos(photos.filter((_, i) => i !== index));
 
-  const dateForPicker = dateOfBirth
-    ? new Date(dateOfBirth + 'T12:00:00')
-    : new Date(2000, 0, 1);
+  const dateForPicker = dateOfBirth ? new Date(dateOfBirth + 'T12:00:00') : new Date(2000, 0, 1);
   const onDateChange = (_: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
@@ -213,224 +200,150 @@ export default function StudyPartnerProfileScreen() {
     }
   };
 
+  const renderChips = (items: string[], selected: string, onSelect: (v: string) => void) => (
+    <View style={st.chipRow}>
+      {items.map((item) => (
+        <TouchableOpacity
+          key={item}
+          style={[st.chip, selected === item && st.chipOn]}
+          onPress={() => onSelect(item)}
+          activeOpacity={0.85}
+        >
+          <Text style={[st.chipTxt, selected === item && st.chipTxtOn]}>{item}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+
   return (
-    <View style={styles.screen}>
+    <View style={st.screen}>
+      <LinearGradient colors={['#FFFBF7', '#F8F4FF', '#FAFAFF']} style={StyleSheet.absoluteFill} />
+
       {!user?.token ? (
-        <View style={styles.centered}>
-          <Text style={styles.title}>Study Partner Profile</Text>
-          <Text style={styles.subtitle}>
-            Please login to edit your study partner profile.
-          </Text>
+        <View style={st.centered}>
+          <Text style={st.emptyTitle}>My Profile</Text>
+          <Text style={st.emptySub}>Please login to edit your study partner profile.</Text>
         </View>
       ) : loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4F46E5" />
-          <Text style={styles.loadingText}>Loading profile...</Text>
+        <View style={st.centered}>
+          <ActivityIndicator size="large" color={C.primary} />
+          <Text style={st.loadingTxt}>Loading profile…</Text>
         </View>
       ) : (
         <>
           <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={[styles.content, { paddingBottom: 24 + 80 }]}
+            style={st.scroll}
+            contentContainerStyle={[st.content, { paddingTop: insets.top + 8, paddingBottom: 120 + insets.bottom }]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.topBar}>
-              <TouchableOpacity
-                onPress={() => router.back()}
-                style={styles.backBtn}
-              >
-                <Ionicons name="chevron-back" size={26} color="#111827" />
-              </TouchableOpacity>
-            </View>
-
             {error ? (
-              <View style={styles.errorCard}>
-                <Ionicons name="alert-circle" size={22} color="#DC2626" />
-                <Text style={styles.errorText}>{error}</Text>
+              <View style={st.errorCard}>
+                <Ionicons name="alert-circle" size={20} color="#DC2626" />
+                <Text style={st.errorTxt}>{error}</Text>
+              </View>
+            ) : null}
+            {success ? (
+              <View style={st.successCard}>
+                <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                <Text style={st.successTxt}>{success}</Text>
               </View>
             ) : null}
 
-            {/* Section: Photos - at top */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: '#FEF3C7' }]}>
-                  <Ionicons name="images" size={22} color="#D97706" />
-                </View>
-                <Text style={styles.sectionTitle}>Photos *</Text>
-              </View>
-              <Text style={styles.helperText}>
-                At least {MIN_PHOTOS} required, max {MAX_PHOTOS}. Tap box to add from gallery.
-              </Text>
-              <View style={styles.photosGrid}>
-              {[0, 1, 2, 3].map(i => {
-                const url = photos[i];
-                const isAddSlot = !url && (i === photos.length) && photos.length < MAX_PHOTOS;
-                const isUploading = uploadingPhotoIndex === i;
-                return (
-                  <View key={i} style={styles.photoBoxWrapper}>
-                    {url ? (
-                      <View style={styles.photoBox}>
-                        <Image source={{ uri: url }} style={styles.photoBoxImage} resizeMode="cover" />
-                        <TouchableOpacity
-                          style={styles.removePhotoBtn}
-                          onPress={() => removePhoto(i)}
-                        >
-                          <Ionicons name="close-circle" size={28} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-                    ) : isAddSlot ? (
-                      <TouchableOpacity
-                        style={styles.photoBoxAdd}
-                        onPress={pickAndUploadPhoto}
-                        disabled={uploadingPhotoIndex !== null}
-                      >
-                        {isUploading ? (
-                          <ActivityIndicator size="small" color="#4F46E5" />
-                        ) : (
-                          <>
-                            <Ionicons name="add" size={42} color="#6B7280" />
-                            <Text style={styles.photoBoxAddText}>Add</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={[styles.photoBoxAdd, styles.photoBoxEmpty]} />
-                    )}
+            {/* Photos */}
+            <SectionCard icon="images" iconBg="#FEF3C7" iconColor="#D97706" title="Photos">
+              <Text style={st.helper}>Min {MIN_PHOTOS}, max {MAX_PHOTOS}. First photo is your main picture.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.photoRow}>
+                {photos.map((url, i) => (
+                  <View key={i} style={st.photoSlot}>
+                    <Image source={{ uri: url.startsWith('http') ? url : getImageUrl(url) }} style={st.photoImg} />
+                    {i === 0 ? (
+                      <View style={st.mainBadge}><Text style={st.mainBadgeTxt}>Main</Text></View>
+                    ) : null}
+                    <TouchableOpacity style={st.removeBtn} onPress={() => removePhoto(i)}>
+                      <Ionicons name="close-circle" size={24} color="#EF4444" />
+                    </TouchableOpacity>
                   </View>
-                );
-              })}
-            </View>
-            {photos.length > 0 && photos.length < MIN_PHOTOS && (
-              <Text style={styles.errorText}>
-                Add at least {MIN_PHOTOS} photo to save your profile.
-              </Text>
-            )}
-            </View>
+                ))}
+                {photos.length < MAX_PHOTOS ? (
+                  <TouchableOpacity
+                    style={st.addPhoto}
+                    onPress={pickAndUploadPhoto}
+                    disabled={uploadingPhotoIndex !== null}
+                    activeOpacity={0.85}
+                  >
+                    {uploadingPhotoIndex !== null ? (
+                      <ActivityIndicator color={C.primary} />
+                    ) : (
+                      <>
+                        <Ionicons name="camera" size={28} color={C.primary} />
+                        <Text style={st.addPhotoTxt}>Add Photo</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                ) : null}
+              </ScrollView>
+            </SectionCard>
 
-            {/* Section: About you */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionIcon}>
-                  <Ionicons name="person" size={22} color="#EC4899" />
-                </View>
-                <Text style={styles.sectionTitle}>About you</Text>
-              </View>
-              <Text style={styles.helperText}>
-                Tell others about your exam, strengths and study style.
-              </Text>
+            <SectionCard icon="person" iconBg="#F3EEFF" iconColor={C.primary} title="About you">
+              <Text style={st.helper}>Tell buddies about your exam prep & study style.</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[st.input, st.textArea]}
                 multiline
-                placeholder=""
-                placeholderTextColor="#9CA3AF"
+                placeholder="Write a short bio…"
+                placeholderTextColor={C.muted}
                 value={bio}
                 onChangeText={setBio}
               />
-            </View>
+            </SectionCard>
 
-            {/* Section: Exam & goals */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: '#FDF2F8' }]}>
-                  <Ionicons name="school" size={22} color="#DB2777" />
-                </View>
-                <Text style={styles.sectionTitle}>Exam & goals</Text>
-              </View>
-              <Text style={styles.label}>Exam type</Text>
-              <View style={styles.chipRow}>
-                {EXAM_TYPES.map(type => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.chip, examType === type && styles.chipSelected]}
-                    onPress={() => setExamType(type)}
-                  >
-                    <Text style={[styles.chipText, examType === type && styles.chipTextSelected]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>Goals</Text>
+            <SectionCard icon="school" iconBg="#FDF2F8" iconColor="#DB2777" title="Exam & goals">
+              <Text style={st.label}>Exam type</Text>
+              {renderChips(EXAM_TYPES, examType, setExamType)}
+              <Text style={st.label}>Goals</Text>
               <TextInput
-                style={styles.input}
+                style={st.input}
                 placeholder="e.g. Clear Tier-1 with 170+ score"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={C.muted}
                 value={goals}
                 onChangeText={setGoals}
               />
-            </View>
+            </SectionCard>
 
-            {/* Section: Schedule */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: '#EEF2FF' }]}>
-                  <Ionicons name="time" size={22} color="#6366F1" />
-                </View>
-                <Text style={styles.sectionTitle}>Schedule</Text>
-              </View>
-              <Text style={styles.label}>Study time slot</Text>
-              <View style={styles.chipRow}>
-                {STUDY_TIME_SLOTS.map(slot => (
-                  <TouchableOpacity
-                    key={slot}
-                    style={[styles.chip, studyTimeSlot === slot && styles.chipSelected]}
-                    onPress={() => setStudyTimeSlot(slot)}
-                  >
-                    <Text style={[styles.chipText, studyTimeSlot === slot && styles.chipTextSelected]}>
-                      {slot}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>Preferred study time</Text>
-              <View style={styles.timeRow}>
+            <SectionCard icon="time" iconBg="#EEF2FF" iconColor="#6366F1" title="Schedule">
+              <Text style={st.label}>Study time slot</Text>
+              {renderChips(STUDY_TIME_SLOTS, studyTimeSlot, setStudyTimeSlot)}
+              <Text style={st.label}>Preferred time</Text>
+              <View style={st.timeRow}>
                 <TextInput
-                  style={[styles.input, styles.timeInput]}
-                  placeholder="From (e.g. 06:00)"
-                  placeholderTextColor="#9CA3AF"
+                  style={[st.input, st.timeInput]}
+                  placeholder="From 06:00"
+                  placeholderTextColor={C.muted}
                   value={studyTimeFrom}
                   onChangeText={setStudyTimeFrom}
                 />
-                <Text style={styles.toText}>to</Text>
+                <Text style={st.toTxt}>to</Text>
                 <TextInput
-                  style={[styles.input, styles.timeInput]}
-                  placeholder="To (e.g. 09:00)"
-                  placeholderTextColor="#9CA3AF"
+                  style={[st.input, st.timeInput]}
+                  placeholder="To 09:00"
+                  placeholderTextColor={C.muted}
                   value={studyTimeTo}
                   onChangeText={setStudyTimeTo}
                 />
               </View>
-            </View>
+            </SectionCard>
 
-            {/* Section: About me */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <View style={[styles.sectionIcon, { backgroundColor: '#D1FAE5' }]}>
-                  <Ionicons name="heart" size={22} color="#059669" />
-                </View>
-                <Text style={styles.sectionTitle}>About me</Text>
-              </View>
-              <Text style={styles.label}>Gender</Text>
-              <View style={styles.chipRow}>
-                {GENDERS.map(g => (
-                  <TouchableOpacity
-                    key={g}
-                    style={[styles.chip, gender === g && styles.chipSelected]}
-                    onPress={() => setGender(g)}
-                  >
-                    <Text style={[styles.chipText, gender === g && styles.chipTextSelected]}>{g}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.label}>Date of birth</Text>
-              <TouchableOpacity style={styles.dateInputRow} onPress={() => setShowDatePicker(true)}>
-                <Text style={[styles.dateText, !dateOfBirth && styles.datePlaceholder]}>
-                  {dateOfBirth || 'Select date (YYYY-MM-DD)'}
+            <SectionCard icon="heart" iconBg="#D1FAE5" iconColor="#059669" title="Personal">
+              <Text style={st.label}>Gender</Text>
+              {renderChips(GENDERS, gender, setGender)}
+              <Text style={st.label}>Date of birth</Text>
+              <TouchableOpacity style={st.dateRow} onPress={() => setShowDatePicker(true)}>
+                <Text style={[st.dateTxt, !dateOfBirth && st.datePlaceholder]}>
+                  {dateOfBirth || 'Select date'}
                 </Text>
-                <Ionicons name="calendar-outline" size={24} color="#6B7280" />
+                <Ionicons name="calendar-outline" size={22} color={C.muted} />
               </TouchableOpacity>
-              {showDatePicker && (
+              {showDatePicker ? (
                 <DateTimePicker
                   value={dateForPicker}
                   mode="date"
@@ -438,66 +351,46 @@ export default function StudyPartnerProfileScreen() {
                   onChange={onDateChange}
                   maximumDate={new Date()}
                 />
-              )}
-              <Text style={styles.label}>Language preference</Text>
-              <View style={styles.chipRow}>
-                {LANGUAGES.map(lang => (
-                  <TouchableOpacity
-                    key={lang}
-                    style={[styles.chip, language === lang && styles.chipSelected]}
-                    onPress={() => setLanguage(lang)}
-                  >
-                    <Text style={[styles.chipText, language === lang && styles.chipTextSelected]}>
-                      {lang}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+              ) : null}
+              <Text style={st.label}>Language</Text>
+              {renderChips(LANGUAGES, language, setLanguage)}
+            </SectionCard>
 
-            {/* Section: Discovery */}
-            <View style={styles.sectionCard}>
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelWrap}>
-                  <View style={[styles.sectionIcon, { backgroundColor: '#E0E7FF' }]}>
-                    <Ionicons name="eye" size={22} color="#4F46E5" />
+            <View style={st.sectionCard}>
+              <View style={st.toggleRow}>
+                <View style={st.toggleLeft}>
+                  <View style={[st.sectionIcon, { backgroundColor: '#E0E7FF' }]}>
+                    <Ionicons name="eye" size={20} color="#4F46E5" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Show me in discovery</Text>
-                    <Text style={styles.helperText}>
-                      Turn off if you don&apos;t want new people to find you.
-                    </Text>
+                    <Text style={st.toggleTitle}>Show in discovery</Text>
+                    <Text style={st.helper}>Turn off to hide from new people.</Text>
                   </View>
                 </View>
                 <Switch
                   value={isActive}
                   onValueChange={setIsActive}
-                  trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+                  trackColor={{ false: '#E5E7EB', true: '#C4B5FD' }}
                   thumbColor="#FFF"
                 />
               </View>
             </View>
           </ScrollView>
 
-          <View style={[styles.footer, { paddingBottom: 18 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[styles.saveButtonWrap, saving && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={saving}
-              activeOpacity={0.9}
-            >
+          <View style={[st.footer, { paddingBottom: 72 + insets.bottom }]}>
+            <TouchableOpacity onPress={handleSave} disabled={saving} activeOpacity={0.9} style={st.saveWrap}>
               <LinearGradient
-                colors={saving ? ['#9CA3AF', '#6B7280'] : ['#EC4899', '#8B5CF6', '#6366F1']}
+                colors={saving ? ['#C4B5FD', '#A78BFA'] : [...HomeTheme.heroCta]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.saveButton}
+                style={st.saveBtn}
               >
                 {saving ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#FFF" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark-circle" size={24} color="#FFF" />
-                    <Text style={styles.saveButtonText}>Save profile</Text>
+                    <Ionicons name="checkmark-circle" size={22} color="#FFF" />
+                    <Text style={st.saveTxt}>Save Profile</Text>
                   </>
                 )}
               </LinearGradient>
@@ -510,280 +403,163 @@ export default function StudyPartnerProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 28,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E5E7EB',
-  },
+const st = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#FAFAFF' },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  emptyTitle: { fontSize: 22, fontFamily: FontFamily.bold, color: C.ink },
+  emptySub: { fontSize: 14, fontFamily: FontFamily.regular, color: C.muted, marginTop: 8, textAlign: 'center' },
+  loadingTxt: { marginTop: 12, fontSize: 14, fontFamily: FontFamily.medium, color: C.muted },
   errorCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     backgroundColor: '#FEF2F2',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 16,
-    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: '#FECACA',
   },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  sectionHeader: {
+  errorTxt: { flex: 1, fontSize: 13, fontFamily: FontFamily.medium, color: '#DC2626' },
+  successCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    gap: 8,
+    backgroundColor: '#ECFDF5',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
+  successTxt: { flex: 1, fontSize: 13, fontFamily: FontFamily.medium, color: '#059669' },
+  sectionCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#EDE9FE',
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 10 },
   sectionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#FCE7F3',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#F9FAFB',
-  },
-  loadingText: {
-    marginTop: 14,
-    fontSize: 17,
-    color: '#4B5563',
-    fontWeight: '500',
-  },
-  label: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 6,
-    marginTop: 12,
-  },
-  helperText: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
+  sectionTitle: { fontSize: 17, fontFamily: FontFamily.bold, color: C.ink },
+  helper: { fontSize: 13, fontFamily: FontFamily.regular, color: C.muted, marginBottom: 10 },
+  label: { fontSize: 14, fontFamily: FontFamily.semiBold, color: C.ink, marginTop: 10, marginBottom: 8 },
   input: {
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 18,
-    color: '#111827',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
+    borderWidth: 1.5,
+    borderColor: '#E8E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: FontFamily.medium,
+    color: C.ink,
+    backgroundColor: '#F8F9FC',
   },
-  textArea: {
-    minHeight: 110,
-    textAlignVertical: 'top',
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  timeInput: {
-    flex: 1,
-  },
-  toText: {
-    marginHorizontal: 10,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  dateInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-  },
-  dateText: {
-    fontSize: 18,
-    color: '#111827',
-  },
-  datePlaceholder: {
-    color: '#9CA3AF',
-  },
-  photosGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: PHOTO_GAP,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  photoBoxWrapper: {
-    width: PHOTO_SIZE,
-    height: PHOTO_SIZE,
-  },
-  photoBox: {
-    width: '100%',
-    height: '100%',
+  textArea: { minHeight: 100, textAlignVertical: 'top' },
+  photoRow: { gap: 12, paddingVertical: 4 },
+  photoSlot: {
+    width: PHOTO_W,
+    height: PHOTO_W * 1.2,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#E5E7EB',
+    position: 'relative',
   },
-  photoBoxImage: {
-    width: '100%',
-    height: '100%',
+  photoImg: { width: '100%', height: '100%' },
+  mainBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: C.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  removePhotoBtn: {
+  mainBadgeTxt: { fontSize: 10, fontFamily: FontFamily.bold, color: '#FFF' },
+  removeBtn: {
     position: 'absolute',
     top: 6,
     right: 6,
     backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 14,
+    borderRadius: 12,
   },
-  photoBoxAdd: {
-    width: '100%',
-    height: '100%',
+  addPhoto: {
+    width: PHOTO_W,
+    height: PHOTO_W * 1.2,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#D1D5DB',
+    borderColor: '#C4B5FD',
     borderStyle: 'dashed',
+    backgroundColor: '#F8F4FF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
+    gap: 6,
   },
-  photoBoxEmpty: {
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F3F4F6',
-  },
-  photoBoxAddText: {
-    marginTop: 6,
-    fontSize: 15,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 6,
-  },
+  addPhotoTxt: { fontSize: 12, fontFamily: FontFamily.semiBold, color: C.primary },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E8E8F0',
+    backgroundColor: '#FFF',
   },
-  chipSelected: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#EEF2FF',
-  },
-  chipText: {
-    fontSize: 16,
-    color: '#4B5563',
-  },
-  chipTextSelected: {
-    color: '#312E81',
-    fontWeight: '600',
-  },
-  toggleRow: {
+  chipOn: { borderColor: C.primary, backgroundColor: '#F3EEFF' },
+  chipTxt: { fontSize: 13, fontFamily: FontFamily.medium, color: C.muted },
+  chipTxtOn: { color: C.primary, fontFamily: FontFamily.bold },
+  timeRow: { flexDirection: 'row', alignItems: 'center' },
+  timeInput: { flex: 1 },
+  toTxt: { marginHorizontal: 8, fontSize: 14, fontFamily: FontFamily.medium, color: C.muted },
+  dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E8E8F0',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#F8F9FC',
   },
-  toggleLabelWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
+  dateTxt: { fontSize: 15, fontFamily: FontFamily.medium, color: C.ink },
+  datePlaceholder: { color: C.muted },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 10 },
+  toggleTitle: { fontSize: 15, fontFamily: FontFamily.semiBold, color: C.ink },
   footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
+    paddingTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EDE9FE',
   },
-  saveButtonWrap: {
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  saveButton: {
+  saveWrap: { borderRadius: 16, overflow: 'hidden' },
+  saveBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 24,
-    gap: 10,
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 16,
   },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 15,
-    marginBottom: 8,
-  },
+  saveTxt: { fontSize: 16, fontFamily: FontFamily.bold, color: '#FFF' },
 });
-

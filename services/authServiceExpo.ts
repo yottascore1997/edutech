@@ -26,8 +26,7 @@ class AuthServiceExpo {
         ? phoneNumber 
         : `+91${phoneNumber}`;
 
-      console.log('Sending REAL OTP to:', formattedPhoneNumber);
-      
+            
       // Real Firebase OTP sending - no mock, only real implementation
       this.confirmationResult = await signInWithPhoneNumber(
         auth, 
@@ -40,8 +39,7 @@ class AuthServiceExpo {
         verificationId: this.confirmationResult.verificationId
       };
     } catch (error: any) {
-      console.error('Error sending OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -51,8 +49,7 @@ class AuthServiceExpo {
   // Verify OTP with Real Firebase
   async verifyOTP(otp: string): Promise<VerifyOTPResult> {
     try {
-      console.log('Verifying REAL OTP:', otp);
-      
+            
       // Real Firebase verification only
       if (!this.confirmationResult) {
         return {
@@ -69,8 +66,7 @@ class AuthServiceExpo {
         user: result.user
       };
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      return {
+            return {
         success: false,
         message: this.getErrorMessage(error.code)
       };
@@ -107,8 +103,7 @@ class AuthServiceExpo {
       await auth.signOut();
       this.confirmationResult = null;
     } catch (error) {
-      console.error('Error signing out:', error);
-      throw error;
+            throw error;
     }
   }
 

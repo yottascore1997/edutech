@@ -95,8 +95,7 @@ const SupportTicketsScreen = () => {
                 Alert.alert('Error', 'Failed to load support tickets.');
             }
         } catch (error) {
-            console.error('Error fetching tickets:', error);
-            Alert.alert('Error', 'Failed to load support tickets. Please try again.');
+                        Alert.alert('Error', 'Failed to load support tickets. Please try again.');
         } finally {
             setLoading(false);
         }

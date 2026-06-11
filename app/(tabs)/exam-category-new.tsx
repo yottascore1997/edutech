@@ -113,12 +113,10 @@ const ExamCategoryPage = () => {
 
         setExams(response.data || []);
       } else {
-        console.error('❌ Failed to fetch exams:', response.data);
-        setExams([]);
+                setExams([]);
       }
     } catch (error) {
-      console.error('❌ Error fetching exams:', error);
-      setExams([]);
+            setExams([]);
     } finally {
       setLoading(false);
     }

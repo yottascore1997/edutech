@@ -69,8 +69,7 @@ export default function CategoryBooksScreen() {
         setBooks([]);
       }
     } catch (error) {
-      console.error('Error fetching category books:', error);
-      Alert.alert('Error', 'Failed to fetch books');
+            Alert.alert('Error', 'Failed to fetch books');
       setBooks([]);
     } finally {
       setLoading(false);

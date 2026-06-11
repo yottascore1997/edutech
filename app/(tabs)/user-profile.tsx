@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -35,17 +36,29 @@ function timeAgo(dateString: string) {
 export default function UserProfileScreen() {
   const { user } = useAuth();
   const route = useRoute();
-  const { userId, originalUserData } = route.params as { userId: string; originalUserData?: any };
+  const searchParams = useLocalSearchParams<{ userId?: string; originalUserData?: string }>();
+  const routeParams = (route.params ?? {}) as { userId?: string; originalUserData?: unknown };
+  const userId = searchParams.userId ?? routeParams.userId;
+  const originalUserData = searchParams.originalUserData ?? routeParams.originalUserData;
   const navigation = useNavigation<any>();
-  
-  // Parse originalUserData if it's a string (from SocialFeed)
-  const parsedOriginalUserData = typeof originalUserData === 'string' 
-    ? JSON.parse(originalUserData) 
-    : originalUserData;
-  
+
+  const parsedOriginalUserData = useMemo(() => {
+    if (!originalUserData) return null;
+    if (typeof originalUserData === 'string') {
+      try {
+        return JSON.parse(originalUserData);
+      } catch {
+        return null;
+      }
+    }
+    return originalUserData;
+  }, [originalUserData]);
+
+  const hasTargetUser = Boolean(userId);
+
   const [profile, setProfile] = useState<any>(parsedOriginalUserData || null);
   const [userPosts, setUserPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasTargetUser);
   const [postsLoading, setPostsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -61,39 +74,34 @@ export default function UserProfileScreen() {
   const [blocking, setBlocking] = useState(false);
 
   const fetchUserProfile = async () => {
-    console.log('🔍 fetchUserProfile called');
-    console.log('🔍 userId:', userId);
-    console.log('🔍 parsedOriginalUserData:', parsedOriginalUserData);
-    
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+            
     // Always make API call to get fresh data
     setLoading(true);
     try {
       // Use the correct API endpoint as specified
-      console.log('🔍 Making API call to:', `/student/profile?userId=${userId}`);
-      const res = await apiFetchAuth(`/student/profile?userId=${userId}`, user?.token || '');
-      console.log('🔍 API response:', res);
-      
+            const res = await apiFetchAuth(`/student/profile?userId=${userId}`, user?.token || '');
+            
       if (res.ok) {
         const profileData = res.data;
-        console.log('🔍 Profile data received:', profileData);
-        setProfile(profileData);
+                setProfile(profileData);
         
         // Set follow status directly from API response
         setIsFollowing(profileData.isFollowing || false);
         
         // Set follow request status if available
         if (profileData.followRequestStatus) {
-          console.log('Follow request status:', profileData.followRequestStatus);
-        }
+                  }
         
-        console.log('✅ Profile loaded successfully with fresh data');
-      } else {
-        console.log('🔍 API call failed:', res);
-        setError('Failed to load profile');
+              } else {
+                setError('Failed to load profile');
       }
     } catch (e) {
-      console.log('🔍 API call error:', e);
-      setError('Failed to load profile');
+            setError('Failed to load profile');
     } finally {
       setLoading(false);
     }
@@ -108,8 +116,7 @@ export default function UserProfileScreen() {
         setIsFollowing(res.data.isFollowing || false);
       }
     } catch (error) {
-      console.error('Error checking follow status:', error);
-      setIsFollowing(false);
+            setIsFollowing(false);
     }
   };
 
@@ -123,8 +130,7 @@ export default function UserProfileScreen() {
         setUserPosts(res.data || []);
       }
     } catch (error) {
-      console.error('Error fetching user posts:', error);
-    } finally {
+          } finally {
       setPostsLoading(false);
     }
   };
@@ -136,10 +142,11 @@ export default function UserProfileScreen() {
   };
 
   useEffect(() => {
-    console.log('🔍 UserProfile useEffect triggered');
-    console.log('🔍 userId:', userId);
-    console.log('🔍 parsedOriginalUserData:', parsedOriginalUserData);
-    fetchUserProfile();
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+                fetchUserProfile();
   }, [userId, originalUserData]);
 
   useEffect(() => {
@@ -169,8 +176,7 @@ export default function UserProfileScreen() {
                   fetchUserProfile();
                 }
               } catch (error) {
-                console.error('Error unfollowing user:', error);
-              }
+                              }
             }
           }
         ]
@@ -206,8 +212,7 @@ export default function UserProfileScreen() {
           fetchUserProfile();
         }
       } catch (error) {
-        console.error('Error following user:', error);
-      }
+              }
     }
   };
 
@@ -240,8 +245,7 @@ export default function UserProfileScreen() {
         Alert.alert('Error', 'Failed to block user. Please try again.');
       }
     } catch (error) {
-      console.error('Error blocking user:', error);
-      Alert.alert('Error', 'Failed to block user. Please try again.');
+            Alert.alert('Error', 'Failed to block user. Please try again.');
     } finally {
       setBlocking(false);
     }
@@ -271,8 +275,7 @@ export default function UserProfileScreen() {
                 Alert.alert('Error', 'Failed to unblock user. Please try again.');
               }
             } catch (error) {
-              console.error('Error unblocking user:', error);
-              Alert.alert('Error', 'Failed to unblock user. Please try again.');
+                            Alert.alert('Error', 'Failed to unblock user. Please try again.');
             }
           }
         }
@@ -320,6 +323,10 @@ export default function UserProfileScreen() {
       )}
     </View>
   );
+
+  if (!hasTargetUser) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -461,8 +468,7 @@ export default function UserProfileScreen() {
                       [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Message', onPress: () => {
-                          console.log('Opening chat with:', profile?.id);
-                        }}
+                                                  }}
                       ]
                     );
                   }

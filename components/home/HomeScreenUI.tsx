@@ -4,7 +4,7 @@ import { FontFamily } from '@/constants/Typography';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { ArrowRight, ChevronRight, Search, Zap } from 'lucide-react-native';
+import { ArrowRight, Zap } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -39,12 +39,90 @@ type Props = {
   onStudyPartnerPress?: () => void;
 };
 
-function getGreeting(): string {
+type GreetingPeriod = 'morning' | 'afternoon' | 'evening';
+
+function getGreetingPeriod(): GreetingPeriod {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
+  if (h < 12) return 'morning';
+  if (h < 17) return 'afternoon';
+  return 'evening';
+}
+
+function getGreeting(): string {
+  const p = getGreetingPeriod();
+  if (p === 'morning') return 'Good morning';
+  if (p === 'afternoon') return 'Good afternoon';
   return 'Good evening';
 }
+
+const GREETING_THEMES: Record<
+  GreetingPeriod,
+  {
+    card: readonly [string, string, string];
+    border: readonly [string, string];
+    badge: readonly [string, string];
+    badgeText: string;
+    accent: string;
+    nameColor: string;
+    subColor: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    iconGrad: readonly [string, string];
+    orb1: string;
+    orb2: string;
+    pillBg: string;
+    pillText: string;
+    emoji: string;
+  }
+> = {
+  morning: {
+    card: ['#FFF7ED', '#FFEDD5', '#FFFBEB'],
+    border: ['#FDBA74', '#FBBF24'],
+    badge: ['#FDE047', '#FACC15'],
+    badgeText: '#78350F',
+    accent: '#EA580C',
+    nameColor: '#9A3412',
+    subColor: '#C2410C',
+    icon: 'sunny',
+    iconGrad: ['#FBBF24', '#F97316'],
+    orb1: 'rgba(251, 191, 36, 0.35)',
+    orb2: 'rgba(249, 115, 22, 0.15)',
+    pillBg: 'rgba(234, 88, 12, 0.12)',
+    pillText: '#C2410C',
+    emoji: '☀️',
+  },
+  afternoon: {
+    card: ['#EFF6FF', '#E0E7FF', '#F5F3FF'],
+    border: ['#93C5FD', '#A78BFA'],
+    badge: ['#BFDBFE', '#93C5FD'],
+    badgeText: '#1E40AF',
+    accent: '#2563EB',
+    nameColor: '#1E3A8A',
+    subColor: '#4338CA',
+    icon: 'partly-sunny',
+    iconGrad: ['#60A5FA', '#6366F1'],
+    orb1: 'rgba(96, 165, 250, 0.3)',
+    orb2: 'rgba(99, 102, 241, 0.12)',
+    pillBg: 'rgba(37, 99, 235, 0.1)',
+    pillText: '#1D4ED8',
+    emoji: '🌤️',
+  },
+  evening: {
+    card: ['#EDE9FE', '#DDD6FE', '#F3E8FF'],
+    border: ['#C4B5FD', '#A78BFA'],
+    badge: ['#DDD6FE', '#C4B5FD'],
+    badgeText: '#5B21B6',
+    accent: '#7C3AED',
+    nameColor: '#4C1D95',
+    subColor: '#6D28D9',
+    icon: 'moon',
+    iconGrad: ['#A78BFA', '#6344D4'],
+    orb1: 'rgba(167, 139, 250, 0.35)',
+    orb2: 'rgba(99, 68, 212, 0.15)',
+    pillBg: 'rgba(124, 58, 237, 0.12)',
+    pillText: '#6D28D9',
+    emoji: '🌙',
+  },
+};
 
 function firstName(name?: string): string {
   if (!name?.trim()) return 'Student';
@@ -64,8 +142,10 @@ export default function HomeScreenUI({
   onStudyPartnerPress,
 }: Props) {
   const router = useRouter();
+  const period = useMemo(() => getGreetingPeriod(), []);
   const greeting = useMemo(() => getGreeting(), []);
   const displayName = firstName(userName);
+  const theme = GREETING_THEMES[period];
 
   const renderExam = ({ item }: { item: any }) => (
     <View style={styles.liveExamSlide}>
@@ -75,57 +155,50 @@ export default function HomeScreenUI({
 
   return (
     <View style={styles.wrap}>
-      {/* Hero — greeting + search in one section */}
-      <LinearGradient colors={['#F3EFFF', '#FAF8FF', '#FFFFFF']} style={styles.heroSection}>
-        <View style={styles.heroTop}>
-          <View style={styles.heroTextCol}>
-            <Text style={styles.heroGreetingLine} numberOfLines={2}>
-              <Text style={styles.heroTime}>{greeting}, </Text>
-              <Text style={styles.heroName}>{displayName} 👋</Text>
-            </Text>
-            {selectedCategory ? (
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryPillText} numberOfLines={1}>
-                  Preparing for {selectedCategory}
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.heroSub}>Ready to ace your exam today?</Text>
-            )}
-          </View>
-          <LinearGradient colors={[...HomeTheme.heroCta]} style={styles.heroIcon}>
-            <Ionicons name="sparkles" size={18} color="#FFF" />
-          </LinearGradient>
-        </View>
+      {/* Hero — time-based greeting */}
+      <LinearGradient colors={[...theme.border]} style={styles.heroBorder}>
+        <LinearGradient colors={[...theme.card]} style={styles.heroSection}>
+          <View style={[styles.heroOrb1, { backgroundColor: theme.orb1 }]} />
+          <View style={[styles.heroOrb2, { backgroundColor: theme.orb2 }]} />
 
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => router.push('/(tabs)/exam' as any)}
-          style={styles.searchOuter}
-        >
-          <LinearGradient colors={['#EDE9FE', '#DDD6FE']} style={styles.searchBorder}>
-            <View style={styles.searchBar}>
-              <View style={styles.searchIconWrap}>
-                <Search size={16} color={HomeTheme.primary} strokeWidth={2.2} />
-              </View>
-              <Text style={styles.searchPlaceholder}>Search exams, topics & more...</Text>
-              <View style={styles.searchGo}>
-                <ChevronRight size={16} color={HomeTheme.primary} strokeWidth={2.5} />
-              </View>
+          <View style={styles.heroTop}>
+            <View style={styles.heroTextCol}>
+              <LinearGradient colors={[...theme.badge]} style={styles.greetingBadge}>
+                <Text style={styles.greetingBadgeEmoji}>{theme.emoji}</Text>
+                <Text style={[styles.greetingBadgeText, { color: theme.badgeText }]}>{greeting}</Text>
+              </LinearGradient>
+
+              <Text style={[styles.heroName, { color: theme.nameColor }]} numberOfLines={1}>
+                {displayName} 👋
+              </Text>
+
+              {selectedCategory ? (
+                <View style={[styles.categoryPill, { backgroundColor: theme.pillBg }]}>
+                  <Ionicons name="ribbon-outline" size={12} color={theme.accent} />
+                  <Text style={[styles.categoryPillText, { color: theme.pillText }]} numberOfLines={1}>
+                    Preparing for {selectedCategory}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.heroSub, { color: theme.subColor }]}>
+                  Ready to ace your exam today?
+                </Text>
+              )}
             </View>
-          </LinearGradient>
-        </TouchableOpacity>
+
+            <LinearGradient colors={[...theme.iconGrad]} style={styles.heroIcon}>
+              <Ionicons name={theme.icon} size={22} color="#FFFFFF" />
+            </LinearGradient>
+          </View>
+        </LinearGradient>
       </LinearGradient>
 
       {/* Live Exams */}
       <View style={styles.liveBlock}>
         <View style={styles.sectionHead}>
-          <View style={styles.sectionHeadLeft}>
-            <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.liveBadge}>
-              <Zap size={11} color="#FFF" fill="#FFF" strokeWidth={2} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
-            </LinearGradient>
+          <View style={styles.sectionHeadText}>
             <Text style={styles.sectionTitle}>Live Exams</Text>
+            <Text style={styles.sectionSub}>Real-time competitive exams</Text>
           </View>
           <TouchableOpacity
             style={styles.viewAllBtn}
@@ -239,34 +312,37 @@ export default function HomeScreenUI({
         style={styles.partnerWrap}
       >
         <LinearGradient
-          colors={[...HomeTheme.partnerGradient]}
+          colors={['#C4B5FD', '#A78BFA', '#8B5CF6']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.partnerCard}
+          style={styles.partnerBorder}
         >
-          <View style={styles.partnerOrb} />
-          <View style={styles.partnerOrb2} />
-          <View style={styles.partnerContent}>
-            <View style={styles.partnerTextCol}>
-              <View style={styles.partnerLabelRow}>
-                <Ionicons name="people" size={12} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.partnerLabel}>Study Partner</Text>
+          <LinearGradient
+            colors={[...HomeTheme.partnerGradient]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.partnerCard}
+          >
+            <LinearGradient colors={['#FDE047', '#FACC15']} style={styles.partnerBadge}>
+              <Ionicons name="sparkles" size={10} color="#713F12" />
+              <Text style={styles.partnerBadgeText}>Study Partner</Text>
+            </LinearGradient>
+            <View style={styles.partnerContent}>
+              <View style={styles.partnerTextCol}>
+                <Text style={styles.partnerTitle}>Find your study partner</Text>
+                <Text style={styles.partnerSub}>Match, chat & prepare together for your dream exam</Text>
+                <LinearGradient colors={[...HomeTheme.heroCta]} style={styles.partnerCtaGrad}>
+                  <Text style={styles.partnerCtaTextLight}>Explore Now</Text>
+                  <ArrowRight size={14} color="#FFFFFF" strokeWidth={2.5} />
+                </LinearGradient>
               </View>
-              <Text style={styles.partnerTitle}>Find your study buddy</Text>
-              <Text style={styles.partnerSub}>Connect with students on the same exam prep journey</Text>
-              <View style={styles.partnerCta}>
-                <Text style={styles.partnerCtaText}>Find Now</Text>
-                <ArrowRight size={14} color={HomeTheme.primary} strokeWidth={2.5} />
-              </View>
-            </View>
-            <View style={styles.partnerImageWrap}>
               <Image
                 source={require('../../assets/images/icons/study-buddy.png')}
                 style={styles.partnerImage}
                 resizeMode="contain"
               />
             </View>
-          </View>
+          </LinearGradient>
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -276,132 +352,128 @@ export default function HomeScreenUI({
 const styles = StyleSheet.create({
   wrap: { paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 4 },
 
-  heroSection: {
-    borderRadius: 20,
-    padding: 14,
+  heroBorder: {
+    borderRadius: 22,
+    padding: 2,
     marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 68, 212, 0.1)',
     ...Platform.select({
       ios: {
         shadowColor: '#6344D4',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 5 },
+        shadowOpacity: 0.14,
+        shadowRadius: 12,
       },
-      android: { elevation: 2 },
+      android: { elevation: 4 },
     }),
+  },
+  heroSection: {
+    borderRadius: 20,
+    padding: 16,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroOrb1: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    top: -28,
+    right: 8,
+  },
+  heroOrb2: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    bottom: -12,
+    left: -8,
   },
   heroTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    zIndex: 1,
   },
-  heroTextCol: { flex: 1, minWidth: 0, paddingRight: 10 },
-  heroGreetingLine: {
-    lineHeight: Platform.OS === 'android' ? 28 : 26,
+  heroTextCol: { flex: 1, minWidth: 0, paddingRight: 12, gap: 6 },
+  greetingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  heroTime: {
-    fontFamily: FontFamily.medium,
-    fontSize: 15,
-    color: HomeTheme.inkSecondary,
+  greetingBadgeEmoji: { fontSize: 13 },
+  greetingBadgeText: {
+    fontFamily: FontFamily.bold,
+    fontSize: 12,
+    letterSpacing: 0.2,
   },
   heroName: {
-    fontFamily: FontFamily.bold,
-    fontSize: 20,
-    color: HomeTheme.ink,
+    fontFamily: FontFamily.extraBold,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.3,
   },
   heroSub: {
-    fontFamily: FontFamily.regular,
+    fontFamily: FontFamily.medium,
     fontSize: 12,
-    color: HomeTheme.inkMuted,
-    marginTop: 4,
-    lineHeight: Platform.OS === 'android' ? 18 : 16,
+    lineHeight: 17,
   },
   heroIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 50,
+    height: 50,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+    }),
   },
   categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 6,
-    backgroundColor: 'rgba(99, 68, 212, 0.1)',
+    gap: 6,
+    marginTop: 2,
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 10,
     maxWidth: '100%',
   },
   categoryPillText: {
+    flex: 1,
     fontFamily: FontFamily.semiBold,
     fontSize: 11,
-    color: HomeTheme.primary,
   },
 
-  searchOuter: {},
-  searchBorder: { borderRadius: 16, padding: 1.5 },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: HomeTheme.card,
-    borderRadius: 14.5,
-    paddingHorizontal: 10,
-    paddingVertical: 11,
-    minHeight: 48,
-  },
-  searchIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: HomeTheme.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    fontFamily: FontFamily.medium,
-    fontSize: 13,
-    color: HomeTheme.inkMuted,
-  },
-  searchGo: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: HomeTheme.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-  },
-
-  liveBlock: { marginBottom: 14 },
+  liveBlock: { marginBottom: 12 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  sectionHeadLeft: { flexDirection: 'row', alignItems: 'center' },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 8,
+  sectionHeadText: { flex: 1, paddingRight: 8 },
+  sectionTitle: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 16,
+    color: HomeTheme.ink,
+    letterSpacing: -0.2,
   },
-  liveBadgeText: {
-    fontFamily: FontFamily.bold,
-    fontSize: 9,
-    color: '#FFF',
-    marginLeft: 3,
-    letterSpacing: 0.5,
+  sectionSub: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: HomeTheme.inkMuted,
+    marginTop: 2,
   },
-  sectionTitle: { fontFamily: FontFamily.bold, fontSize: 17, color: HomeTheme.ink },
-  sectionSub: { fontFamily: FontFamily.medium, fontSize: 11, color: HomeTheme.inkMuted },
   viewAllBtn: { flexDirection: 'row', alignItems: 'center' },
   viewAllText: {
     fontFamily: FontFamily.semiBold,
@@ -411,24 +483,10 @@ const styles = StyleSheet.create({
   },
 
   liveSection: {
-    borderRadius: 18,
-    backgroundColor: HomeTheme.card,
-    borderWidth: 1,
-    borderColor: HomeTheme.border,
-    paddingTop: 10,
-    paddingBottom: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#6344D4',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-      },
-      android: { elevation: 2 },
-    }),
+    paddingBottom: 4,
   },
-  liveExamSlide: { width: HERO_W, paddingHorizontal: 4 },
-  liveLoading: { paddingVertical: 28, alignItems: 'center' },
+  liveExamSlide: { width: HERO_W, paddingHorizontal: 0 },
+  liveLoading: { paddingVertical: 20, alignItems: 'center' },
   liveLoadingText: {
     fontFamily: FontFamily.medium,
     fontSize: 13,
@@ -444,14 +502,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(99, 68, 212, 0.12)',
   },
   liveEmptyInner: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
     alignItems: 'center',
   },
   liveEmptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: HomeTheme.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -478,19 +536,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 5,
     marginBottom: 2,
   },
   examDot: {
-    width: 6,
-    height: 6,
+    width: 5,
+    height: 5,
     borderRadius: 3,
     backgroundColor: 'rgba(99, 68, 212, 0.2)',
     marginHorizontal: 3,
   },
   examDotActive: {
     backgroundColor: HomeTheme.primary,
-    width: 18,
+    width: 14,
     borderRadius: 3,
   },
 
@@ -530,83 +588,69 @@ const styles = StyleSheet.create({
 
   partnerWrap: {
     marginBottom: 6,
-    borderRadius: 18,
-    overflow: 'hidden',
+    borderRadius: 20,
     ...HomeTheme.shadowPurple,
+  },
+  partnerBorder: {
+    borderRadius: 20,
+    padding: 2,
+    overflow: 'hidden',
   },
   partnerCard: {
     borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     overflow: 'hidden',
-    minHeight: 120,
+    minHeight: 148,
   },
-  partnerOrb: {
-    position: 'absolute',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    top: -50,
-    right: 20,
+  partnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  partnerOrb2: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    bottom: -10,
-    left: 40,
+  partnerBadgeText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 10,
+    color: '#713F12',
   },
   partnerContent: { flexDirection: 'row', alignItems: 'center' },
-  partnerTextCol: { flex: 1, paddingRight: 8 },
-  partnerLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  partnerLabel: {
-    fontFamily: FontFamily.medium,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.75)',
-    marginLeft: 4,
-  },
+  partnerTextCol: { flex: 1, paddingRight: 4, justifyContent: 'center' },
   partnerTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: 17,
+    fontSize: 16,
     color: '#FFFFFF',
     marginBottom: 4,
-    lineHeight: 22,
+    lineHeight: 21,
+    letterSpacing: -0.2,
   },
   partnerSub: {
     fontFamily: FontFamily.regular,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
+    color: 'rgba(255,255,255,0.72)',
     marginBottom: 10,
     lineHeight: 16,
   },
-  partnerCta: {
+  partnerCtaGrad: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 10,
+    gap: 4,
   },
-  partnerCtaText: {
+  partnerCtaTextLight: {
     fontFamily: FontFamily.semiBold,
     fontSize: 12,
-    color: HomeTheme.primary,
-    marginRight: 4,
+    color: '#FFFFFF',
   },
-  partnerImageWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  partnerImage: {
+    width: 140,
+    height: 140,
   },
-  partnerImage: { width: 76, height: 76 },
 });

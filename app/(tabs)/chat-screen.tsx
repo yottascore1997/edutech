@@ -1,4 +1,6 @@
 import { apiFetchAuth, getImageUrl } from '@/constants/api';
+import { HomeTheme } from '@/constants/HomeTheme';
+import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -32,13 +34,14 @@ const SP_BG = ['#EDE9FE', '#FDF2F8', '#FAFAFF'] as const;
 
 const ChatTheme = {
   bg: SP_BG,
-  primary: '#6344D4',
+  primary: HomeTheme.primary,
   primarySoft: '#F3EEFF',
-  ink: '#0F0A1E',
-  inkMuted: '#64748B',
-  border: '#E8E8F0',
-  bubbleMine: '#6344D4',
+  ink: HomeTheme.ink,
+  inkMuted: HomeTheme.inkMuted,
+  border: HomeTheme.border,
+  bubbleMine: HomeTheme.primary,
   bubbleTheirs: '#FFFFFF',
+  ctaGrad: [...HomeTheme.heroCta] as const,
 };
 
 interface User {
@@ -146,8 +149,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
   // Initialize socket connection - Like matchmaking screen
   useEffect(() => {
     if (currentUser?.token) {
-      console.log('🔌 Initializing socket connection...');
-      
+            
       const newSocket = io(WEBSOCKET_CONFIG.SERVER_URL, {
         auth: {
           token: currentUser.token
@@ -159,38 +161,32 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       });
 
       newSocket.on('connect', () => {
-        console.log('✅ Chat Socket connected:', newSocket.id);
-        setIsConnected(true);
+                setIsConnected(true);
         setSocketError(null);
         
         // Register user immediately after connection
         if (currentUser?.id) {
-          console.log('👤 Registering user:', currentUser.id);
-          newSocket.emit('register_user', currentUser.id);
+                    newSocket.emit('register_user', currentUser.id);
         }
       });
 
       newSocket.on('disconnect', () => {
-        console.log('❌ Chat Socket disconnected');
-        setIsConnected(false);
+                setIsConnected(false);
       });
 
       newSocket.on('connect_error', (error) => {
         // Silently handle socket errors - no console logging
-        // console.error('🔥 Chat Socket connection error:', error);
-        setSocketError('Connection failed. Please check your internet connection and try again.');
+        //         setSocketError('Connection failed. Please check your internet connection and try again.');
         setIsConnected(false);
       });
 
       newSocket.on('pong', () => {
-        console.log('🏓 Chat Socket pong received');
-      });
+              });
 
       setSocket(newSocket);
 
       return () => {
-        console.log('🔌 Cleaning up socket connection');
-        newSocket.disconnect();
+                newSocket.disconnect();
       };
     } else {
       setSocketError('Authentication required. Please login again.');
@@ -199,10 +195,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
   // Test WebSocket connection function
   const testWebSocketConnection = () => {
-    console.log('🔍 Testing WebSocket connection...');
-    console.log('🔍 Connection status:', isConnected);
-    console.log('🔍 Socket ID:', socket?.id);
-  };
+              };
   
   // State management
   const [messages, setMessages] = useState<Message[]>([]);
@@ -212,7 +205,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
   // Debug newMessage state
   useEffect(() => {
-
 
   }, [newMessage, sending]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -261,8 +253,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       const blob = await response.blob();
       return blob.size;
     } catch (error) {
-      console.error('Error getting file size:', error);
-      return 0;
+            return 0;
     }
   };
 
@@ -393,8 +384,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         await handleFileUpload(file);
       }
     } catch (error) {
-      console.error('Error selecting document:', error);
-      Alert.alert('Error', 'Failed to select document. Please try again.');
+            Alert.alert('Error', 'Failed to select document. Please try again.');
     } finally {
       setShowFileOptions(false);
     }
@@ -427,8 +417,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         });
       }
     } catch (error) {
-      console.error('Error selecting image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
+            Alert.alert('Error', 'Failed to select image. Please try again.');
     } finally {
       setShowFileOptions(false);
     }
@@ -481,8 +470,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         } : null);
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
-      setSelectedFile(null);
+            setSelectedFile(null);
       
       if (error instanceof TypeError && error.message.includes('Network request failed')) {
         Alert.alert(
@@ -526,8 +514,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
       setSelectedFile(null);
     } catch (error) {
-      console.error('Error sending file message:', error);
-      Alert.alert('Error', 'Failed to send file. Please try again.');
+            Alert.alert('Error', 'Failed to send file. Please try again.');
     }
   };
 
@@ -648,7 +635,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         throw new Error('No authentication token');
       }
 
-
       const response = await apiFetchAuth(`/student/messages/${targetUserId}`, currentUser.token);
       
       if (response.data) {
@@ -682,8 +668,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         });
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      if (!isRefresh) {
+            if (!isRefresh) {
         Alert.alert('Error', 'Failed to load messages');
       }
     } finally {
@@ -718,8 +703,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         setMessageRequests(response.data);
       }
     } catch (error) {
-      console.error('Error fetching message requests:', error);
-    }
+          }
   };
 
   // Mark messages as read
@@ -745,8 +729,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       }
 
     } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
+          }
   };
 
   // Handle accept message request
@@ -772,8 +755,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         }
       }
     } catch (error) {
-      console.error('Error accepting message request:', error);
-    }
+          }
   };
 
   // Handle reject message request
@@ -794,8 +776,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         setMessages(prev => prev.filter(msg => msg.requestId !== requestId));
       }
     } catch (error) {
-      console.error('Error rejecting message request:', error);
-    }
+          }
   };
 
   // Delete message functionality
@@ -837,8 +818,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         Alert.alert('Error', 'Failed to delete message. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting message:', error);
-      Alert.alert('Error', 'Failed to delete message. Please try again.');
+            Alert.alert('Error', 'Failed to delete message. Please try again.');
     } finally {
       setDeleting(false);
     }
@@ -851,7 +831,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
 
     // Send message function
   const sendMessage = async () => {
-
 
     
     // Enhanced validation check
@@ -901,7 +880,6 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
          try {
        // Force REST API for now (WebSocket can be enabled later)
 
-
        // Fallback to REST API if WebSocket is not available
 
       if (!currentUser.token) {
@@ -914,14 +892,10 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         messageType: 'TEXT'
       };
 
-
-
       const response = await apiFetchAuth('/student/messages', currentUser.token, {
         method: 'POST',
         body: messagePayload,
       });
-
-
 
       if (response.data) {
         const result = response.data;
@@ -950,8 +924,7 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       }
 
     } catch (error: any) {
-      console.error('❌ Error sending message:', error);
-      
+            
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
       setNewMessage(content);
@@ -1060,17 +1033,22 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
           <View style={styles.messageContentCol}>
             <TouchableOpacity onLongPress={() => handleDeleteMessage(item)} activeOpacity={0.85}>
               {isMyMessage ? (
-                <View style={[styles.messageBubble, styles.myBubble]}>
+                <LinearGradient
+                  colors={[...ChatTheme.ctaGrad]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.messageBubble, styles.myBubble]}
+                >
                   {renderMessageContent(item, true)}
                   <View style={styles.bubbleFooter}>
                     <Text style={styles.myBubbleTime}>{formatMessageTime(item.createdAt)}</Text>
                     <Ionicons
                       name={item.isRead ? 'checkmark-done' : 'checkmark'}
                       size={11}
-                      color={item.isRead ? '#C4B5FD' : 'rgba(255,255,255,0.75)'}
+                      color={item.isRead ? '#FDE68A' : 'rgba(255,255,255,0.75)'}
                     />
                   </View>
-                </View>
+                </LinearGradient>
               ) : (
                 <View style={[styles.messageBubble, styles.theirBubble]}>
                   {renderMessageContent(item, false)}
@@ -1082,11 +1060,12 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
             {item.isRequest && !isMyMessage && (
               <View style={styles.requestButtons}>
                 <TouchableOpacity
-                  style={styles.acceptButton}
                   onPress={() => handleAcceptRequest(item.requestId!)}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.acceptButtonText}>Accept</Text>
+                  <LinearGradient colors={[...ChatTheme.ctaGrad]} style={styles.acceptButton}>
+                    <Text style={styles.acceptButtonText}>Accept</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.rejectButton}
@@ -1127,12 +1106,14 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
       <View style={styles.chatHeader}>
-        <TouchableOpacity style={styles.headerBackBtn} onPress={() => router.replace('/(tabs)/messages' as any)} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={24} color={ChatTheme.ink} />
+        <TouchableOpacity style={styles.headerBackBtn} onPress={() => router.replace('/(tabs)/messages' as any)} activeOpacity={0.85}>
+          <View style={styles.backCircle}>
+            <Ionicons name="arrow-back" size={22} color={ChatTheme.ink} />
+          </View>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.headerUserRow}
-          activeOpacity={0.7}
+          style={styles.headerUserCard}
+          activeOpacity={0.85}
           onPress={() => {
             router.push({
               pathname: '/(tabs)/study-partner-liked-user',
@@ -1145,34 +1126,38 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
             } as any);
           }}
         >
-          <View style={styles.headerAvatarWrap}>
-            {displayPhotoUrl ? (
-              <Image source={{ uri: displayPhotoUrl }} style={styles.headerAvatar} />
-            ) : (
-              <View style={styles.headerAvatarPlaceholder}>
-                <Text style={styles.headerAvatarInitials}>
-                  {userName && userName.length > 0 ? userName.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              </View>
-            )}
-            {isConnected ? <View style={styles.headerOnlineDot} /> : null}
-          </View>
+          <LinearGradient colors={['#EDE9FE', '#F3EEFF']} style={styles.headerAvatarRing}>
+            <View style={styles.headerAvatarWrap}>
+              {displayPhotoUrl ? (
+                <Image source={{ uri: displayPhotoUrl }} style={styles.headerAvatar} />
+              ) : (
+                <LinearGradient colors={['#C4B5FD', '#8E78E7']} style={styles.headerAvatarPlaceholder}>
+                  <Text style={styles.headerAvatarInitials}>
+                    {userName && userName.length > 0 ? userName.charAt(0).toUpperCase() : 'U'}
+                  </Text>
+                </LinearGradient>
+              )}
+              {isConnected ? <View style={styles.headerOnlineDot} /> : null}
+            </View>
+          </LinearGradient>
           <View style={styles.headerNameWrap}>
             <Text style={styles.headerName} numberOfLines={1}>{userName}</Text>
-            <Text style={styles.headerUsername} numberOfLines={1}>
-              {isConnected ? 'Study Buddy' : 'Connecting…'}
-            </Text>
+            <View style={styles.headerStatusRow}>
+              <View style={[styles.statusDot, isConnected && styles.statusDotOn]} />
+              <Text style={styles.headerUsername} numberOfLines={1}>
+                {isTyping ? 'Typing…' : isConnected ? 'Study Buddy · Online' : 'Connecting…'}
+              </Text>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+          <View style={styles.headerProfileBtn}>
+            <Ionicons name="person-outline" size={18} color={ChatTheme.primary} />
+          </View>
         </TouchableOpacity>
       </View>
 
-      {isTyping && (
-        <Text style={styles.typingHint}>{userName} is typing…</Text>
-      )}
-
       {!isConnected && (
         <View style={styles.connectionBanner}>
+          <ActivityIndicator size="small" color="#D97706" />
           <Text style={styles.connectionBannerText}>Reconnecting…</Text>
         </View>
       )}
@@ -1185,10 +1170,10 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
           </View>
         ) : messages.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="chatbubbles-outline" size={48} color={ChatTheme.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <LinearGradient colors={['#F3EEFF', '#EDE9FE']} style={styles.emptyIcon}>
+              <Ionicons name="chatbubbles" size={44} color={ChatTheme.primary} />
+            </LinearGradient>
+            <Text style={styles.emptyTitle}>Start the conversation</Text>
             <Text style={styles.emptySubtitle}>
               {isFollowing
                 ? 'Say hi to your study buddy'
@@ -1285,25 +1270,30 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
         )}
 
         <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.attachBtn} onPress={() => setShowFileOptions(!showFileOptions)}>
-            <Ionicons name="add-circle-outline" size={28} color={ChatTheme.primary} />
-          </TouchableOpacity>
-          <TextInput
-            ref={textInputRef}
-            style={styles.messageInput}
-            placeholder="Message…"
-            placeholderTextColor="#94A3B8"
-            multiline
-            value={newMessage}
-            onChangeText={handleTypingChange}
-            onBlur={emitStopTyping}
-            onKeyPress={handleKeyPress}
-            editable={!sending}
-            maxLength={1000}
-          />
+          <View style={styles.inputPill}>
+            <TouchableOpacity style={styles.attachBtn} onPress={() => setShowFileOptions(!showFileOptions)}>
+              <Ionicons name="add" size={22} color={ChatTheme.primary} />
+            </TouchableOpacity>
+            <TextInput
+              ref={textInputRef}
+              style={styles.messageInput}
+              placeholder="Type a message…"
+              placeholderTextColor={ChatTheme.inkMuted}
+              multiline
+              value={newMessage}
+              onChangeText={handleTypingChange}
+              onBlur={emitStopTyping}
+              onKeyPress={handleKeyPress}
+              editable={!sending}
+              maxLength={1000}
+            />
+            <TouchableOpacity style={styles.emojiBtn} onPress={() => setShowEmojiPicker(!showEmojiPicker)}>
+              <Text style={styles.emojiBtnText}>😊</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[
-              styles.sendBtn,
+              styles.sendBtnWrap,
               !newMessage.trim() && !selectedFile?.uploadedUrl && styles.sendBtnDisabled,
             ]}
             onPress={() => {
@@ -1311,15 +1301,15 @@ const ChatScreen = ({ route }: ChatScreenProps) => {
               else if (newMessage.trim()) sendMessage();
             }}
             disabled={sending || (!newMessage.trim() && !selectedFile?.uploadedUrl)}
+            activeOpacity={0.9}
           >
-            {sending ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Ionicons name="send" size={20} color="#fff" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.emojiBtn} onPress={() => setShowEmojiPicker(!showEmojiPicker)}>
-            <Text style={styles.emojiBtnText}>😊</Text>
+            <LinearGradient colors={[...ChatTheme.ctaGrad]} style={styles.sendBtn}>
+              {sending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Ionicons name="send" size={18} color="#fff" />
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
@@ -1428,11 +1418,57 @@ const styles = StyleSheet.create({
   chatHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(232,232,240,0.9)',
-    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderBottomColor: 'rgba(232,232,240,0.85)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  backCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerUserCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginLeft: 4,
+    paddingVertical: 4,
+    paddingRight: 4,
+  },
+  headerAvatarRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerProfileBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3EEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#CBD5E1',
+  },
+  statusDotOn: {
+    backgroundColor: '#22C55E',
   },
   typingHint: {
     fontSize: 12,
@@ -1442,12 +1478,18 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   connectionBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    backgroundColor: 'rgba(254,243,199,0.6)',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(254,243,199,0.75)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(251,191,36,0.3)',
   },
   connectionBannerText: {
     fontSize: 12,
+    fontFamily: FontFamily.medium,
     color: '#92400E',
   },
   headerBackBtn: {
@@ -1508,13 +1550,13 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FontFamily.bold,
     color: ChatTheme.ink,
   },
   headerUsername: {
     fontSize: 12,
+    fontFamily: FontFamily.medium,
     color: ChatTheme.inkMuted,
-    marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
@@ -1536,22 +1578,28 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     maxWidth: '100%',
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 18,
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   theirBubble: {
     alignSelf: 'flex-start',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 5,
     backgroundColor: ChatTheme.bubbleTheirs,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: ChatTheme.border,
+    borderColor: 'rgba(232,232,240,0.9)',
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
   },
   myBubble: {
     alignSelf: 'flex-end',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 5,
     marginLeft: 28,
-    backgroundColor: ChatTheme.bubbleMine,
   },
   bubbleFooter: {
     flexDirection: 'row',
@@ -1591,61 +1639,88 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 56,
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 56,
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: ChatTheme.border,
   },
+  inputPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F8F7FF',
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(232,232,240,0.9)',
+    paddingLeft: 4,
+    paddingRight: 8,
+    minHeight: 48,
+  },
   attachBtn: {
-    paddingBottom: 6,
+    width: 40,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messageInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
+    fontFamily: FontFamily.regular,
     color: ChatTheme.ink,
     maxHeight: 100,
-    minHeight: 40,
+    minHeight: 44,
     paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: ChatTheme.border,
+    paddingHorizontal: 4,
+    backgroundColor: 'transparent',
   },
   emojiBtn: {
-    paddingBottom: 6,
-    paddingHorizontal: 4,
-  },
-  emojiBtnText: {
-    fontSize: 24,
-  },
-  sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ChatTheme.primary,
+    width: 36,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emojiBtnText: {
+    fontSize: 22,
+  },
+  sendBtnWrap: {
     marginBottom: 2,
   },
+  sendBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
   sendBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.45,
   },
   fileOptionsRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 24,
-    paddingVertical: 10,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    gap: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: ChatTheme.border,
   },
   fileOptionBtn: {
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: '#F3EEFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    minWidth: 100,
   },
   enhancedHeader: {
     paddingTop: Platform.OS === 'ios' ? 44 : 20,
@@ -1774,8 +1849,8 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 15,
-    color: '#64748B',
-    fontWeight: '500',
+    fontFamily: FontFamily.medium,
+    color: ChatTheme.inkMuted,
   },
   emptyContainer: {
     flex: 1,
@@ -1784,13 +1859,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
   quickRepliesWrap: {
     width: '100%',
@@ -1799,28 +1878,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   quickReplyChip: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: ChatTheme.border,
+    borderColor: '#E9D5FF',
+    shadowColor: '#6344D4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   quickReplyText: {
     fontSize: 14,
-    color: ChatTheme.ink,
+    fontFamily: FontFamily.medium,
+    color: ChatTheme.primary,
     textAlign: 'center',
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FontFamily.bold,
     color: ChatTheme.ink,
     marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#64748B',
+    fontFamily: FontFamily.regular,
+    color: ChatTheme.inkMuted,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 28,
@@ -1888,7 +1974,8 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 21,
+    lineHeight: 22,
+    fontFamily: FontFamily.regular,
   },
   myMessageText: {
     color: '#fff',
@@ -2020,15 +2107,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   acceptButton: {
-    backgroundColor: ChatTheme.primary,
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   acceptButtonText: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFamily.bold,
   },
   rejectButton: {
     backgroundColor: '#FFFFFF',
@@ -2122,7 +2209,9 @@ const styles = StyleSheet.create({
       marginBottom: 6,
       borderRadius: 20,
       maxHeight: 280,
-      shadowColor: '#14532D',
+      borderWidth: 1,
+      borderColor: '#E9D5FF',
+      shadowColor: '#6344D4',
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
@@ -2168,8 +2257,8 @@ const styles = StyleSheet.create({
     },
     fileOptionText: {
       fontSize: 12,
-      color: ChatTheme.inkMuted,
-      marginTop: 2,
+      fontFamily: FontFamily.semiBold,
+      color: ChatTheme.primary,
     },
     filePreviewContainer: {
       position: 'absolute',

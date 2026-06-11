@@ -370,8 +370,7 @@ export default function TimetableScreen() {
         Alert.alert('Error', response.data?.message || 'Failed to delete event. Please try again.');
       }
     } catch (error) {
-      console.error('Error deleting event:', error);
-      Alert.alert('Error', 'Failed to delete event. Please try again.');
+            Alert.alert('Error', 'Failed to delete event. Please try again.');
     } finally {
       setDeleting(false);
     }
@@ -493,7 +492,6 @@ export default function TimetableScreen() {
         onScrollToSchedule={scrollToSchedule}
         onSlotMenu={showSlotMenu}
       />
-
 
       {/* Add Timetable Modal */}
       <Modal

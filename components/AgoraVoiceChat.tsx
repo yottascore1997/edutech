@@ -64,8 +64,7 @@ export default function AgoraVoiceChat({
         Alert.alert('Error', 'Cannot open browser');
       }
     } catch (error) {
-      console.error('❌ Failed to open browser:', error);
-      Alert.alert('Error', 'Failed to open Agora browser');
+            Alert.alert('Error', 'Failed to open Agora browser');
     }
   };
 

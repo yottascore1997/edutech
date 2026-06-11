@@ -74,8 +74,7 @@ export default function PYQAttemptScreen() {
         startTimer();
       }
     } catch (e: any) {
-      console.error('Failed to load questions', e);
-      setError(e?.message || 'Failed to load questions');
+            setError(e?.message || 'Failed to load questions');
     } finally {
       setLoading(false);
     }
@@ -173,8 +172,7 @@ export default function PYQAttemptScreen() {
       setShowSubmitModal(false);
       router.replace(`/pyq/${examId}/result/${attemptId}`);
     } catch (e: any) {
-      console.error('Auto-submit failed', e);
-      setSubmitting(false);
+            setSubmitting(false);
       Alert.alert('Time Up!', 'Your exam has been submitted. Redirecting to results...');
       router.replace(`/pyq/${examId}/result/${attemptId}`);
     }
@@ -196,8 +194,7 @@ export default function PYQAttemptScreen() {
       setSubmitting(false);
       router.replace(`/pyq/${examId}/result/${attemptId}`);
     } catch (e: any) {
-      console.error('Submit failed', e);
-      setSubmitting(false);
+            setSubmitting(false);
       Alert.alert('Error', e?.message || 'Failed to submit. Please try again.');
     }
   };

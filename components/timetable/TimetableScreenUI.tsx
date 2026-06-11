@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, ChevronLeft, ChevronRight, Clock, MoreVertical, Plus, Trophy } from 'lucide-react-native';
 import {
   Animated,
-  Dimensions,
   Image,
   Platform,
   RefreshControl,
@@ -15,8 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_W } = Dimensions.get('window');
 const PAD = 16;
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_COLORS = ['#EF4444', '#64748B', '#64748B', '#64748B', '#64748B', '#64748B', '#3B82F6'];
@@ -105,8 +104,54 @@ export default function TimetableScreenUI({
   onScrollToSchedule,
   onSlotMenu,
 }: Props) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.screen}>
+      <View style={[styles.fixedHeader, { paddingTop: Math.max(insets.top - 4, Platform.OS === 'android' ? 6 : 2) }]}>
+        <LinearGradient
+          colors={['#312E81', '#4338CA', '#2563EB']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
+          <View style={styles.heroDecor1} />
+          <View style={styles.heroDecor2} />
+
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroTitleCol}>
+              <View style={styles.heroBadge}>
+                <Calendar size={11} color="#C4B5FD" strokeWidth={2.2} />
+                <Text style={styles.heroBadgeTxt}>STUDY PLAN</Text>
+              </View>
+              <Text style={styles.heroTitle} numberOfLines={1}>
+                Timetable <Text style={styles.heroTitleAccent}>Pro</Text>
+              </Text>
+              <Text style={styles.heroTagline} numberOfLines={1}>
+                Plan daily blocks · Stay consistent
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.heroAddBtn} onPress={onAddStudy} activeOpacity={0.9}>
+              <LinearGradient colors={['#8B5CF6', '#6D28D9']} style={styles.heroAddBtnGrad}>
+                <Plus size={15} color="#FFFFFF" strokeWidth={2.8} />
+                <Text style={styles.heroAddBtnText}>Add</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStatCard}>
+              <Text style={styles.heroStatNum}>{completedTodayCount}</Text>
+              <Text style={styles.heroStatLabel}>Done today</Text>
+            </View>
+            <View style={styles.heroStatCard}>
+              <Text style={styles.heroStatNum}>{studyHoursToday.toFixed(1)}</Text>
+              <Text style={styles.heroStatLabel}>Study hours</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
@@ -117,62 +162,6 @@ export default function TimetableScreenUI({
         }
       >
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* ── Hero (light purple-blue, mockup) ── */}
-          <View style={styles.heroWrap}>
-            <LinearGradient
-              colors={['#0F172A', '#1E3A8A', '#2563EB']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0.5 }}
-              style={styles.heroCard}
-            >
-              <View style={styles.heroContent}>
-                <View style={styles.heroLeft}>
-                  <View style={styles.heroTopRow}>
-                    <View style={styles.heroTitleCol}>
-                      <View style={styles.heroBadge}>
-                        <View style={styles.heroBadgeDot} />
-                        <Text style={styles.heroBadgeTxt}>STUDY PLAN</Text>
-                      </View>
-                      <Text style={styles.heroTitle} numberOfLines={1}>
-                        Timetable <Text style={styles.heroTitleAccent}>Pro</Text>
-                      </Text>
-                      <Text style={styles.heroTagline} numberOfLines={1}>
-                        Plan daily blocks · Stay consistent
-                      </Text>
-                    </View>
-                    <TouchableOpacity style={styles.heroAddBtn} onPress={onAddStudy} activeOpacity={0.9}>
-                      <LinearGradient colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0.12)']} style={styles.heroAddBtnGrad}>
-                        <Plus size={16} color="#FFFFFF" strokeWidth={2.8} />
-                        {Platform.OS === 'ios' && <Text style={styles.heroAddBtnText}>Add</Text>}
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.heroStatsRow}>
-                    <View style={styles.heroStatPill}>
-                      <View style={[styles.heroStatDot, { backgroundColor: '#34D399' }]} />
-                      <Text style={styles.heroStatText} numberOfLines={1}>
-                        <Text style={styles.heroStatNum}>{completedTodayCount}</Text> done today
-                      </Text>
-                    </View>
-                    <View style={styles.heroStatDivider} />
-                    <View style={styles.heroStatPill}>
-                      <View style={[styles.heroStatDot, { backgroundColor: '#93C5FD' }]} />
-                      <Text style={styles.heroStatText} numberOfLines={1}>
-                        <Text style={styles.heroStatNum}>{studyHoursToday}</Text> hrs today
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <Image
-                  source={require('../../assets/images/timetable-hero.jpg')}
-                  style={styles.heroArt}
-                  resizeMode="contain"
-                />
-              </View>
-            </LinearGradient>
-          </View>
-
           {/* ── Calendar (white card) ── */}
           <View style={styles.calendarCard}>
             <View style={styles.calHeader}>
@@ -374,57 +363,78 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: TimetableTheme.screenBg },
   scroll: { flex: 1 },
   scrollContent: {
-    paddingTop: Platform.OS === 'android' ? 2 : 8,
+    paddingTop: 4,
     paddingBottom: Platform.OS === 'ios' ? 120 : 116,
   },
 
-  heroWrap: { marginHorizontal: PAD, marginBottom: Platform.OS === 'android' ? 10 : 14 },
+  fixedHeader: {
+    paddingHorizontal: PAD,
+    paddingBottom: 6,
+    backgroundColor: TimetableTheme.screenBg,
+    zIndex: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6D28D9',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+    }),
+  },
   heroCard: {
-    borderRadius: 20,
-    padding: Platform.OS === 'android' ? 10 : 14,
-    paddingRight: 8,
-    minHeight: Platform.OS === 'android' ? 108 : 130,
+    borderRadius: 18,
+    padding: 12,
     overflow: 'hidden',
     ...softShadow,
+  },
+  heroDecor1: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -30,
+    right: -20,
+  },
+  heroDecor2: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    bottom: -18,
+    left: 24,
   },
   heroBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
     marginBottom: 6,
-  },
-  heroBadgeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#FCA5A5',
   },
   heroBadgeTxt: {
     fontFamily: FontFamily.semiBold,
-    fontSize: 10,
-    color: '#FCA5A5',
-    letterSpacing: 1,
+    fontSize: 9,
+    color: '#DDD6FE',
+    letterSpacing: 0.8,
   },
-  heroContent: { flexDirection: 'row', alignItems: 'flex-end' },
-  heroLeft: { flex: 1, paddingRight: 4, zIndex: 2 },
   heroTopRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
-    marginBottom: Platform.OS === 'android' ? 6 : 8,
+    marginBottom: 8,
+    zIndex: 1,
   },
   heroTitleCol: { flex: 1, minWidth: 0 },
   heroTitle: {
     fontFamily: FontFamily.extraBold,
-    fontSize: Platform.OS === 'android' ? 20 : 23,
+    fontSize: 20,
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
@@ -434,47 +444,44 @@ const styles = StyleSheet.create({
   heroTagline: {
     fontFamily: FontFamily.medium,
     fontSize: 11,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 4,
+    color: 'rgba(255,255,255,0.78)',
+    marginTop: 3,
   },
-  heroAddBtn: { borderRadius: 14, overflow: 'hidden', alignSelf: 'flex-start' },
+  heroAddBtn: { borderRadius: 12, overflow: 'hidden', alignSelf: 'flex-start' },
   heroAddBtnGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Platform.OS === 'android' ? 10 : 12,
-    paddingVertical: Platform.OS === 'android' ? 7 : 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    ...Platform.select({
-      ios: { shadowColor: '#6D28D9', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.22, shadowRadius: 6 },
-      android: { elevation: 3 },
-    }),
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   heroAddBtnText: { fontFamily: FontFamily.bold, fontSize: 12, color: '#FFF' },
   heroStatsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: Platform.OS === 'android' ? 7 : 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    marginBottom: Platform.OS === 'android' ? 6 : 8,
+    gap: 10,
+    zIndex: 1,
   },
-  heroStatPill: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'center' },
-  heroStatDot: { width: 7, height: 7, borderRadius: 4 },
-  heroStatText: { fontFamily: FontFamily.medium, fontSize: 12, color: 'rgba(255,255,255,0.8)' },
-  heroStatNum: { fontFamily: FontFamily.bold, color: '#FFFFFF' },
-  heroStatDivider: { width: 1, height: 18, backgroundColor: 'rgba(15, 23, 42, 0.12)' },
-  // heroHint removed to keep banner compact
-  heroArt: {
-    width: SCREEN_W * 0.36,
-    height: Platform.OS === 'android' ? 72 : 90,
-    marginRight: -4,
-    marginBottom: -6,
+  heroStatCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+  },
+  heroStatNum: {
+    fontFamily: FontFamily.bold,
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  heroStatLabel: {
+    fontFamily: FontFamily.medium,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 2,
   },
 
   calendarCard: {

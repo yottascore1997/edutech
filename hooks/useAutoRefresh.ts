@@ -29,11 +29,9 @@ export const useAutoRefresh = ({
     try {
       isRefreshing.current = true;
       lastRefreshTime.current = now;
-      console.log(`🔄 Auto-refreshing ${screenName}`);
-      await refreshFunction();
+            await refreshFunction();
     } catch (error) {
-      console.error(`Error auto-refreshing ${screenName}:`, error);
-    } finally {
+          } finally {
       isRefreshing.current = false;
     }
   }, [refreshFunction, screenName, debounceMs]);
@@ -42,8 +40,7 @@ export const useAutoRefresh = ({
     if (!enabled) return;
 
     const unsubscribe = navigation.addListener('focus', () => {
-      console.log(`📱 Screen focused: ${screenName}`);
-      debouncedRefresh();
+            debouncedRefresh();
     });
 
     return unsubscribe;

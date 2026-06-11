@@ -75,8 +75,7 @@ export default function CurrentAffairsMonthScreen() {
       setSelectedCategory(null);
     } catch (e: unknown) {
       const err = e as { message?: string };
-      console.error('Failed to load month data', e);
-      setError(err?.message || 'Failed to load data');
+            setError(err?.message || 'Failed to load data');
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -78,8 +78,7 @@ const PracticeExamQuestionsScreen = () => {
       };
       await AsyncStorage.setItem(PRACTICE_EXAM_STATE_KEY(id), JSON.stringify(payload));
     } catch (e) {
-      console.warn('Failed to save practice exam state', e);
-    }
+          }
   }, [id]);
 
   const clearExamState = useCallback(async () => {
@@ -87,8 +86,7 @@ const PracticeExamQuestionsScreen = () => {
     try {
       await AsyncStorage.removeItem(PRACTICE_EXAM_STATE_KEY(id));
     } catch (e) {
-      console.warn('Failed to clear practice exam state', e);
-    }
+          }
   }, [id]);
 
   // Initialize: check for saved state (resume) or fetch fresh
@@ -143,13 +141,11 @@ const PracticeExamQuestionsScreen = () => {
 
   const fetchQuestions = async () => {
     if (!user?.token) return;
-    console.log('Fetching questions with user ID:', user.id, 'Exam ID:', id);
-    setLoading(true);
+        setLoading(true);
     try {
       const res = await apiFetchAuth(`/student/practice-exams/${id}/questions`, user.token);
       if (res.ok) {
-        console.log('Successfully fetched questions');
-        setQuestions(res.data);
+                setQuestions(res.data);
         setStatuses(res.data.map(() => ({ answered: false, marked: false, visited: false })));
         setLoading(false);
         startTimer();
@@ -158,8 +154,7 @@ const PracticeExamQuestionsScreen = () => {
         setLoading(false);
       }
     } catch (e) {
-      console.error('Error fetching questions:', e);
-      Alert.alert('Error', 'Could not fetch questions.');
+            Alert.alert('Error', 'Could not fetch questions.');
       setLoading(false);
     }
   };
@@ -283,8 +278,7 @@ const PracticeExamQuestionsScreen = () => {
         }
       });
 
-      console.log('Auto-submitting exam (timer expired):', answers);
-
+      
       // Make API call to submit the test
       const response = await apiFetchAuth(`/student/practice-exams/${id}/submit`, user?.token || '', {
         method: 'POST',
@@ -292,21 +286,12 @@ const PracticeExamQuestionsScreen = () => {
       });
 
       if (response.ok) {
-        console.log('Exam auto-submitted successfully');
-        console.log('Submit response:', response.data);
-        setSubmitting(false);
+                        setSubmitting(false);
         await clearExamState();
         
         // Pass full response data (includes result and rankPreview)
         const resultData = response.data;
-        console.log('📦 Full response.data structure (auto-submit):', {
-          hasSuccess: !!resultData.success,
-          hasRedirectTo: !!resultData.redirectTo,
-          hasResult: !!resultData.result,
-          hasRankPreview: !!resultData.rankPreview,
-          rankPreviewData: resultData.rankPreview
-        });
-        
+                
         // Ensure we're passing the full response structure
         const dataToPass = {
           success: resultData.success,
@@ -315,8 +300,7 @@ const PracticeExamQuestionsScreen = () => {
           rankPreview: resultData.rankPreview
         };
         
-        console.log('📦 Data to pass (full structure - auto-submit):', JSON.stringify(dataToPass, null, 2));
-        
+                
         // Store result data and redirect to result page
         router.push({
           pathname: '/(tabs)/practice-exam/result/[id]' as any,
@@ -326,8 +310,7 @@ const PracticeExamQuestionsScreen = () => {
           }
         });
       } else {
-        console.error('Failed to auto-submit test:', response);
-        setSubmitting(false);
+                setSubmitting(false);
         Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
         // Even if API fails, try to navigate to result page
         router.push({
@@ -336,8 +319,7 @@ const PracticeExamQuestionsScreen = () => {
         });
       }
     } catch (error) {
-      console.error('Error auto-submitting exam:', error);
-      setSubmitting(false);
+            setSubmitting(false);
       Alert.alert('Time Up!', 'Your exam has been automatically submitted. Redirecting to results...');
       // Even if error occurs, try to navigate to result page
       router.push({
@@ -358,8 +340,7 @@ const PracticeExamQuestionsScreen = () => {
         }
       });
 
-      console.log('Submitting answers:', answers);
-
+      
       // Make API call to submit the test
       const response = await apiFetchAuth(`/student/practice-exams/${id}/submit`, user?.token || '', {
         method: 'POST',
@@ -367,22 +348,13 @@ const PracticeExamQuestionsScreen = () => {
       });
 
       if (response.ok) {
-        console.log('Test submitted successfully');
-        console.log('Submit response:', response.data);
-        setShowSubmitModal(false);
+                        setShowSubmitModal(false);
         setSubmitting(false);
         await clearExamState();
         
         // Pass full response data (includes result and rankPreview)
         const resultData = response.data;
-        console.log('📦 Full response.data structure:', {
-          hasSuccess: !!resultData.success,
-          hasRedirectTo: !!resultData.redirectTo,
-          hasResult: !!resultData.result,
-          hasRankPreview: !!resultData.rankPreview,
-          rankPreviewData: resultData.rankPreview
-        });
-        
+                
         // Ensure we're passing the full response structure
         const dataToPass = {
           success: resultData.success,
@@ -391,8 +363,7 @@ const PracticeExamQuestionsScreen = () => {
           rankPreview: resultData.rankPreview
         };
         
-        console.log('📦 Data to pass (full structure):', JSON.stringify(dataToPass, null, 2));
-        
+                
         // Store result data and redirect to result page
         router.push({
           pathname: '/(tabs)/practice-exam/result/[id]' as any,
@@ -402,13 +373,11 @@ const PracticeExamQuestionsScreen = () => {
           }
         });
       } else {
-        console.error('Failed to submit test:', response);
-        setSubmitting(false);
+                setSubmitting(false);
         Alert.alert('Error', 'Failed to submit the test. Please try again.');
       }
     } catch (error) {
-      console.error('Error submitting test:', error);
-      setSubmitting(false);
+            setSubmitting(false);
       Alert.alert('Error', 'An error occurred while submitting the test. Please try again.');
     }
   };
@@ -564,8 +533,6 @@ const PracticeExamQuestionsScreen = () => {
           </View>
         </View>
       </View>
-
-
 
       {/* Side Panel */}
       {showSidePanel && (

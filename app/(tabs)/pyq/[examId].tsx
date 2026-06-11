@@ -34,8 +34,7 @@ export default function PYQDetailScreen() {
       const data = await fetchPYQDetail(user.token, examId);
       setExam(data);
     } catch (e: any) {
-      console.error('Failed to load PYQ detail', e);
-      setError(e?.message || 'Failed to load exam detail');
+            setError(e?.message || 'Failed to load exam detail');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -52,8 +51,7 @@ export default function PYQDetailScreen() {
       if (!attemptId) throw new Error('No attemptId returned');
       router.push(`/pyq/${examId}/attempt?attemptId=${attemptId}${duration ? `&duration=${duration}` : ''}`);
     } catch (e: any) {
-      console.error('Start attempt failed', e);
-      setError(e?.message || 'Failed to start attempt');
+            setError(e?.message || 'Failed to start attempt');
     } finally {
       setStarting(false);
     }

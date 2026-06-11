@@ -83,8 +83,7 @@ export default function CartScreen() {
         setCartData(response.data.data);
       }
     } catch (error) {
-      console.error('Error fetching cart data:', error);
-      Alert.alert('Error', 'Failed to fetch cart data');
+            Alert.alert('Error', 'Failed to fetch cart data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -117,8 +116,7 @@ export default function CartScreen() {
         });
       }
     } catch (error) {
-      console.error('Error opening chat with seller:', error);
-      Alert.alert('Error', 'Could not open chat. Please try again.');
+            Alert.alert('Error', 'Could not open chat. Please try again.');
     }
   };
 
@@ -139,8 +137,7 @@ export default function CartScreen() {
               Alert.alert('Success', 'Item removed from cart');
               fetchCartData(); // Refresh cart
             } catch (error) {
-              console.error('Error removing item:', error);
-              Alert.alert('Error', 'Failed to remove item');
+                            Alert.alert('Error', 'Failed to remove item');
             }
           }
         }
@@ -161,11 +158,9 @@ export default function CartScreen() {
       });
       fetchCartData(); // Refresh cart
     } catch (error) {
-      console.error('Error updating quantity:', error);
-      Alert.alert('Error', 'Failed to update quantity');
+            Alert.alert('Error', 'Failed to update quantity');
     }
   };
-
 
   const renderBookItem = (book: Book, cartItem: CartItem) => (
     <View key={cartItem.id} style={styles.bookItem}>

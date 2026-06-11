@@ -74,8 +74,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 setIsParticipant(false);
             }
         } catch (error) {
-            console.error('Error checking participant status:', error);
-            setIsParticipant(false);
+                        setIsParticipant(false);
         } finally {
             setCheckingParticipant(false);
         }
@@ -92,8 +91,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 setWalletBalance(response.data.balance || 0);
             }
         } catch (error) {
-            console.error('Error fetching wallet balance:', error);
-        } finally {
+                    } finally {
             setWalletLoading(false);
         }
     };
@@ -465,8 +463,7 @@ const ExamCard = ({ exam, navigation, hideAttemptButton = false, isDetailsPage =
                 Alert.alert('Error', 'Failed to fetch wallet balance.');
             }
         } catch (error) {
-            console.error('Error fetching wallet:', error);
-            Alert.alert('Error', 'Failed to fetch wallet balance.');
+                        Alert.alert('Error', 'Failed to fetch wallet balance.');
         } finally {
             setWalletLoading(false);
         }

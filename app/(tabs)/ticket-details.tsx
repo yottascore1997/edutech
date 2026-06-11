@@ -100,8 +100,7 @@ const TicketDetailsScreen = () => {
                 Alert.alert('Error', 'Failed to load ticket details.');
             }
         } catch (error) {
-            console.error('Error fetching ticket details:', error);
-            Alert.alert('Error', 'Failed to load ticket details. Please try again.');
+                        Alert.alert('Error', 'Failed to load ticket details. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -135,8 +134,7 @@ const TicketDetailsScreen = () => {
                 setAttachments(prev => [...prev, attachment]);
             }
         } catch (error) {
-            console.error('Error picking image:', error);
-            Alert.alert('Error', 'Failed to pick image.');
+                        Alert.alert('Error', 'Failed to pick image.');
         } finally {
             setUploading(false);
         }
@@ -178,8 +176,7 @@ const TicketDetailsScreen = () => {
                 Alert.alert('Error', 'Failed to send reply.');
             }
         } catch (error) {
-            console.error('Error sending reply:', error);
-            Alert.alert('Error', 'Failed to send reply. Please try again.');
+                        Alert.alert('Error', 'Failed to send reply. Please try again.');
         } finally {
             setSendingReply(false);
         }

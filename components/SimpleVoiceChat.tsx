@@ -36,16 +36,13 @@ export default function SimpleVoiceChat({
   // Request audio permissions
   const requestAudioPermissions = async () => {
     try {
-      console.log('🎤 Requesting audio permissions...');
-      const { status } = await Audio.requestPermissionsAsync();
+            const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
         throw new Error('Audio permission denied');
       }
-      console.log('🎤 Audio permissions granted');
-      return true;
+            return true;
     } catch (error) {
-      console.error('🎤 Permission request failed:', error);
-      setError('Audio permission denied');
+            setError('Audio permission denied');
       return false;
     }
   };
@@ -53,8 +50,7 @@ export default function SimpleVoiceChat({
   // Initialize audio
   const initAudio = async () => {
     try {
-      console.log('🎤 Initializing audio...');
-      
+            
       // Request permissions
       const hasPermission = await requestAudioPermissions();
       if (!hasPermission) {
@@ -70,12 +66,10 @@ export default function SimpleVoiceChat({
         staysActiveInBackground: false,
       });
 
-      console.log('🎤 Audio initialized successfully');
-      return true;
+            return true;
 
     } catch (error) {
-      console.error('🎤 Failed to initialize audio:', error);
-      setError(`Failed to initialize audio: ${error}`);
+            setError(`Failed to initialize audio: ${error}`);
       setIsLoading(false);
       return false;
     }
@@ -84,8 +78,7 @@ export default function SimpleVoiceChat({
   // Join room (simplified)
   const joinRoom = async () => {
     try {
-      console.log('🎤 Joining room:', roomId);
-      setIsLoading(true);
+            setIsLoading(true);
       setError(null);
 
       // Initialize audio
@@ -99,12 +92,10 @@ export default function SimpleVoiceChat({
         setIsJoined(true);
         setIsLoading(false);
         onJoinSuccess?.();
-        console.log('🎤 Successfully joined room');
-      }, 1000);
+              }, 1000);
 
     } catch (error) {
-      console.error('🎤 Failed to join room:', error);
-      setError(`Failed to join room: ${error}`);
+            setError(`Failed to join room: ${error}`);
       setIsLoading(false);
       onError?.(error);
     }
@@ -113,8 +104,7 @@ export default function SimpleVoiceChat({
   // Leave room
   const leaveRoom = async () => {
     try {
-      console.log('🎤 Leaving room...');
-      
+            
       // Stop recording if active
       if (recordingRef.current) {
         await recordingRef.current.stopAndUnloadAsync();
@@ -130,11 +120,9 @@ export default function SimpleVoiceChat({
 
       setIsJoined(false);
       onLeaveChannel?.();
-      console.log('🎤 Left room successfully');
-
+      
     } catch (error) {
-      console.error('🎤 Failed to leave room:', error);
-    }
+          }
   };
 
   // Start recording
@@ -145,8 +133,7 @@ export default function SimpleVoiceChat({
         return;
       }
 
-      console.log('🎤 Starting recording...');
-      
+            
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -156,11 +143,9 @@ export default function SimpleVoiceChat({
       setIsRecording(true);
       setIsMuted(false);
       
-      console.log('🎤 Recording started');
-
+      
     } catch (error) {
-      console.error('🎤 Failed to start recording:', error);
-      setError(`Failed to start recording: ${error}`);
+            setError(`Failed to start recording: ${error}`);
     }
   };
 
@@ -169,26 +154,22 @@ export default function SimpleVoiceChat({
     try {
       if (!recordingRef.current) return;
 
-      console.log('🎤 Stopping recording...');
-      
+            
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
       
       // In a real app, you would send this audio file to other players
-      console.log('🎤 Recording saved to:', uri);
-      
+            
       // Send audio to other players via socket
       if (uri) {
-        console.log('🎤 Sending audio to other players...');
-        // In a real implementation, you would:
+                // In a real implementation, you would:
         // 1. Upload audio file to your server
         // 2. Send audio URL to other players via socket
         // 3. Other players would receive and play the audio
         
         // For now, we'll simulate this
         setTimeout(() => {
-          console.log('🎤 Audio sent to all players in room');
-        }, 500);
+                  }, 500);
       }
 
       recordingRef.current = null;
@@ -196,19 +177,16 @@ export default function SimpleVoiceChat({
       setIsRecording(false);
       setIsMuted(true);
       
-      console.log('🎤 Recording stopped');
-
+      
     } catch (error) {
-      console.error('🎤 Failed to stop recording:', error);
-      setError(`Failed to stop recording: ${error}`);
+            setError(`Failed to stop recording: ${error}`);
     }
   };
 
   // Play received audio (simplified)
   const playReceivedAudio = async (audioUri: string) => {
     try {
-      console.log('🎤 Playing received audio...');
-      
+            
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUri },
         { shouldPlay: true }
@@ -224,16 +202,14 @@ export default function SimpleVoiceChat({
       });
 
     } catch (error) {
-      console.error('🎤 Failed to play audio:', error);
-      setError(`Failed to play audio: ${error}`);
+            setError(`Failed to play audio: ${error}`);
     }
   };
 
   // Simulate receiving audio from other players
   const simulateAudioReceived = () => {
     // This would be called when other players send audio
-    console.log('🎤 Simulating audio received from other player');
-    // In real implementation, you would play the received audio
+        // In real implementation, you would play the received audio
   };
 
   // Toggle microphone
@@ -259,10 +235,8 @@ export default function SimpleVoiceChat({
         staysActiveInBackground: false,
       });
       setIsSpeakerOn(newSpeakerState);
-      console.log('🎤 Speaker', newSpeakerState ? 'on' : 'off');
-    } catch (error) {
-      console.error('🎤 Failed to toggle speaker:', error);
-    }
+          } catch (error) {
+          }
   };
 
   // Initialize on mount
