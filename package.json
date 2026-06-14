@@ -14,7 +14,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "clean": "if exist node_modules\\.cache rmdir /s /q node_modules\\.cache && if exist .expo rmdir /s /q .expo && echo Cache cleared"
+    "clean": "if exist node_modules\\.cache rmdir /s /q node_modules\\.cache && if exist .expo rmdir /s /q .expo && echo Cache cleared",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@expo-google-fonts/poppins": "^0.4.1",
@@ -89,6 +90,7 @@
     "metro": "^0.83.1",
     "metro-config": "^0.81.5",
     "metro-resolver": "^0.81.5",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true

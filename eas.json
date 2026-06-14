@@ -21,7 +21,7 @@
     "production": {
       "android": {
         "buildType": "app-bundle",
-        "image": "sdk-55"
+        "image": "ubuntu-22.04-jdk-17-ndk-r26b"
       },
       "node": "20.18.2",
       "env": {
