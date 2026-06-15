@@ -4,28 +4,18 @@ import { useAuth } from '@/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  Play,
-  Sparkles,
-  Users,
-} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Image,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -190,10 +180,10 @@ export default function ExamCategoryPage() {
             >
               <View style={st.heroTop}>
                 <TouchableOpacity style={st.backBtn} onPress={() => router.back()} activeOpacity={0.88}>
-                  <ArrowLeft size={20} color="#FFF" strokeWidth={2.2} />
+                  <Ionicons name="arrow-back" size={20} color="#FFF" />
                 </TouchableOpacity>
                 <View style={st.heroBadge}>
-                  <Sparkles size={11} color="#C4B5FD" strokeWidth={2} />
+                  <Ionicons name="sparkles" size={14} color="#C4B5FD" />
                   <Text style={st.heroBadgeTxt}>PRACTICE</Text>
                 </View>
               </View>
@@ -278,7 +268,7 @@ export default function ExamCategoryPage() {
             )}
 
             <View style={st.listHead}>
-              <BookOpen size={16} color={C.primary} strokeWidth={2.2} />
+              <Ionicons name="book" size={18} color={C.primary} />
               <Text style={st.listTitle}>
                 {selectedSubcategory === 'all' ? 'Available Tests' : selectedSubcategory}
               </Text>
@@ -343,9 +333,9 @@ export default function ExamCategoryPage() {
                                 {exam.subcategory}
                               </Text>
                               <View style={st.metaRow}>
-                                <Clock size={11} color={C.muted} strokeWidth={2} />
+                                <Ionicons name="time" size={14} color={C.muted} />
                                 <Text style={st.metaTxt}>{formatDate(exam.startTime)}</Text>
-                                <Users size={11} color={C.muted} strokeWidth={2} />
+                                <Ionicons name="people" size={14} color={C.muted} />
                                 <Text style={st.metaTxt}>
                                   {exam.spotsLeft}/{exam.spots}
                                 </Text>
@@ -353,7 +343,7 @@ export default function ExamCategoryPage() {
                             </View>
                             {done ? (
                               <View style={st.doneBadge}>
-                                <CheckCircle2 size={12} color={C.success} strokeWidth={2.5} />
+                                <Ionicons name="checkmark-circle" size={18} color={C.success} />
                                 <Text style={st.doneBadgeTxt}>Done</Text>
                               </View>
                             ) : (
@@ -368,14 +358,14 @@ export default function ExamCategoryPage() {
                             style={st.examCta}
                           >
                             {done ? (
-                              <BookOpen size={15} color="#FFF" strokeWidth={2.2} />
+                              <Ionicons name="book" size={18} color="#FFF" />
                             ) : (
-                              <Play size={15} color="#FFF" fill="#FFF" strokeWidth={2} />
+                              <Ionicons name="play" size={18} color="#FFF" />
                             )}
                             <Text style={st.examCtaTxt}>
                               {done ? 'Review Results' : 'Start Test'}
                             </Text>
-                            <ChevronRight size={16} color="#FFF" strokeWidth={2.5} />
+                            <Ionicons name="chevron-forward" size={18} color="#FFF" />
                           </LinearGradient>
                         </View>
                       </View>

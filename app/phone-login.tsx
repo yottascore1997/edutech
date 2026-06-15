@@ -5,23 +5,24 @@ import { AUTH_PAD, AuthTheme } from '@/constants/AuthTheme';
 import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { isDummyPhone } from '@/lib/dummy-auth';
 import { Ionicons } from '@expo/vector-icons';
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  ImageBackground,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  View,
+    ActivityIndicator,
+    ImageBackground,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -139,6 +140,7 @@ export default function PhoneLogin() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [isDummyLogin, setIsDummyLogin] = useState(false);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -159,11 +161,20 @@ export default function PhoneLogin() {
     } catch {}
     setLoading(true);
     try {
-      await auth.loginWithOTP(phoneForApi, recaptchaVerifier.current);
-      setStep('otp');
-      setOtp('');
-      setResendIn(RESEND_SECONDS);
-      showSuccess('OTP sent to your phone.');
+      if (isDummyPhone(phoneForApi)) {
+        setIsDummyLogin(true);
+        setStep('otp');
+        setOtp('');
+        setResendIn(RESEND_SECONDS);
+        showSuccess('OTP sent to your phone (dummy OTP: 123456).');
+      } else {
+        await auth.loginWithOTP(phoneForApi, recaptchaVerifier.current);
+        setIsDummyLogin(false);
+        setStep('otp');
+        setOtp('');
+        setResendIn(RESEND_SECONDS);
+        showSuccess('OTP sent to your phone.');
+      }
     } catch (error: any) {
       showError(error?.message || 'Failed to send OTP.');
     } finally {
@@ -183,8 +194,13 @@ export default function PhoneLogin() {
     } catch {}
     setLoading(true);
     try {
-      await auth.verifyOTP(pin);
-      showSuccess('Login successful! Welcome back.');
+      if (isDummyLogin) {
+        await auth.verifyDummyOTP(phoneForApi, pin);
+        showSuccess('Login successful! Welcome back.');
+      } else {
+        await auth.verifyOTP(pin);
+        showSuccess('Login successful! Welcome back.');
+      }
     } catch (error: any) {
       showError(error?.message || 'OTP verification failed.');
     } finally {

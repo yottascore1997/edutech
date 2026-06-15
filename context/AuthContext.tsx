@@ -1,10 +1,11 @@
 import { auth } from '@/config/firebase';
 import { apiFetch } from '@/constants/api';
+import { isDummyOTP, isDummyPhone } from '@/lib/dummy-auth';
 import authService from '@/services/authServiceFirebaseJS';
 import { setApiAuthHandler } from '@/utils/apiAuthHandler';
 import { clearAuthData, getRefreshToken, getToken, getUser, storeAuthData } from '@/utils/storage';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'expo-router';
+import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 interface User {
@@ -31,6 +32,7 @@ interface AuthContextType {
     // Firebase OTP methods (same flow as web)
     loginWithOTP: (phoneNumber: string, appVerifier: any) => Promise<any>;
     verifyOTP: (otp: string) => Promise<any>;
+    verifyDummyOTP: (phoneNumber: string, otp: string) => Promise<any>;
     firebaseUser: FirebaseUser | null;
 }
 
@@ -43,6 +45,7 @@ const AuthContext = createContext<AuthContextType>({
     updateUser: () => {},
     loginWithOTP: async () => {},
     verifyOTP: async () => {},
+    verifyDummyOTP: async () => {},
     firebaseUser: null,
 });
 
@@ -238,7 +241,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         const validateRes = await apiFetch('/auth/send-otp', {
             method: 'POST',
-            headers: { 'X-App-Client': 'expo' },
+            headers: { 'X-App-Client': 'expo', 'X-Auth-Provider': 'firebase', 'X-Token-Type': 'firebase-jwt', 'X-Client-Type': 'mobile-app' },
             body: { phoneNumber: normalized },
         });
 
@@ -267,7 +270,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const idToken = await result.user.getIdToken();
         const backendResponse = await apiFetch('/auth/firebase', {
             method: 'POST',
+            headers: { 'X-Auth-Provider': 'firebase', 'X-Token-Type': 'firebase-jwt', 'X-Client-Type': 'mobile-app' },
             body: { idToken },
+        });
+
+        if (!backendResponse.ok) {
+            throw new Error(backendResponse.data?.error || backendResponse.data?.message || 'Login failed');
+        }
+
+        const { token, refreshToken, user: userData } = backendResponse.data;
+        const userWithToken = { ...userData, token };
+
+        setUser(userWithToken);
+        setUserStateVersion(prev => prev + 1);
+        await storeAuthData(token, userData, refreshToken ?? null);
+        return { success: true, user: userWithToken };
+    };
+
+    const verifyDummyOTP = async (phoneNumber: string, otp: string) => {
+        if (!isDummyPhone(phoneNumber) || !isDummyOTP(otp)) {
+            throw new Error('Invalid dummy phone or OTP');
+        }
+
+        const backendResponse = await apiFetch('/auth/dummy-login', {
+            method: 'POST',
+            headers: { 'X-Auth-Provider': 'firebase', 'X-Token-Type': 'firebase-jwt', 'X-Client-Type': 'mobile-app' },
+            body: { phoneNumber: phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`, otp },
         });
 
         if (!backendResponse.ok) {
@@ -292,6 +320,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         updateUser,
         loginWithOTP,
         verifyOTP,
+        verifyDummyOTP,
         firebaseUser,
     };
 
