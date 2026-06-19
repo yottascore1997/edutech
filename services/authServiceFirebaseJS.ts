@@ -1,5 +1,5 @@
 import { auth, firebaseConfig } from '@/config/firebase';
-import { ApplicationVerifier, ConfirmationResult, signInWithPhoneNumber } from 'firebase/auth';
+import { ConfirmationResult, signInWithPhoneNumber } from 'firebase/auth';
 
 export interface OTPResult {
   success: boolean;
@@ -15,10 +15,14 @@ export interface VerifyOTPResult {
 
 class AuthServiceFirebaseJS {
   private confirmationResult: ConfirmationResult | null = null;
+  private mockVerifier: any = {
+    type: 'recaptcha',
+    verify: async () => 'mock-verification-token',
+  };
 
-  async sendOTP(phoneNumber: string, appVerifier: ApplicationVerifier): Promise<OTPResult> {
+  async sendOTP(phoneNumber: string, appVerifier?: any): Promise<OTPResult> {
     try {
-      this.confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
+      this.confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, appVerifier || this.mockVerifier);
 
       return {
         success: true,

@@ -1,13 +1,11 @@
 import { AuthLogo } from '@/components/auth/AuthLogo';
 import { AuthTrustStrip } from '@/components/auth/AuthTrustStrip';
-import { firebaseConfig } from '@/config/firebase';
 import { AUTH_PAD, AuthTheme } from '@/constants/AuthTheme';
 import { FontFamily } from '@/constants/Typography';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { isDummyPhone } from '@/lib/dummy-auth';
 import { Ionicons } from '@expo/vector-icons';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
@@ -132,7 +130,6 @@ export default function PhoneLogin() {
   const auth = useAuth();
   const { showError, showSuccess } = useToast();
   const insets = useSafeAreaInsets();
-  const recaptchaVerifier = useRef<FirebaseRecaptchaVerifierModal>(null);
   const phoneInputRef = useRef<TextInput>(null);
 
   const [step, setStep] = useState<Step>('phone');
@@ -168,7 +165,7 @@ export default function PhoneLogin() {
         setResendIn(RESEND_SECONDS);
         showSuccess('OTP sent to your phone (dummy OTP: 123456).');
       } else {
-        await auth.loginWithOTP(phoneForApi, recaptchaVerifier.current);
+        await auth.loginWithOTP(phoneForApi);
         setIsDummyLogin(false);
         setStep('otp');
         setOtp('');
@@ -215,15 +212,8 @@ export default function PhoneLogin() {
   };
 
   return (
-    <>
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifier}
-        firebaseConfig={firebaseConfig}
-        attemptInvisibleVerification
-      />
-
-      <ImageBackground source={BG_IMAGE} style={styles.root} resizeMode="cover">
-        <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <ImageBackground source={BG_IMAGE} style={styles.root} resizeMode="cover">
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
           <KeyboardAvoidingView
             style={styles.flex}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -372,7 +362,6 @@ export default function PhoneLogin() {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </ImageBackground>
-    </>
   );
 }
 

@@ -4,8 +4,12 @@ import { getApiAuthHandler } from '@/utils/apiAuthHandler';
 
 // export const API_BASE_URL = 'https://www.yottascore.com/api';
 // Local: set EXPO_PUBLIC_API_URL in .env to your PC's LAN IP (ipconfig → IPv4).
-export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.12:3000/api';
+const _rawApiUrl = process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.12:3000/api';
+// Prevent servers that redirect http->https from converting POST to GET (causes 405).
+// If someone set an http yottascore URL, prefer https automatically.
+export const API_BASE_URL = (_rawApiUrl.startsWith('http://yottascore.com') || _rawApiUrl.startsWith('http://www.yottascore.com'))
+  ? _rawApiUrl.replace('http://', 'https://')
+  : _rawApiUrl;
 export const SITE_BASE_URL = API_BASE_URL.replace('/api', '');
 
 /** Image/uploads base URL – use score.yottascore.com for images */
@@ -18,13 +22,24 @@ type ApiOptions = {
 };
 
 export async function apiFetch(endpoint: string, options: ApiOptions = {}) {
-  const { method = 'GET', body, headers = {} } = options;
+  const { method, body, headers = {} } = options;
+  // If caller didn't provide a method but did provide a body, assume POST.
+  const finalMethod = (method || (body ? 'POST' : 'GET')).toUpperCase();
   
   const fullUrl = `${API_BASE_URL}${endpoint}`;
 
   try {
+    // Dev-only logging to verify method/URL/headers/body at runtime
+    try {
+      // __DEV__ is available in React Native/Expo; guard for other envs
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[apiFetch]', finalMethod, fullUrl, { headers, body });
+      }
+    } catch {}
+
     const res = await fetch(fullUrl, {
-      method,
+      method: finalMethod,
       headers: {
         'Content-Type': 'application/json',
         ...headers,

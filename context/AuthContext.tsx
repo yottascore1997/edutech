@@ -30,7 +30,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     updateUser: (userData: Partial<User>) => void;
     // Firebase OTP methods (same flow as web)
-    loginWithOTP: (phoneNumber: string, appVerifier: any) => Promise<any>;
+    loginWithOTP: (phoneNumber: string, appVerifier?: any) => Promise<any>;
     verifyOTP: (otp: string) => Promise<any>;
     verifyDummyOTP: (phoneNumber: string, otp: string) => Promise<any>;
     firebaseUser: FirebaseUser | null;
@@ -235,7 +235,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     // Firebase OTP — Step 1: backend validate, Step 2: Firebase SMS (web jaisa)
-    const loginWithOTP = async (phoneNumber: string, appVerifier: any) => {
+    const loginWithOTP = async (phoneNumber: string, appVerifier?: any) => {
         const trimmed = (phoneNumber || '').trim();
         const normalized = trimmed.startsWith('+') ? trimmed : `+91${trimmed.replace(/\D/g, '')}`;
 
